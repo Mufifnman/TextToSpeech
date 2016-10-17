@@ -1,0 +1,25 @@
+﻿<one:Page xmlns:one="http://schemas.microsoft.com/office/onenote/2013/onenote" ID="{D2954871-2111-06B9-1AB9-882CD62848AA}{1}{E1833485368852652557020163191444754720811741}" name="SandboxPage" dateTime="2013-02-09T03:26:39.000Z" lastModifiedTime="2013-02-09T06:34:42.000Z" pageLevel="1" isCurrentlyViewed="true">
+  <one:QuickStyleDef index="0" name="p" fontColor="automatic" highlightColor="automatic" font="Calibri" fontSize="11.0" spaceBefore="0.0" spaceAfter="0.0" />
+  <one:PageSettings RTL="false" color="automatic">
+    <one:PageSize>
+      <one:Automatic />
+    </one:PageSize>
+    <one:RuleLines visible="false" />
+  </one:PageSettings>
+  <one:Title lang="en-US">
+    <one:OE author="kjluecke@gmail.com" authorInitials="K" lastModifiedBy="kjluecke@gmail.com" lastModifiedByInitials="K" creationTime="2013-02-09T06:34:42.000Z" lastModifiedTime="2013-02-09T06:34:42.000Z" objectID="{5727C39D-48AF-4D01-9DB2-4D8632D7C978}{161}{B0}" alignment="left" quickStyleIndex="0" style="font-family:Calibri;font-size:17.0pt">
+      <one:T><![CDATA[SandboxPage]]></one:T>
+    </one:OE>
+  </one:Title>
+  <one:Outline author="kjluecke@gmail.com" authorInitials="K" lastModifiedBy="kjluecke@gmail.com" lastModifiedByInitials="K" lastModifiedTime="2013-02-09T06:34:42.000Z" objectID="{5727C39D-48AF-4D01-9DB2-4D8632D7C978}{166}{B0}">
+    <one:Position x="20.0" y="50.00000381469727" z="3" />
+    <one:Size width="525.0" height="287.25" isSetByUser="true" />
+    <one:OEChildren>
+      <one:OE creationTime="2013-02-09T06:34:42.000Z" lastModifiedTime="2013-02-09T06:34:42.000Z" objectID="{5727C39D-48AF-4D01-9DB2-4D8632D7C978}{167}{B0}" alignment="left">
+        <one:Image>
+          <one:CallbackID callbackID="{5727C39D-48AF-4D01-9DB2-4D8632D7C978}{168}{B0}" />
+        </one:Image>
+      </one:OE>
+    </one:OEChildren>
+  </one:Outline>
+</one:Page>
