@@ -307,7 +307,7 @@ namespace TextToSpeach
             Filters.CombineLines(ref readText);
             readText = readText.Replace('¡', 'i');
 
-            Filters.PsycologyFilter(ref readText);
+            Filters.PsychologyFilter(ref readText);
 
             textbox.Text = readText;
 

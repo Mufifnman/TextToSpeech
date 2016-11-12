@@ -5,7 +5,7 @@ namespace TextToSpeach
     // TODO: Make these check-able
     static internal class Filters
     {
-        internal static void PsycologyFilter(ref string readText)
+        internal static void PsychologyFilter(ref string readText)
         {
             // Psycology Site removal (up to 10 citations removes)
             string extra = @"[a-zA-Z,&\.\-\n\r ,]+[0-9]{4}a?b?;";
@@ -26,7 +26,7 @@ namespace TextToSpeach
 
         internal static void GovernmentFilter(ref string text)
         {
-            PsycologyFilter(ref text);
+            PsychologyFilter(ref text);
 
             string citation = @"([a-z,A-Z\. ]+, )*([0-9]{4}b?, )?(pp?\. )([0-9, \-xiv]+(ff)?)";
             string buildup = citation;
