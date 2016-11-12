@@ -5,25 +5,11 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Xml.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Speech.Synthesis;
 using Microsoft.Office.Interop.OneNote;
 
-using EPocalipse.IFilter; // for not used ReadFile method
-
-
-//using Puma.Net;
 
 namespace TextToSpeach
 {
@@ -374,15 +360,7 @@ namespace TextToSpeach
 
         // TODO: make program current position knowledgeable, 
         //   so you can save position and move around in large text files
-        private void FileRead(object sender, RoutedEventArgs e)
-        {
-            FilterReader fileReader = new FilterReader(@"C:\Users\kjlue_000\Desktop\Capture.JPG");
-            using (fileReader)
-            {
-                textbox.Text = textbox.Text + "\n" + fileReader.ReadToEnd();
-                fileReader.Close();
-            }
-        }
+
 
         private void Window_KeyDown_1(object sender, KeyEventArgs e)
         {
@@ -408,138 +386,6 @@ namespace TextToSpeach
                         reader.Resume();
                     }
                 }
-            }
-        }
-
-        // PUMA.NET implementation (doesnt work)
-        //private void ImageRead(object sender, RoutedEventArgs e)
-        //{
-        //    string readText = "ooo";
-        //    //var pumaPage = new PumaPage(@"C:\Users\kjlue_000\Desktop\Capture.JPG");
-        //    var pumaPage = new PumaPage(@"C:\Users\kjlue_000\Downloads\test.bmp");
-
-        //    using(pumaPage)
-        //    {
-        //        pumaPage.FileFormat = PumaFileFormat.TxtAscii;
-        //        pumaPage.EnableSpeller = false;
-        //        pumaPage.Language = PumaLanguage.RussianEnglish;
-        //        pumaPage.RecognitionProgress += RecognitionProgress;
-
-        //        //pumaPage.RecognizeToFile("PUMAtext.txt");
-
-        //        readText = pumaPage.RecognizeToString();
-        //    }
-
-        //    textbox.Text += "\n" + readText;
-        //}
-
-        //private void RecognitionProgress(Object sender, RecognitionEventArgs e)
-        //{
-        //    textbox.Text += "\n" + e.ProgressPercents + " : " + e.ProgressStageName;
-        //}
-    }
-
-    // TODO: Make these check-able
-    static class Filters
-    {
-        internal static void PsycologyFilter(ref string readText)
-        {
-            // Psycology Site removal (up to 10 citations removes)
-            string extra = @"[a-zA-Z,&\.\-\n\r ,]+[0-9]{4}a?b?;";
-            string finish = @"[a-zA-Z,&\.\-\n\r ,]+[0-9]{4}a?b?\)";
-            for (int i = 0; i < 10; i++)
-            {
-                RemoveTargets(ref readText, @"\(" + finish);
-                finish = extra + finish;
-            }
-        }
-
-        internal static void WikipediaCitation(ref string preFiltered)
-        {
-            RemoveTargets(ref preFiltered, @"\[edit\]");
-
-            RemoveTargets(ref preFiltered, @"\[[0-9]+\]");
-        }
-
-        internal static void GovernmentFilter(ref string text)
-        {
-            PsycologyFilter(ref text);
-
-            string citation = @"([a-z,A-Z\. ]+, )*([0-9]{4}b?, )?(pp?\. )([0-9, \-xiv]+(ff)?)";
-            string buildup = citation;
-            for (int i = 0; i < 6; i++)
-            {
-                RemoveTargets(ref text, @"\(" + buildup + @"\)");
-                buildup += "; " + citation;
-            }
-
-            buildup = citation;
-            for (int i = 0; i < 5; i++)
-            {
-                RemoveTargets(ref text, @"\{" + buildup + @"\)");
-                buildup += "; " + citation;
-            }
-
-            // book title
-
-            string title = @"CLASSIC MODELS";
-            RemoveTargets(ref text, title);
-
-            //Lifetimes
-            string lifetime = @"\([0-9]{4}-[0-9]{4}\)";
-            RemoveTargets(ref text, lifetime);
-            
-            //Regex Scratch Area
-            //TODO: figure out how to make | work within other contexts
-
-            //string form2 = @"\(" + @"(pp\. ((([0-9])+\-([0-9])+)|(([0-9])+)),?)+" + @"\)";
-            //string formExact = @"\(" + @"([a-z,A-Z]+, )*(pp\. )(([0-9]+-[0-9]+,?)|([0-9]+,?))+" + @"\)";
-            //string form = @"\(" + @"([a-z,A-Z]+, )*(pp?\. )([0-9, -]+)" + @"\)";
-            //RemoveTargets(ref text, form);
-        }
-
-        internal static void CombineLines(ref string text)
-        {
-            // Split after section titles by adding a period
-            string target = @"[^.]\n[A-Z]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Insert(match.Index + 1, ".");
-            }
-
-            // get rid of breaks
-            text = text.Replace("-\n\r", "");
-            text = text.Replace("-\n", "");
-            text = text.Replace('\n', ' ');
-
-            // stop splitting on things like "Section 3.3"
-            target = @"[0-9]\.[0-9]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index + 1, 1);
-                text = text.Insert(match.Index + 1, " point ");
-            }
-
-            // Don't break when not a new sentence (remove '.')
-            target = @"\.( )*[a-z]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index, 1);
-                text = text.Insert(match.Index, " ");
-            }
-        }
-
-        //Helper(s)
-
-        private static void RemoveTargets(ref string text, string target)
-        {
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index, match.Length);
             }
         }
     }

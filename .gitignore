@@ -1,4 +1,9 @@
 
+
+# Ignore vs temp files #
+########################
+.vs/*
+
 # Ignore Build Files #
 ######################
 */bin
