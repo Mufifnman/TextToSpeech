@@ -9,7 +9,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Speech.Synthesis;
 using Microsoft.Office.Interop.OneNote;
-
+using System.Text;
 
 namespace TextToSpeach
 {
@@ -25,9 +25,14 @@ namespace TextToSpeach
         Object readLock = new Object();
         int rate = 4;
         string savedEnd = null;
+        StringBuilder sb = new StringBuilder();
+
+        ReadingTextViewModel readingTextView = new ReadingTextViewModel();
 
         public MainWindow()
         {
+            this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
+            DataContext = readingTextView;
             InitializeComponent();
         }
 
@@ -61,6 +66,8 @@ namespace TextToSpeach
         /// </summary>
         /// <param name="sender">
         /// Must be null on first call for it to function properly
+        /// todo: /\ chnge that and arguments /\
+        /// currently garenteed to be called on main thread
         /// </param>
         /// <param name="e"></param>
         private void ReadList(object sender = null, SpeakCompletedEventArgs e = null)
@@ -81,9 +88,16 @@ namespace TextToSpeach
                 if (0 < readList.Count && reader != null) // one because not dequeued until after this
                 {
                     wordCount = 0;
-                    reader.SpeakProgress += reader_SpeakProgress;
+                    if (shouldUnderlineWord)
+                    {
+                        StringToXamlConverter.currentWordIndex = wordCount;
+                    }
+                    else
+                    {
+                        StringToXamlConverter.currentWordIndex = -1;
+                    }
                     reader.SpeakAsync(readList.Peek());
-                    Dispatcher.Invoke(UpdateTextBlock);
+                    UpdateTextBlock();
                     if (1 == readList.Count)
                     {
                         savedEnd = readList.Peek();
@@ -110,7 +124,13 @@ namespace TextToSpeach
         private void reader_SpeakProgress(object sender, SpeakProgressEventArgs e)
         {
             wordCount++;
-            UpdateTextBlock();
+            if (shouldUnderlineWord)
+            {
+                StringToXamlConverter.currentWordIndex = wordCount;
+                readingTextView.Text = sb.ToString();
+                //readingTextView.NotifyPropertyChanged();
+                //UpdateTextBlock();
+            }
         }
 
         /// <summary>
@@ -188,6 +208,20 @@ namespace TextToSpeach
             return longest;
         }
 
+        bool shouldUnderlineWord = true;
+        // TODO: make program current position knowledgeable, 
+        //   so you can save position and move around in large text files
+        //   should be possible in the string to xaml converter (maybe make it a string array to xaml converter?
+        //   could then have 'buttons' for all the text with alternating gray/white backgrounds 
+        //   would need to figure out how to keep to what was being read in the scrolled view
+        //      but break this until we hit read again if scrollign happnes in that area 
+        //
+        //   buttons would rewind to that setion of the text we want to read
+        //   
+        //   All this would require a refacter of the reading methods to remove the queue crap
+        //   we'd need to like clear whenever we finished reading as well
+
+
         /// <summary>
         /// Updates the current textBlock list of things to say
         /// </summary>
@@ -195,11 +229,20 @@ namespace TextToSpeach
         {
             lock (readLock)
             {
-                __ReadListDisplay__.Text = "";
-                foreach (string item in readList)
+                sb.Clear();
+
+                // todo: move this to a faster redraw method (also a string to XAMLConverter todo)
+                sb.Append(StringToXamlConverter.BeginHighlightToken);
+                string line = readList.Peek();
+                sb.Append(line);
+                sb.Append(StringToXamlConverter.EndHighlightToken);
+
+                foreach (string item in readList.Skip(1))
                 {
-                    __ReadListDisplay__.Text = __ReadListDisplay__.Text + item + "\n";
+                    //sb.AppendLine();
+                    sb.Append(item);
                 }
+                readingTextView.Text = sb.ToString();
             }
         }
 
@@ -207,7 +250,12 @@ namespace TextToSpeach
         {
             reader = new SpeechSynthesizer();
             reader.Rate = rate;
-            reader.SpeakCompleted += ReadList;
+            reader.SpeakCompleted += 
+                (sender, e) =>
+                {
+                    Dispatcher.Invoke(() => ReadList(sender, e));
+                };
+            reader.SpeakProgress += reader_SpeakProgress;
         }
 
         private void SpeedChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -357,10 +405,6 @@ namespace TextToSpeach
             this.Top = this.Top - size.Height;
             return bitmap;
         }
-
-        // TODO: make program current position knowledgeable, 
-        //   so you can save position and move around in large text files
-
 
         private void Window_KeyDown_1(object sender, KeyEventArgs e)
         {
