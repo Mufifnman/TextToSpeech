@@ -214,11 +214,11 @@ namespace TextToSpeach
         //   should be possible in the string to xaml converter (maybe make it a string array to xaml converter?
         //   could then have 'buttons' for all the text with alternating gray/white backgrounds 
         //   would need to figure out how to keep to what was being read in the scrolled view
-        //      but break this until we hit read again if scrollign happnes in that area 
+        //      but break this until we hit read again if scrolling happens in that area 
         //
-        //   buttons would rewind to that setion of the text we want to read
+        //   buttons would rewind to that section of the text we want to read
         //   
-        //   All this would require a refacter of the reading methods to remove the queue crap
+        //   All this would require a refactor of the reading methods to remove the queue crap
         //   we'd need to like clear whenever we finished reading as well
 
 
@@ -229,6 +229,13 @@ namespace TextToSpeach
         {
             lock (readLock)
             {
+                if (readList.Count <= 0)
+                {
+                    // nothing to update
+                    readingTextView.Text = string.Empty;
+                    return;
+                }
+
                 sb.Clear();
 
                 // todo: move this to a faster redraw method (also a string to XAMLConverter todo)
