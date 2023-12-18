@@ -1,6 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 
-namespace TextToSpeach
+namespace TextToSpeech
 {
     // TODO: Make these check-able
     static internal class Filters
@@ -15,6 +15,12 @@ namespace TextToSpeach
                 RemoveTargets(ref readText, @"\(" + finish);
                 finish = extra + finish;
             }
+        }
+
+        internal static void AHITStarredQuestion(ref string readText)
+        {
+            RemoveTargets(ref readText, @"Unset starred question");
+            ReplaceTargets(ref readText, @"_____", @" blank ");
         }
 
         internal static void WikipediaCitation(ref string preFiltered)
@@ -103,6 +109,16 @@ namespace TextToSpeach
             {
                 var match = Regex.Match(text, target);
                 text = text.Remove(match.Index, match.Length);
+            }
+        }
+
+        private static void ReplaceTargets(ref string text, string target, string replacemnt)
+        {
+            while (Regex.IsMatch(text, target))
+            {
+                var match = Regex.Match(text, target);
+                text = text.Remove(match.Index, match.Length);
+                text = text.Insert(match.Index, replacemnt);
             }
         }
     }

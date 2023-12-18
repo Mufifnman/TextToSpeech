@@ -7,7 +7,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Media;
 
-namespace TextToSpeach
+namespace TextToSpeech
 {
     //TODO: move to local change model 
     // https://stackoverflow.com/questions/751741/wpf-textblock-highlight-certain-parts-based-on-search-condition

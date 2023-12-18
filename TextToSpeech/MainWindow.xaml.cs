@@ -11,7 +11,7 @@ using System.Speech.Synthesis;
 using Microsoft.Office.Interop.OneNote;
 using System.Text;
 
-namespace TextToSpeach
+namespace TextToSpeech
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -181,6 +181,7 @@ namespace TextToSpeach
 
                         Filters.WikipediaCitation(ref preFiltered);
                         Filters.GovernmentFilter(ref preFiltered);
+                        Filters.AHITStarredQuestion(ref preFiltered);
 
                         textbox.Text = textbox.Text + "\n" + preFiltered;
                         Clipboard.Clear();
@@ -284,6 +285,37 @@ namespace TextToSpeach
 
         private void ImageRead(object sender, RoutedEventArgs e)
         {
+            Bitmap bitmap = CaptureScreenBehindWinodw();
+
+            string readText, errorMessage;
+
+            //if(GetTextFromImageOneNote(bitmap, out readText, out errorMessage))
+            if (!OCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage))
+            {
+                textbox.Text = errorMessage;
+                return;
+            }
+
+            if (savedEnd != null)
+            {
+                readText = savedEnd + " " + readText;
+                savedEnd = null;
+            }
+
+            Filters.CombineLines(ref readText);
+            readText = readText.Replace('¡', 'i');
+
+            Filters.PsychologyFilter(ref readText);
+
+            textbox.Text = readText;
+
+            //Minimize then read
+            this.WindowState = System.Windows.WindowState.Minimized;
+            this.ReadText(sender, e);
+        }
+
+        private bool GetTextFromImageOneNote(Bitmap bitmap, out string readText, out string errorMessage)
+        {
             string strID, strXML, notebookXml;
             string pageToBeChange = "SandboxPage";
             Microsoft.Office.Interop.OneNote.Application app = new Microsoft.Office.Interop.OneNote.Application();
@@ -295,16 +327,15 @@ namespace TextToSpeach
             var pageNode = doc.Descendants(ns + "Page").Where(n => n.Attribute("name").Value == pageToBeChange).FirstOrDefault();
             var existingPageId = pageNode.Attribute("ID").Value;
 
-            Bitmap bitmap = ScreenCapture();
-
             MemoryStream stream = new MemoryStream();
             bitmap.Save(stream, ImageFormat.Jpeg);
             string fileString = Convert.ToBase64String(stream.ToArray());
 
+
             String strImportXML;
 
             strImportXML = "<?xml version=\"1.0\"?>" +
-            "<one:Page xmlns:one=\"http://schemas.microsoft.com/office/onenote/2013/onenote\" ID=\""+existingPageId+"\">"+ //{D2954871-2111-06B9-1AB9-882CD62848AA}{1}{E1833485368852652557020163191444754720811741}\">" +
+            "<one:Page xmlns:one=\"http://schemas.microsoft.com/office/onenote/2013/onenote\" ID=\"" + existingPageId + "\">" + //{D2954871-2111-06B9-1AB9-882CD62848AA}{1}{E1833485368852652557020163191444754720811741}\">" +
             "    <one:PageSettings RTL=\"false\" color=\"automatic\">" +
             "        <one:PageSize>" +
             "            <one:Automatic/>" +
@@ -325,7 +356,7 @@ namespace TextToSpeach
             "            <one:OE alignment=\"left\">" +
             //"                <one:T>" +
             "    <one:Image> <one:Data>" + fileString + "</one:Data></one:Image>" +
-                //"                    <![CDATA[Sample Text]]>" +
+            //"                    <![CDATA[Sample Text]]>" +
             //"                </one:T>" +
             "            </one:OE>" +
             "        </one:OEChildren>" +
@@ -347,24 +378,12 @@ namespace TextToSpeach
                 timeoutCounter++;
                 if (timeoutCounter > 30)
                 {
-                    textbox.Text = "OneNote timed out texify-ing image! try again? maybe?...";
-                    return;
+                    readText = null;
+                    errorMessage = "OneNote timed out texify-ing image! try again? maybe?...";
+                    return false;
                 }
             }
-            string readText = doc.Descendants(ns + "OCRText").FirstOrDefault().Value;
-
-            if (savedEnd != null)
-            {
-                readText = savedEnd + " " + readText;
-                savedEnd = null;
-            }
-
-            Filters.CombineLines(ref readText);
-            readText = readText.Replace('¡', 'i');
-
-            Filters.PsychologyFilter(ref readText);
-
-            textbox.Text = readText;
+            readText = doc.Descendants(ns + "OCRText").FirstOrDefault().Value;
 
             //Empty Page (I.E. Cleanup)
             doc = XDocument.Parse(strXML);
@@ -378,37 +397,21 @@ namespace TextToSpeach
                 }
             }
 
-            //Minimize then read
-            this.WindowState = System.Windows.WindowState.Minimized;
-            this.ReadText(sender, e);
-
+            errorMessage = null;
+            return true;
         }
 
-        private Bitmap ScreenCapture()
+        private Bitmap CaptureScreenBehindWinodw()
         {
             System.Drawing.Size size = new System.Drawing.Size((int)this.ActualWidth, (int)this.ActualHeight);
+            System.Drawing.Point origin = new System.Drawing.Point((int)this.Left, (int)this.Top);
 
-            //System.Windows.Point pointOrigin = this.PointToScreen(new System.Windows.Point(0, 0));
-            System.Drawing.Point dOrigin = new System.Drawing.Point((int)this.Left, (int)this.Top);
-
-            //this.WindowState = System.Windows.WindowState.Minimized;
+            // move window up for capture
             this.Top = this.Top + size.Height;
-            
-            Bitmap bitmap = new Bitmap(size.Width, size.Height);
-            {
-                using (Graphics graphics = Graphics.FromImage(bitmap))
-                {
-                    graphics.CopyFromScreen(dOrigin, new System.Drawing.Point(0, 0), size);
-                }
-            }
-            //System.IO.FileStream fileStream = new System.IO.FileStream(@"C:\Users\kjlue_000\Desktop\Scratch\clip.jpg", System.IO.FileMode.Create);
-            //if (fileStream != null)
-            //{
-            //    bitmap.Save(fileStream, System.Drawing.Imaging.ImageFormat.Jpeg);
-            //    fileStream.Close();
-            //}
 
-            //this.WindowState = System.Windows.WindowState.Normal;
+            var bitmap = Utilities.CaptureScreenInArea(origin, size);
+
+            // move window back down
             this.Top = this.Top - size.Height;
             return bitmap;
         }

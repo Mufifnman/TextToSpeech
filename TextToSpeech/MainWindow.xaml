@@ -1,8 +1,8 @@
-﻿<Window x:Class="TextToSpeach.MainWindow"
+﻿<Window x:Class="TextToSpeech.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:l="clr-namespace:TextToSpeach"
-        Title="Text to Speach" Height="383" Width="525" GotFocus="Window_GotFocus_1" KeyUp="Window_KeyDown_1">
+        xmlns:l="clr-namespace:TextToSpeech"
+        Title="Text to Speech" Height="383" Width="525" GotFocus="Window_GotFocus_1" KeyUp="Window_KeyDown_1">
     <Window.Resources>
         <l:StringToXamlConverter x:Key="CONVERTERS_StringToXaml" />
     </Window.Resources>
@@ -16,7 +16,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="textbox" TextWrapping="Wrap" Text="Test sentence for me to speak" KeyUp="Window_KeyDown_1"/>
+            <TextBox x:Name="textbox" TextWrapping="Wrap" Text="Test" KeyUp="Window_KeyDown_1"/>
             <ContentControl x:Name="__ReadListDisplay__" Grid.Column="1" VerticalAlignment="Top" Background="LightGray" KeyUp="Window_KeyDown_1"
                Content="{Binding Path=Text, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource CONVERTERS_StringToXaml}, Mode=TwoWay}">
             </ContentControl>  
@@ -38,7 +38,7 @@
                 <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="2" Click="StopRead" KeyUp="Window_KeyDown_1"/>
                 <Button x:Name="__ImageRead" Content="Read Image" Grid.Column="3" Click="ImageRead" KeyUp="Window_KeyDown_1"/>
                 </Grid>
-            <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-10" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
+            <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
         </Grid>
     </Grid>
 </Window>
