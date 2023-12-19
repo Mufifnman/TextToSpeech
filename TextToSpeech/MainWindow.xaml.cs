@@ -290,7 +290,7 @@ namespace TextToSpeech
             string readText, errorMessage;
 
             //if(GetTextFromImageOneNote(bitmap, out readText, out errorMessage))
-            if (!OCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage))
+            if (!TesseractOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage))
             {
                 textbox.Text = errorMessage;
                 return;
