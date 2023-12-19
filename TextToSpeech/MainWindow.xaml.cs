@@ -1,15 +1,13 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
+﻿
+
 using System.Drawing;
-using System.Drawing.Imaging;
-using System.Linq;
-using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Speech.Synthesis;
-using Microsoft.Office.Interop.OneNote;
 using System.Text;
+
+using System.Windows.Controls;
+
 
 namespace TextToSpeech
 {
@@ -283,14 +281,39 @@ namespace TextToSpeech
     //        }
         }
 
+        private OcrOptions selectedOCROption = new OcrOptions();
+
+        private void OcrOptionsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+            var selectedItem = comboBox.SelectedItem;
+
+            if (selectedItem != null)
+            {
+                selectedOCROption = (OcrOptions)comboBox.SelectedItem;
+            }
+        }
+
         private void ImageRead(object sender, RoutedEventArgs e)
         {
             Bitmap bitmap = CaptureScreenBehindWinodw();
 
             string readText, errorMessage;
 
-            //if(GetTextFromImageOneNote(bitmap, out readText, out errorMessage))
-            if (!TesseractOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage))
+            bool ocrTextReadSucceded = false;
+            switch (selectedOCROption)
+            {
+                case OcrOptions.OneNote:
+                    ocrTextReadSucceded = OneNoteOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
+                    break;
+                case OcrOptions.Tesseract:
+                    ocrTextReadSucceded = TesseractOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            if (!ocrTextReadSucceded)
             {
                 textbox.Text = errorMessage;
                 return;
@@ -312,93 +335,6 @@ namespace TextToSpeech
             //Minimize then read
             this.WindowState = System.Windows.WindowState.Minimized;
             this.ReadText(sender, e);
-        }
-
-        private bool GetTextFromImageOneNote(Bitmap bitmap, out string readText, out string errorMessage)
-        {
-            string strID, strXML, notebookXml;
-            string pageToBeChange = "SandboxPage";
-            Microsoft.Office.Interop.OneNote.Application app = new Microsoft.Office.Interop.OneNote.Application();
-            //app.OpenHierarchy(@"C:\Users\kjlue_000\Documents\OneNote Notebooks\OCRSandbox\Ocr.one",
-            //    System.String.Empty, out strID, CreateFileType.cftNone);
-            app.GetHierarchy(null, HierarchyScope.hsPages, out notebookXml);
-            var doc = XDocument.Parse(notebookXml);
-            var ns = doc.Root.Name.Namespace;
-            var pageNode = doc.Descendants(ns + "Page").Where(n => n.Attribute("name").Value == pageToBeChange).FirstOrDefault();
-            var existingPageId = pageNode.Attribute("ID").Value;
-
-            MemoryStream stream = new MemoryStream();
-            bitmap.Save(stream, ImageFormat.Jpeg);
-            string fileString = Convert.ToBase64String(stream.ToArray());
-
-
-            String strImportXML;
-
-            strImportXML = "<?xml version=\"1.0\"?>" +
-            "<one:Page xmlns:one=\"http://schemas.microsoft.com/office/onenote/2013/onenote\" ID=\"" + existingPageId + "\">" + //{D2954871-2111-06B9-1AB9-882CD62848AA}{1}{E1833485368852652557020163191444754720811741}\">" +
-            "    <one:PageSettings RTL=\"false\" color=\"automatic\">" +
-            "        <one:PageSize>" +
-            "            <one:Automatic/>" +
-            "        </one:PageSize>" +
-            "        <one:RuleLines visible=\"false\"/>" +
-            "    </one:PageSettings>" +
-            "    <one:Title style=\"font-family:Calibri;font-size:17.0pt\" lang=\"en-US\">" +
-            "        <one:OE alignment=\"left\">" +
-            "            <one:T>" +
-            "                <![CDATA[SandboxPage]]>" +
-            "            </one:T>" +
-            "        </one:OE>" +
-            "    </one:Title>" +
-            "    <one:Outline >" +
-            "        <one:Position x=\"20\" y=\"50\"/>" +
-            "        <one:Size width=\"" + bitmap.Width + "\" height=\"" + bitmap.Height + "\"  isSetByUser=\"true\"/>" +
-            "        <one:OEChildren>" +
-            "            <one:OE alignment=\"left\">" +
-            //"                <one:T>" +
-            "    <one:Image> <one:Data>" + fileString + "</one:Data></one:Image>" +
-            //"                    <![CDATA[Sample Text]]>" +
-            //"                </one:T>" +
-            "            </one:OE>" +
-            "        </one:OEChildren>" +
-            "    </one:Outline>" +
-            "</one:Page>";
-            app.UpdatePageContent(strImportXML);
-
-            //app.SyncHierarchy(strID);
-
-            //Give one note some time to ocr the texts
-            app.GetPageContent(existingPageId, out strXML);
-            doc = XDocument.Parse(strXML);
-            int timeoutCounter = 0;
-            while (doc.Descendants(ns + "OCRText").FirstOrDefault() == null)
-            {
-                System.Threading.Thread.Sleep(200);
-                app.GetPageContent(existingPageId, out strXML);
-                doc = XDocument.Parse(strXML);
-                timeoutCounter++;
-                if (timeoutCounter > 30)
-                {
-                    readText = null;
-                    errorMessage = "OneNote timed out texify-ing image! try again? maybe?...";
-                    return false;
-                }
-            }
-            readText = doc.Descendants(ns + "OCRText").FirstOrDefault().Value;
-
-            //Empty Page (I.E. Cleanup)
-            doc = XDocument.Parse(strXML);
-            var imageXML = doc.Descendants(ns + "Outline");
-            foreach (var item in imageXML)
-            {
-                string outlineID = item.Attribute("objectID").Value;
-                if (outlineID != null)
-                {
-                    app.DeletePageContent(existingPageId, outlineID);
-                }
-            }
-
-            errorMessage = null;
-            return true;
         }
 
         private Bitmap CaptureScreenBehindWinodw()
