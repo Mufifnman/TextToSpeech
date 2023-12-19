@@ -28,6 +28,10 @@ jobs:
     # Add MSBuild to the PATH
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v1.0.2
+          
+    # Restore NuGet packages
+    - name: Restore NuGet packages
+      run: dotnet restore $env:Solution_Name
 
     # Build the solution
     - name: Build the application
