@@ -1,0 +1,255 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Fragment>
+        <DirectoryRef Id="INSTALLFOLDER">
+            <Component Id="cmpD42EA8B252B1C60C8C081F5D3F1FC959" Guid="{C11A67B7-80A4-4E6C-A389-CEDAF1F063DF}">
+                <File Id="filFEAC7FB2D02F03F705A6182DB1349B9B" KeyPath="yes" Source="SourceDir\Emgu.CV.Bitmap.dll" />
+            </Component>
+            <Component Id="cmpD7536BFE5500F2890F659513D58FD881" Guid="{84C311E2-86CE-4C76-BE09-BDA32ACF7222}">
+                <File Id="fil56ACC74C520CF1BA4B54D2742B6972EA" KeyPath="yes" Source="SourceDir\Emgu.CV.dll" />
+            </Component>
+            <Component Id="cmp558D723D7C16AC02574F8D21F35775AB" Guid="{E5A780A6-1849-4341-914B-33F312F09794}">
+                <File Id="fil5B7B0C0FE313F8157AC37CDEF03652A3" KeyPath="yes" Source="SourceDir\Emgu.CV.Wpf.dll" />
+            </Component>
+            <Component Id="cmp2C6B834FD2FA305019C43452246727AB" Guid="{7237F588-328E-4A80-9922-9101F72D469E}">
+                <File Id="filBB3450EDC6B47A367D5371EFEEB5AA3D" KeyPath="yes" Source="SourceDir\Interop.Microsoft.Office.Interop.OneNote.dll" />
+            </Component>
+            <Component Id="cmp49175621409A052211B7DBEE18A8CD89" Guid="{B9AFB89E-2042-453E-8DC4-6D7ACC9DB603}">
+                <File Id="filE7836F40EF72DDC1E653A3F82C7833BA" KeyPath="yes" Source="SourceDir\nbsbuilder.exe" />
+            </Component>
+            <Component Id="cmpA4527B3EE567E08B95CA13CDE2A1C70F" Guid="{DE9E01D6-3D95-45F5-9897-2D3275958097}">
+                <File Id="fil1464CA51634D8E71E66E5E20257F67ED" KeyPath="yes" Source="SourceDir\Office.dll" />
+            </Component>
+            <Component Id="cmp00D7C080B69FD5A5E7F96F9ABFC8E76F" Guid="{71B4FCC0-C7C9-4F13-9603-61049B9C9576}">
+                <File Id="filDBD7B603EE731395159C8F5E0A12B457" KeyPath="yes" Source="SourceDir\System.Speech.dll" />
+            </Component>
+            <Component Id="cmp0E39CC7E4DF8174F295F14507A523505" Guid="{C6C4557F-400F-4B82-A986-924FF810D4AD}">
+                <File Id="fil6BC8A0249B8533E276EBFD2A37790F8F" KeyPath="yes" Source="SourceDir\Tesseract.dll" />
+            </Component>
+            <Component Id="cmp9840A8056EBAC13EA9EF21CD4AD92626" Guid="{0B1D33A9-9DFD-4253-AFEC-F3B6C64FE888}">
+                <File Id="filDF670684FD13B5017FB13A658A48F196" KeyPath="yes" Source="SourceDir\Tesseract.Drawing.dll" />
+            </Component>
+            <Component Id="cmp7F59BD022B3D952EBE521DB96FA8483B" Guid="{7459E48A-34E3-4C6B-982F-F290A045026D}">
+                <File Id="fil9FE10E018EC0D0CF88A9C84F4797F3F9" KeyPath="yes" Source="SourceDir\TextToSpeech.deps.json" />
+            </Component>
+            <Component Id="cmp5F6B692E99A657680891236149618CB4" Guid="{FFF045F5-1241-43F4-911C-6610A71F0662}">
+                <File Id="fil37F7C2D63101EB7107F9D536B786F77E" KeyPath="yes" Source="SourceDir\TextToSpeech.dll" />
+            </Component>
+            <Component Id="cmp9ACD67DAC4705B4CED2134A4AF2D982D" Guid="{C5B5FA01-3DAC-4A92-8AB0-DAF6AFE9D759}">
+                <File Id="filB4950ACC74B7072FB743B989F3BDE878" KeyPath="yes" Source="SourceDir\TextToSpeech.exe" />
+            </Component>
+            <Component Id="cmpB6EEA98333ACBFD81D296C1F6804EF37" Guid="{F656FDAA-743D-4311-B3F7-AB4AEE50CE45}">
+                <File Id="filEB37C849C366C3607622354677BE0DE7" KeyPath="yes" Source="SourceDir\TextToSpeech.pdb" />
+            </Component>
+            <Component Id="cmp68C09A91A4C25501D098CE11491E5873" Guid="{70E72D92-6DFC-402C-85C4-8D734F625FB5}">
+                <File Id="fil479EB688B1B50B137E2776D833543578" KeyPath="yes" Source="SourceDir\TextToSpeech.runtimeconfig.json" />
+            </Component>
+            <Directory Id="dir58E8247E2885C01898CAD009F9EFD8BA" Name="runtimes">
+                <Directory Id="dir9BE9104649A116CC7BCCF4D9CCD3331B" Name="win">
+                    <Directory Id="dirD19B0610952D1EE2D417EB5361695989" Name="lib">
+                        <Directory Id="dir83F1876DE08D123126E8658B6C89D603" Name="net8.0">
+                            <Component Id="cmp00AC7CE7C2C03218F1D62F8F203BBB5D" Guid="{D0EA4159-EC2F-4EE4-B7A0-31902D0AD102}">
+                                <File Id="fil51536FF0BCC02496D4AE76521C63BDA2" KeyPath="yes" Source="SourceDir\runtimes\win\lib\net8.0\System.Speech.dll" />
+                            </Component>
+                        </Directory>
+                    </Directory>
+                </Directory>
+                <Directory Id="dirFF6AADC4B618984E1542CDA5FCBD7BB1" Name="win-arm64">
+                    <Directory Id="dir65EC979D52EB501E3A656AA03EE4F2F5" Name="native">
+                        <Component Id="cmp742D2CA6D86AF1E41250E79439D75414" Guid="{15CD39BD-1713-42D3-BD6A-21AF89DE428D}">
+                            <File Id="fil9D1F5938022F2262420462B6C3B3FFAC" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\concrt140.dll" />
+                        </Component>
+                        <Component Id="cmp14D27FC0C1AAF12614B624755FFAD74A" Guid="{F3D05906-2FED-43EE-B00A-32278E44A514}">
+                            <File Id="fil2C948FF66043883D23A6E42BDA9E3CF1" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\cvextern.dll" />
+                        </Component>
+                        <Component Id="cmp7C5D96A243E45090D557D15ECA981775" Guid="{DA6CD5E3-042D-4D9A-8B15-6B06902BF513}">
+                            <File Id="filA92B3709EB1B9E4C2BF16A6E3D75F61E" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\msvcp140.dll" />
+                        </Component>
+                        <Component Id="cmp6BB18B9B87A949525FDC9774B774DCE0" Guid="{A8E2FFD2-1B26-4408-9701-38A02785FCDD}">
+                            <File Id="fil92F9CBE98897E036C0E716E1751CB150" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\msvcp140_1.dll" />
+                        </Component>
+                        <Component Id="cmp830643C84280EA967EB881BEC9545AF5" Guid="{C6F304C0-DD0F-463D-9061-A92EE90145E0}">
+                            <File Id="fil636FFEE0AEE5DEB2FC6997BF724E9FA7" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\msvcp140_2.dll" />
+                        </Component>
+                        <Component Id="cmpC6EF205B8F395B280FA8D4816E4F8D02" Guid="{BC0E5F31-7C93-4911-8812-438240697617}">
+                            <File Id="filD36DEF62FC968A5954E0FA870C0514B9" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\msvcp140_atomic_wait.dll" />
+                        </Component>
+                        <Component Id="cmp2DB8BFC3D8E5C164D08A7697A7401D64" Guid="{6BF4FBD6-DF03-4B04-B5C5-9E19762EC9EE}">
+                            <File Id="fil787B6C4AA6A883E0CD8300D0A29837C0" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\msvcp140_codecvt_ids.dll" />
+                        </Component>
+                        <Component Id="cmpED7017D3A8F7B818989897262E2670DA" Guid="{74654880-787F-4ED0-9B27-F79ABE61CBB5}">
+                            <File Id="fil8C234F1CD69CB5CC51079838DB9FBAF0" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\vcruntime140.dll" />
+                        </Component>
+                        <Component Id="cmpF4300B4BB267DBCACF1C85A1B1A23727" Guid="{E4FCE551-0EFC-4E15-870C-BE46631FD481}">
+                            <File Id="filEFB16F85295AAF0102755BB294DA6383" KeyPath="yes" Source="SourceDir\runtimes\win-arm64\native\vcruntime140_1.dll" />
+                        </Component>
+                    </Directory>
+                </Directory>
+                <Directory Id="dirB9C75524282911E40C3C964A8836A714" Name="win-x64">
+                    <Directory Id="dir1F9DF9DD2FB29AE2942604FAC206D5C4" Name="native">
+                        <Component Id="cmp2C1B9059CA2BE1BE76D8B339CA90AB28" Guid="{C844271F-8718-4AA9-841D-EE15951DB9BF}">
+                            <File Id="fil6EB14B8D4F2950583E4E49E65A573173" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\concrt140.dll" />
+                        </Component>
+                        <Component Id="cmp10AA2FAA7C61AD863CEF52B44B658806" Guid="{E8C9D31F-CB5B-447D-9282-C218B623798D}">
+                            <File Id="fil1C69564BE0D0DB9A6FECBDB7B425B1AE" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\cvextern.dll" />
+                        </Component>
+                        <Component Id="cmpF7D3CB1248D36BCA4B47FB65F561072E" Guid="{35E22957-CA33-4313-BA5E-21AFA1A98995}">
+                            <File Id="fil6E472B049469758504B8FC6A62A14D48" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\msvcp140.dll" />
+                        </Component>
+                        <Component Id="cmpA64974D73B9964F396D0DB8475A8A3A4" Guid="{F53F325C-218B-42A2-B5BB-9C6879C17FDA}">
+                            <File Id="fil7069B5DD109A14DA71244441DC00D731" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\msvcp140_1.dll" />
+                        </Component>
+                        <Component Id="cmp93F505048BE8FFDBA975AB0575DC143B" Guid="{FE96A7FA-2991-494F-AD28-7983A8BB6FB6}">
+                            <File Id="fil63A91B742D76EBF03A1ECE36A77D8FAF" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\msvcp140_2.dll" />
+                        </Component>
+                        <Component Id="cmp29AE2EEA204BBD858FC1181AE145EF1A" Guid="{28174283-3E61-48C7-A943-4C56FF7D85C9}">
+                            <File Id="filE5A4B426BD937AE8843C558A028279CC" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\msvcp140_atomic_wait.dll" />
+                        </Component>
+                        <Component Id="cmpEC6AE23322DFD1F9099EAD9D2F8007A1" Guid="{C0AA5A27-5E71-411C-8D04-30AEA942CCC4}">
+                            <File Id="fil80D1135E9E20E4FA466A6E2DDED9BA11" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\msvcp140_codecvt_ids.dll" />
+                        </Component>
+                        <Component Id="cmp2E82F8C8058D8874DC4C9A9B9FC3D7D9" Guid="{55D8C171-A86F-4B89-B64D-A073BDA42681}">
+                            <File Id="filD017CBF51D6F7F4D08D4C33292110ADB" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\opencv_videoio_ffmpeg481_64.dll" />
+                        </Component>
+                        <Component Id="cmp5CEBAAAB2F8BE3082E9AB0FBE97B2B75" Guid="{8B4F5610-DBD5-40F0-A2BD-A8CE8758CAEA}">
+                            <File Id="fil89316D64CCC3673A43F941FA59E93362" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\vcruntime140.dll" />
+                        </Component>
+                        <Component Id="cmpF56C2BBEB59D2169A010CAD361311CDF" Guid="{E3CDE6AF-C262-4BF0-8A36-9820CE60B6EC}">
+                            <File Id="fil2B15F10E961D37C0B759615ECE73ABBE" KeyPath="yes" Source="SourceDir\runtimes\win-x64\native\vcruntime140_1.dll" />
+                        </Component>
+                    </Directory>
+                </Directory>
+                <Directory Id="dir92F336DAA82E5A629052407A3F87EF27" Name="win-x86">
+                    <Directory Id="dir2B43AAE918D399CEF13EC6CBA2D3D5EA" Name="native">
+                        <Component Id="cmpA53BB0B29C65252F6C60E350B0806C39" Guid="{873B90A5-165D-471F-A0CB-13ABEDCDEC50}">
+                            <File Id="filE4DA433C255196F87EECBD8DB6BCD5CA" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\concrt140.dll" />
+                        </Component>
+                        <Component Id="cmp791980CB296BD1085D1E3B1FC5B92D19" Guid="{DB46AABD-4A9B-4AC3-81AE-C9EBE867E843}">
+                            <File Id="fil0641BC2622EEBDB28DB48F8EC4BDC83F" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\cvextern.dll" />
+                        </Component>
+                        <Component Id="cmpE5ADE4E1AFB1E0870C05EFCF3221A104" Guid="{922DC6F8-7976-43A3-B185-E9AA91210A9C}">
+                            <File Id="fil4362B60A331609CE5798E0D9E1D71A5A" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\msvcp140.dll" />
+                        </Component>
+                        <Component Id="cmp1315C8B99927AF8816F7C3C862E31E9A" Guid="{98D92AB0-355B-4507-882C-9B8CB087136D}">
+                            <File Id="fil1D145906CF5EF7BF6DA0C00C1056A75E" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\msvcp140_1.dll" />
+                        </Component>
+                        <Component Id="cmpCF30345E89D3DF3E429A632DD18973E7" Guid="{AA1767E0-8E66-4569-85C7-DCD9B6CC11BC}">
+                            <File Id="filE1DBAFA253D74C7435B5B25BC20B8536" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\msvcp140_2.dll" />
+                        </Component>
+                        <Component Id="cmp1C8458778633C9D3A94EB0B40C215FD4" Guid="{6684D4C5-B177-4610-AEDF-E99833B4BFAB}">
+                            <File Id="filB9EE47E8A7C8BBC867E952D37C8CBD52" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\msvcp140_atomic_wait.dll" />
+                        </Component>
+                        <Component Id="cmpB274B3D6EF0535702340716252939296" Guid="{5D53D600-A39D-4A78-A632-BE47BF92E636}">
+                            <File Id="fil931C928D28F774AAEC8C95EFBF82AB32" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\msvcp140_codecvt_ids.dll" />
+                        </Component>
+                        <Component Id="cmpB36210A063E35914E679489ACE8E2EDD" Guid="{F8764DAE-C2A1-4E0F-8C57-1AFA02C8C1C9}">
+                            <File Id="fil4291212CEF0F1938885C79522CE2812B" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\opencv_videoio_ffmpeg481.dll" />
+                        </Component>
+                        <Component Id="cmpBBF8E010FA8ED89E0A175EB417ED5AE5" Guid="{8FEA7B64-6B5E-4634-B7FE-84EAF3C195BB}">
+                            <File Id="fil1154453DA6087835E65FD96A6338645E" KeyPath="yes" Source="SourceDir\runtimes\win-x86\native\vcruntime140.dll" />
+                        </Component>
+                    </Directory>
+                </Directory>
+            </Directory>
+            <Directory Id="dir06249C254B8FEA6A37A7C6E4984EF433" Name="tessdata">
+                <Component Id="cmp92673DCD3A790F0AE44C8C35A1E2CE7C" Guid="{823BAAE5-2B62-46F0-BDD5-0A538CB43620}">
+                    <File Id="fil8A735A93EC1DA3907F32FD0458422B92" KeyPath="yes" Source="SourceDir\tessdata\eng.traineddata" />
+                </Component>
+                <Component Id="cmpB4B99FCD228AF6EB9B1AAA68095CF6F6" Guid="{D42FB782-DF14-4A38-9034-3872A6EC2383}">
+                    <File Id="filBE500C70A2E3731661EFA337A3E92261" KeyPath="yes" Source="SourceDir\tessdata\equ.traineddata" />
+                </Component>
+                <Component Id="cmp173807028E37C6E6C510888B1138AB2A" Guid="{5B11CB22-CF0C-4884-BCDC-FE24545918DD}">
+                    <File Id="filC06290BE5CC46A19234CDA277A17C58B" KeyPath="yes" Source="SourceDir\tessdata\eus.traineddata" />
+                </Component>
+                <Component Id="cmp0898162D09AE6F9E28ED9EEDA7457EA1" Guid="{94A25839-CB94-4680-A2A0-6F8A3AED82C5}">
+                    <File Id="fil04F0232148E05CC12675A3C64B93FE30" KeyPath="yes" Source="SourceDir\tessdata\osd.traineddata" />
+                </Component>
+                <Component Id="cmpDB6DEC39B307530F3D7C5C8BE218B0CF" Guid="{4DC82C9A-D30D-4F29-A39A-5309519C1458}">
+                    <File Id="filE144B04E53451F92AF8A9E03AE46B2A1" KeyPath="yes" Source="SourceDir\tessdata\pdf.ttf" />
+                </Component>
+                <Component Id="cmpC26A1245158F022E4207B786FF5C42BA" Guid="{DCE81734-804C-4DA8-ADE5-FE9DAE87F8AA}">
+                    <File Id="fil3CD9BB885771977F8BAD7916D55BB4CB" KeyPath="yes" Source="SourceDir\tessdata\pdf.ttx" />
+                </Component>
+                <Directory Id="dir3F0555D68285FA93FCB08481E3700371" Name="configs">
+                    <Component Id="cmp1812ACD78B70277C299B6751AC2B86BF" Guid="{2454E59E-E68E-4D91-AC36-0D4812B74F1E}">
+                        <File Id="filADD253231FAE310D06B3BEBE373E02AF" KeyPath="yes" Source="SourceDir\tessdata\configs\config.cfg" />
+                    </Component>
+                </Directory>
+            </Directory>
+            <Directory Id="dir43FCCFA109FBF584D9155DCE31E452EB" Name="x64">
+                <Component Id="cmp24BA720100E2EA2A08059FE4DE0AF613" Guid="{A990B7F2-C88B-44C7-9073-AAA4147B9F1D}">
+                    <File Id="fil0BB9E331CD9EDA710E4C3D109D97B60D" KeyPath="yes" Source="SourceDir\x64\leptonica-1.82.0.dll" />
+                </Component>
+                <Component Id="cmp0CAD416CE9D915D4AA26CC9640859643" Guid="{D858F41C-62DB-43FC-9534-146ACD523DC7}">
+                    <File Id="fil579D938F0433AB7E7E7C7710DACDCD08" KeyPath="yes" Source="SourceDir\x64\tesseract50.dll" />
+                </Component>
+            </Directory>
+            <Directory Id="dir97F42FF68945B97AAE670945C4FDAE93" Name="x86">
+                <Component Id="cmp27556E2B5A3DE12361EB93A4970E3336" Guid="{EAD9974B-C801-407B-8E15-D67CEF2D8124}">
+                    <File Id="fil7CB6241AC38251B1292286E64B7D27C9" KeyPath="yes" Source="SourceDir\x86\leptonica-1.82.0.dll" />
+                </Component>
+                <Component Id="cmpAE60CDCA33472090F1B0DAAB15BBFE05" Guid="{4CAB3250-8B38-41BC-AEB4-999761FDF083}">
+                    <File Id="filEA6B456360FF033405513C0D87B2646D" KeyPath="yes" Source="SourceDir\x86\tesseract50.dll" />
+                </Component>
+            </Directory>
+        </DirectoryRef>
+    </Fragment>
+    <Fragment>
+        <ComponentGroup Id="TextToSpeechComponents">
+            <ComponentRef Id="cmpD42EA8B252B1C60C8C081F5D3F1FC959" />
+            <ComponentRef Id="cmpD7536BFE5500F2890F659513D58FD881" />
+            <ComponentRef Id="cmp558D723D7C16AC02574F8D21F35775AB" />
+            <ComponentRef Id="cmp2C6B834FD2FA305019C43452246727AB" />
+            <ComponentRef Id="cmp49175621409A052211B7DBEE18A8CD89" />
+            <ComponentRef Id="cmpA4527B3EE567E08B95CA13CDE2A1C70F" />
+            <ComponentRef Id="cmp00D7C080B69FD5A5E7F96F9ABFC8E76F" />
+            <ComponentRef Id="cmp0E39CC7E4DF8174F295F14507A523505" />
+            <ComponentRef Id="cmp9840A8056EBAC13EA9EF21CD4AD92626" />
+            <ComponentRef Id="cmp7F59BD022B3D952EBE521DB96FA8483B" />
+            <ComponentRef Id="cmp5F6B692E99A657680891236149618CB4" />
+            <ComponentRef Id="cmp9ACD67DAC4705B4CED2134A4AF2D982D" />
+            <ComponentRef Id="cmpB6EEA98333ACBFD81D296C1F6804EF37" />
+            <ComponentRef Id="cmp68C09A91A4C25501D098CE11491E5873" />
+            <ComponentRef Id="cmp00AC7CE7C2C03218F1D62F8F203BBB5D" />
+            <ComponentRef Id="cmp742D2CA6D86AF1E41250E79439D75414" />
+            <ComponentRef Id="cmp14D27FC0C1AAF12614B624755FFAD74A" />
+            <ComponentRef Id="cmp7C5D96A243E45090D557D15ECA981775" />
+            <ComponentRef Id="cmp6BB18B9B87A949525FDC9774B774DCE0" />
+            <ComponentRef Id="cmp830643C84280EA967EB881BEC9545AF5" />
+            <ComponentRef Id="cmpC6EF205B8F395B280FA8D4816E4F8D02" />
+            <ComponentRef Id="cmp2DB8BFC3D8E5C164D08A7697A7401D64" />
+            <ComponentRef Id="cmpED7017D3A8F7B818989897262E2670DA" />
+            <ComponentRef Id="cmpF4300B4BB267DBCACF1C85A1B1A23727" />
+            <ComponentRef Id="cmp2C1B9059CA2BE1BE76D8B339CA90AB28" />
+            <ComponentRef Id="cmp10AA2FAA7C61AD863CEF52B44B658806" />
+            <ComponentRef Id="cmpF7D3CB1248D36BCA4B47FB65F561072E" />
+            <ComponentRef Id="cmpA64974D73B9964F396D0DB8475A8A3A4" />
+            <ComponentRef Id="cmp93F505048BE8FFDBA975AB0575DC143B" />
+            <ComponentRef Id="cmp29AE2EEA204BBD858FC1181AE145EF1A" />
+            <ComponentRef Id="cmpEC6AE23322DFD1F9099EAD9D2F8007A1" />
+            <ComponentRef Id="cmp2E82F8C8058D8874DC4C9A9B9FC3D7D9" />
+            <ComponentRef Id="cmp5CEBAAAB2F8BE3082E9AB0FBE97B2B75" />
+            <ComponentRef Id="cmpF56C2BBEB59D2169A010CAD361311CDF" />
+            <ComponentRef Id="cmpA53BB0B29C65252F6C60E350B0806C39" />
+            <ComponentRef Id="cmp791980CB296BD1085D1E3B1FC5B92D19" />
+            <ComponentRef Id="cmpE5ADE4E1AFB1E0870C05EFCF3221A104" />
+            <ComponentRef Id="cmp1315C8B99927AF8816F7C3C862E31E9A" />
+            <ComponentRef Id="cmpCF30345E89D3DF3E429A632DD18973E7" />
+            <ComponentRef Id="cmp1C8458778633C9D3A94EB0B40C215FD4" />
+            <ComponentRef Id="cmpB274B3D6EF0535702340716252939296" />
+            <ComponentRef Id="cmpB36210A063E35914E679489ACE8E2EDD" />
+            <ComponentRef Id="cmpBBF8E010FA8ED89E0A175EB417ED5AE5" />
+            <ComponentRef Id="cmp92673DCD3A790F0AE44C8C35A1E2CE7C" />
+            <ComponentRef Id="cmpB4B99FCD228AF6EB9B1AAA68095CF6F6" />
+            <ComponentRef Id="cmp173807028E37C6E6C510888B1138AB2A" />
+            <ComponentRef Id="cmp0898162D09AE6F9E28ED9EEDA7457EA1" />
+            <ComponentRef Id="cmpDB6DEC39B307530F3D7C5C8BE218B0CF" />
+            <ComponentRef Id="cmpC26A1245158F022E4207B786FF5C42BA" />
+            <ComponentRef Id="cmp1812ACD78B70277C299B6751AC2B86BF" />
+            <ComponentRef Id="cmp24BA720100E2EA2A08059FE4DE0AF613" />
+            <ComponentRef Id="cmp0CAD416CE9D915D4AA26CC9640859643" />
+            <ComponentRef Id="cmp27556E2B5A3DE12361EB93A4970E3336" />
+            <ComponentRef Id="cmpAE60CDCA33472090F1B0DAAB15BBFE05" />
+        </ComponentGroup>
+    </Fragment>
+</Wix>

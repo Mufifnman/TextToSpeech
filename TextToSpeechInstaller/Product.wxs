@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Product Id="*" Name="TextToSpeech" Language="1033" Version="1.0.0.0" Manufacturer="Farmiliar" UpgradeCode="ab228944-2c06-4dbd-a253-a95c9b6d5810">
+		<Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
+
+		<MajorUpgrade DowngradeErrorMessage="A newer version of TextToSpeech is already installed." />
+		<MediaTemplate />
+
+		<Feature Id="TextToSpeech" Title="TextToSpeech" Level="1">
+			<ComponentGroupRef Id="TextToSpeechComponents" />
+		</Feature>
+	</Product>
+
+	<Fragment>
+		<Directory Id="TARGETDIR" Name="SourceDir">
+			<Directory Id="ProgramFilesFolder">
+				<Directory Id="INSTALLFOLDER" Name="TextToSpeech" />
+			</Directory>
+		</Directory>
+	</Fragment>
+</Wix>
