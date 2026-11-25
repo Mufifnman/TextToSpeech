@@ -1,7 +1,7 @@
 ﻿using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
-using System.Speech.Synthesis;
+using TextToSpeech.Speech;
 using TextToSpeech.Core.Reading;
 
 using System.Windows.Controls;
@@ -19,7 +19,15 @@ namespace TextToSpeech
     public partial class MainWindow : System.Windows.Window, IRegionReader
     {
         // objects
-        SpeechSynthesizer? reader = null;
+        readonly VoiceCatalog catalog = new VoiceCatalog();
+        readonly AppSettings settings = AppSettings.Load();
+        VoiceInfo? selectedVoice = null;
+        bool loadingVoices = false;
+
+        // Cancels the sentence being spoken; null when nothing is speaking.
+        CancellationTokenSource? speechCts = null;
+        bool IsSpeaking => speechCts != null;
+
         readonly ReadingDocument document = new ReadingDocument();
         int rate = 4;
 
@@ -37,25 +45,85 @@ namespace TextToSpeech
         public MainWindow()
         {
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
+            int savedRate = settings.Rate;
             InitializeComponent();
+            __Speed__.Value = savedRate; // the XAML default fires SpeedChanged first, so set it after
+            RefreshVoices();
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
 
-            wikipediaFilterItem.IsChecked = filterSettings.WikipediaCitations;
-            psychologyFilterItem.IsChecked = filterSettings.PsychologyCitations;
-            governmentFilterItem.IsChecked = filterSettings.GovernmentCitations;
-            ahitFilterItem.IsChecked = filterSettings.AhitStarredQuestions;
+            BuildFiltersMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => SetupHotkeys();
-            Closed += (_, _) => hotkeys?.Dispose();
+            Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
+        }
+
+        /// <summary>Rebuilds the voice picker from what is installed, keeping the current choice if it still exists.</summary>
+        private void RefreshVoices()
+        {
+            loadingVoices = true;
+            try
+            {
+                catalog.Refresh();
+                string? wanted = selectedVoice?.Id ?? settings.VoiceId;
+                voiceComboBox.ItemsSource = catalog.Voices;
+                selectedVoice = catalog.PickInitial(wanted);
+                voiceComboBox.SelectedItem = selectedVoice;
+                if (catalog.LastError != null) voiceComboBox.ToolTip = catalog.LastError;
+            }
+            finally
+            {
+                loadingVoices = false;
+            }
+        }
+
+        private void VoiceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingVoices) return;
+            if (voiceComboBox.SelectedItem is VoiceInfo v)
+            {
+                selectedVoice = v;
+                settings.VoiceId = v.Id;
+                settings.Save();
+                // takes effect from the next sentence
+            }
+        }
+
+        private void MoreVoices_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new VoiceDownloadWindow { Owner = this };
+            dialog.ShowDialog();
+            RefreshVoices();
+        }
+
+        // One submenu per FilterRegistry group, one checkable item per filter.
+        private void BuildFiltersMenu()
+        {
+            filtersMenu.Items.Clear();
+            foreach (string group in FilterRegistry.Groups)
+            {
+                var groupItem = new MenuItem { Header = group };
+                foreach (var filter in FilterRegistry.All.Where(f => f.Group == group))
+                {
+                    var item = new MenuItem
+                    {
+                        Header = filter.Label,
+                        IsCheckable = true,
+                        StaysOpenOnClick = true,
+                        IsChecked = filterSettings.IsEnabled(filter.Id),
+                        Tag = filter.Id,
+                    };
+                    item.Click += FilterMenuItem_Click;
+                    groupItem.Items.Add(item);
+                }
+                filtersMenu.Items.Add(groupItem);
+            }
         }
 
         private void FilterMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            filterSettings.WikipediaCitations = wikipediaFilterItem.IsChecked;
-            filterSettings.PsychologyCitations = psychologyFilterItem.IsChecked;
-            filterSettings.GovernmentCitations = governmentFilterItem.IsChecked;
-            filterSettings.AhitStarredQuestions = ahitFilterItem.IsChecked;
+            var item = (MenuItem)sender;
+            filterSettings.SetEnabled((string)item.Tag, item.IsChecked);
             FilterSettingsStore.Save(filterSettings);
         }
 
@@ -71,8 +139,10 @@ namespace TextToSpeech
             hotkeys ??= new GlobalHotkeyManager(this);
             hotkeys.UnregisterAll();
             var failed = new List<string>();
-            if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey()))
+            if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey(showWindow: false)))
                 failed.Add(hotkeySettings.GetReadSelection().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetReadSelectionAndShow(), () => _ = ReadSelectionHotkey(showWindow: true)))
+                failed.Add(hotkeySettings.GetReadSelectionAndShow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetSummonWindow(), BringToFront))
                 failed.Add(hotkeySettings.GetSummonWindow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey()))
@@ -98,10 +168,19 @@ namespace TextToSpeech
             Focus();
         }
 
-        private async Task ReadSelectionHotkey()
+        // Set when a hotkey brought a hidden window up; the window goes back down when reading ends.
+        bool minimizeWhenDone = false;
+
+        private async Task ReadSelectionHotkey(bool showWindow)
         {
             string text = await SelectionCapture.GetSelectedTextAsync();
             if (text == null) return;
+            if (showWindow)
+            {
+                // Only re-minimize if the window wasn't already up (if the user had it open, leave it alone).
+                minimizeWhenDone = WindowState == System.Windows.WindowState.Minimized || !IsVisible;
+                BringToFront();
+            }
             QueueTextAndRead(text);
         }
 
@@ -122,7 +201,6 @@ namespace TextToSpeech
         {
             Filters.ApplyClipboardFilters(ref text, filterSettings);
             textbox.Text = text;
-            if (hotkeySettings.ReadingSummonsWindow) BringToFront();
             ReadText(this, new RoutedEventArgs());
         }
 
@@ -143,7 +221,7 @@ namespace TextToSpeech
                 textbox.Text = "";
             }
             paused = false;
-            if (reader == null) // if we aren't already reading
+            if (!IsSpeaking) // if we aren't already reading
             {
                 SpeakCurrent();
             }
@@ -160,8 +238,14 @@ namespace TextToSpeech
             string? text = document.GetTextToSpeak(out spokenOffset);
             if (text == null)
             {
+                if (minimizeWhenDone)
+                {
+                    // The hotkey brought the window up for this read; put it away again.
+                    minimizeWhenDone = false;
+                    this.WindowState = System.Windows.WindowState.Minimized;
+                }
                 // Done: maximize so next image can be scanned or line can be copied
-                if (this.WindowState == System.Windows.WindowState.Minimized)
+                else if (this.WindowState == System.Windows.WindowState.Minimized)
                 {
                     this.WindowState = System.Windows.WindowState.Normal;
                 }
@@ -170,44 +254,86 @@ namespace TextToSpeech
             }
 
             int generation = ++speakGeneration;
-            var synth = new SpeechSynthesizer { Rate = rate };
-            reader = synth;
-            synth.SpeakProgress += (s, e) =>
+            var cts = new CancellationTokenSource();
+            speechCts = cts;
+            string sentenceText = text;
+            int offset = spokenOffset;
+            _ = SpeakSentenceAsync(sentenceText, offset, generation, cts);
+            UpdatePauseButton();
+        }
+
+        /// <summary>
+        /// Speaks one chunk of text with the chosen voice, then moves the document on and speaks the next.
+        /// If a neural voice fails, falls back to a Windows voice instead of going silent.
+        /// </summary>
+        private async Task SpeakSentenceAsync(string text, int offset, int generation, CancellationTokenSource cts)
+        {
+            VoiceInfo? voice = selectedVoice;
+            try
             {
-                // SAPI raises this off the UI thread
+                try
+                {
+                    await SpeakWith(voice, text, offset, generation, cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (voice != null && voice.IsNeural && catalog.DefaultFallbackVoice != null)
+                {
+                    VoiceInfo fallback = catalog.DefaultFallbackVoice!;
+                    statusText.Text = "Neural voice failed (" + ex.Message + "); using " + fallback.DisplayName;
+                    selectedVoice = fallback;
+                    loadingVoices = true;
+                    voiceComboBox.SelectedItem = fallback;
+                    loadingVoices = false;
+                    await SpeakWith(fallback, text, offset, generation, cts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return; // paused, stopped, or moved: whoever cancelled decides what happens next
+            }
+            catch (Exception ex)
+            {
+                if (generation == speakGeneration)
+                {
+                    statusText.Text = "Speech failed: " + ex.Message;
+                    CancelSpeech();
+                    paused = true;
+                    UpdatePauseButton();
+                }
+                return;
+            }
+
+            if (generation != speakGeneration || cts.IsCancellationRequested)
+            {
+                return;
+            }
+            document.CompleteSentence();
+            SpeakCurrent();
+        }
+
+        private Task SpeakWith(VoiceInfo? voice, string text, int offset, int generation, CancellationToken token) =>
+            catalog.EngineFor(voice).SpeakAsync(text, voice, rate, boundary =>
+            {
+                // engines report words off the UI thread
                 Dispatcher.BeginInvoke(() =>
                 {
                     if (generation == speakGeneration)
                     {
-                        document.ReportSpokenCharacter(spokenOffset + e.CharacterPosition);
+                        document.ReportSpokenCharacter(offset + boundary.CharOffset);
                     }
                 });
-            };
-            synth.SpeakCompleted += (s, e) =>
-            {
-                Dispatcher.BeginInvoke(() =>
-                {
-                    if (generation != speakGeneration || e.Cancelled)
-                    {
-                        return;
-                    }
-                    document.CompleteSentence();
-                    SpeakCurrent();
-                });
-            };
-            synth.SpeakAsync(text);
-            UpdatePauseButton();
-        }
+            }, token);
 
         /// <summary>Stops speaking without moving the reading position.</summary>
         private void CancelSpeech()
         {
             speakGeneration++; // ignore events from the utterance being cancelled
-            if (reader != null)
-            {
-                reader.Dispose();
-                reader = null;
-            }
+            var cts = speechCts;
+            speechCts = null;
+            cts?.Cancel();
         }
 
         /// <summary>After the position moved: keep reading from there, unless the user is paused.</summary>
@@ -279,7 +405,7 @@ namespace TextToSpeech
 
         private void TogglePlayPause()
         {
-            if (reader != null && !paused)
+            if (IsSpeaking && !paused)
             {
                 Pause();
             }
@@ -292,7 +418,7 @@ namespace TextToSpeech
 
         private void UpdatePauseButton()
         {
-            ___PauseButton_.Content = (reader != null && !paused) ? "\u23F8 Pause" : "\u25B6 Play";
+            ___PauseButton_.Content = (IsSpeaking && !paused) ? "\u23F8 Pause" : "\u25B6 Play";
         }
 
         private void Window_GotFocus_1(object sender, RoutedEventArgs e)
@@ -342,11 +468,10 @@ namespace TextToSpeech
             }
             rate = (int)e.NewValue;
 
-            // GUESS: SAPI applies the new rate to the next sentence, not mid-sentence.
-            if (reader != null)
-            {
-                reader.Rate = rate;
-            }
+            // GUESS: engines apply the new rate to the next sentence, not mid-sentence.
+            catalog.EngineFor(selectedVoice).SetRate(rate);
+            settings.Rate = rate;
+            settings.Save();
         }
 
         private OcrOptions selectedOCROption = new OcrOptions();

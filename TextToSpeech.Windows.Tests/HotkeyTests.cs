@@ -55,17 +55,37 @@ public class HotkeySettingsTests
     public void Defaults_AreValidAndDistinct()
     {
         var s = new HotkeySettings();
-        var all = new[] { s.GetReadSelection(), s.GetSummonWindow(), s.GetReadRegion() };
+        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion() };
         Assert.All(all, b => Assert.True(b.IsValid));
-        Assert.Equal(3, all.Distinct().Count());
-        Assert.False(s.ReadingSummonsWindow);
+        Assert.Equal(4, all.Distinct().Count());
+    }
+
+    [Fact]
+    public void ReadSelectionDefaults_AreAltRAndCtrlAltR()
+    {
+        var s = new HotkeySettings();
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.R), s.GetReadSelection());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Alt, Key.R), s.GetReadSelectionAndShow());
+    }
+
+    [Fact]
+    public void OldSavedCtrlAltR_IsResetSoItDoesNotCollide()
+    {
+        var s = new HotkeySettings { ReadSelection = "Ctrl+Alt+R" };
+        s.FixOldDefaults();
+        Assert.Equal("Alt+R", s.ReadSelection);
+
+        var custom = new HotkeySettings { ReadSelection = "Ctrl+Shift+Y" };
+        custom.FixOldDefaults();
+        Assert.Equal("Ctrl+Shift+Y", custom.ReadSelection);
     }
 
     [Fact]
     public void BadText_FallsBackToDefault()
     {
-        var s = new HotkeySettings { ReadSelection = "garbage", SummonWindow = "", ReadRegion = "Ctrl" };
+        var s = new HotkeySettings { ReadSelection = "garbage", ReadSelectionAndShow = "Alt", SummonWindow = "", ReadRegion = "Ctrl" };
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.ReadSelection)), s.GetReadSelection());
+        Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.ReadSelectionAndShow)), s.GetReadSelectionAndShow());
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.SummonWindow)), s.GetSummonWindow());
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.ReadRegion)), s.GetReadRegion());
     }
@@ -80,11 +100,11 @@ public class HotkeySettingsTests
     [Fact]
     public void Json_RoundTripsAndStaysHandEditable()
     {
-        var s = new HotkeySettings { ReadSelection = "Ctrl+Shift+Y", ReadingSummonsWindow = true };
+        var s = new HotkeySettings { ReadSelection = "Ctrl+Shift+Y", ReadSelectionAndShow = "Ctrl+Shift+U" };
         string json = JsonSerializer.Serialize(s, HotkeySettings.WriteOptions);
         Assert.Contains("Ctrl+Shift+Y", json);
         var back = JsonSerializer.Deserialize<HotkeySettings>(json)!;
         Assert.Equal("Ctrl+Shift+Y", back.ReadSelection);
-        Assert.True(back.ReadingSummonsWindow);
+        Assert.Equal("Ctrl+Shift+U", back.ReadSelectionAndShow);
     }
 }

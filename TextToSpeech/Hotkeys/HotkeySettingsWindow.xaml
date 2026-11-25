@@ -11,17 +11,17 @@
                 <ColumnDefinition Width="180"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition/><RowDefinition/><RowDefinition/>
+                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
             </Grid.RowDefinitions>
-            <TextBlock Text="Read selected text" Margin="0,4,12,4"/>
+            <TextBlock Text="Read selected text" Margin="0,4,12,4" ToolTip="Window stays hidden"/>
             <TextBox x:Name="readBox" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Read"/>
-            <TextBlock Text="Show window" Grid.Row="1" Margin="0,4,12,4"/>
-            <TextBox x:Name="summonBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Summon"/>
-            <TextBlock Text="Read screen region (OCR)" Grid.Row="2" Margin="0,4,12,4"/>
-            <TextBox x:Name="regionBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Region"/>
+            <TextBlock Text="Read selected text and show window" Grid.Row="1" Margin="0,4,12,4" ToolTip="Window is minimized again when reading ends, if it was hidden"/>
+            <TextBox x:Name="readShowBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="ReadShow"/>
+            <TextBlock Text="Show window" Grid.Row="2" Margin="0,4,12,4"/>
+            <TextBox x:Name="summonBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Summon"/>
+            <TextBlock Text="Read screen region (OCR)" Grid.Row="3" Margin="0,4,12,4"/>
+            <TextBox x:Name="regionBox" Grid.Row="3" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Region"/>
         </Grid>
-        <CheckBox x:Name="summonOnReadBox" Margin="0,10,0,0"
-                  Content="Reading from a hotkey also brings the window to the front"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Save" Width="70" IsDefault="True" Click="Save_Click" Margin="0,0,8,0"/>
             <Button Content="Cancel" Width="70" IsCancel="True"/>

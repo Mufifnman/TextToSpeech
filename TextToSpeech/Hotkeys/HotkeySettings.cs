@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Windows.Input;
 
@@ -8,21 +8,24 @@ namespace TextToSpeech.Hotkeys
     public class HotkeySettings
     {
         // Strings (not HotkeyBinding) so the JSON file is hand-editable, e.g. "Ctrl+Alt+R".
-        public string ReadSelection { get; set; } = "Ctrl+Alt+R";
+        /// <summary>Reads the selected text without showing the window.</summary>
+        public string ReadSelection { get; set; } = "Alt+R";
+        /// <summary>Reads the selected text and brings the window up (minimized again afterwards if it was hidden).</summary>
+        public string ReadSelectionAndShow { get; set; } = "Ctrl+Alt+R";
+        // GUESS: summon-window and region-select keep their original shortcuts.
         public string SummonWindow { get; set; } = "Ctrl+Alt+W";
         public string ReadRegion { get; set; } = "Ctrl+Alt+O";
 
-        /// <summary>When true, the read-selection and region hotkeys also bring the window to the front.</summary>
-        public bool ReadingSummonsWindow { get; set; } = false;
-
         public static HotkeyBinding Default(string name) => name switch
         {
-            nameof(ReadSelection) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.R),
+            nameof(ReadSelection) => new(ModifierKeys.Alt, Key.R),
+            nameof(ReadSelectionAndShow) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.R),
             nameof(SummonWindow) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.W),
             _ => new(ModifierKeys.Control | ModifierKeys.Alt, Key.O),
         };
 
         public HotkeyBinding GetReadSelection() => Resolve(ReadSelection, nameof(ReadSelection));
+        public HotkeyBinding GetReadSelectionAndShow() => Resolve(ReadSelectionAndShow, nameof(ReadSelectionAndShow));
         public HotkeyBinding GetSummonWindow() => Resolve(SummonWindow, nameof(SummonWindow));
         public HotkeyBinding GetReadRegion() => Resolve(ReadRegion, nameof(ReadRegion));
 
@@ -37,10 +40,24 @@ namespace TextToSpeech.Hotkeys
             try
             {
                 if (File.Exists(FilePath))
-                    return JsonSerializer.Deserialize<HotkeySettings>(File.ReadAllText(FilePath)) ?? new();
+                {
+                    var loaded = JsonSerializer.Deserialize<HotkeySettings>(File.ReadAllText(FilePath)) ?? new();
+                    loaded.FixOldDefaults();
+                    return loaded;
+                }
             }
             catch { /* corrupt file: fall back to defaults */ }
             return new();
+        }
+
+        /// <summary>
+        /// Older builds saved Ctrl+Alt+R as the plain read-selection key, which now belongs to
+        /// read-and-show. Put read-selection back to its default so the two never collide.
+        /// </summary>
+        public void FixOldDefaults()
+        {
+            if (GetReadSelection() == GetReadSelectionAndShow())
+                ReadSelection = Default(nameof(ReadSelection)).ToString();
         }
 
         // Relaxed escaping so '+' stays '+' (not +) and the file is easy to edit by hand.
