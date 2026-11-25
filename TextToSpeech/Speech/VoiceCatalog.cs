@@ -22,6 +22,13 @@ namespace TextToSpeech.Speech
             Voices = voices;
         }
 
+        /// <summary>Forget any prepared audio in every engine.</summary>
+        public void ClearUpcoming()
+        {
+            Sapi.ClearUpcoming();
+            Neural.ClearUpcoming();
+        }
+
         /// <summary>Applies the reading volume to every engine.</summary>
         public void SetVolume(int percent)
         {

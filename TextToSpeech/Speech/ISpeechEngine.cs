@@ -43,6 +43,18 @@ namespace TextToSpeech.Speech
         /// </summary>
         void SetVolume(int percent);
 
+        /// <summary>Gets a voice ready in the background (loads the model) so the first sentence starts quickly. No-op where nothing needs loading.</summary>
+        void Prewarm(VoiceInfo? voice);
+
+        /// <summary>
+        /// The sentences that will be spoken next, in order. Engines that generate audio can prepare them
+        /// while the current one plays. No-op where speech is produced live.
+        /// </summary>
+        void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate);
+
+        /// <summary>Forget prepared audio (the reading list was cleared).</summary>
+        void ClearUpcoming();
+
         /// <summary>Changes the rate. Some engines can only apply it from the next utterance.</summary>
         void SetRate(int rate);
     }

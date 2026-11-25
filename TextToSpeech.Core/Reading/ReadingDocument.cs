@@ -109,6 +109,17 @@ namespace TextToSpeech.Core.Reading
             return text;
         }
 
+        /// <summary>The full text of up to <paramref name="count"/> sentences after the current one, in reading order.</summary>
+        public IReadOnlyList<string> PeekUpcomingTexts(int count)
+        {
+            var result = new List<string>();
+            for (int i = Position.Sentence + 1; i < sentences.Count && result.Count < count; i++)
+            {
+                result.Add(sentences[i].Text);
+            }
+            return result;
+        }
+
         /// <summary>Returns all the text (read and unread) and empties the document.</summary>
         public string TakeAll()
         {

@@ -243,6 +243,35 @@ namespace TextToSpeech.Core.Tests
         }
     }
 
+    public class ReadingDocumentLookAheadTests
+    {
+        [Fact]
+        public void PeekUpcomingTexts_ReturnsTheNextFullSentences_AndMovesWithTheReader()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six. Seven eight.");
+
+            Assert.Equal(new[] { "Three four.", "Five six." }, doc.PeekUpcomingTexts(2));
+            doc.CompleteSentence();
+            Assert.Equal(new[] { "Five six.", "Seven eight." }, doc.PeekUpcomingTexts(2));
+            doc.CompleteSentence();
+            doc.CompleteSentence();
+            Assert.Empty(doc.PeekUpcomingTexts(2));   // nothing after the last sentence
+        }
+
+        [Fact]
+        public void PeekUpcomingTexts_MatchesWhatWillBeSpoken()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four.");
+            var peeked = doc.PeekUpcomingTexts(1)[0];
+
+            doc.CompleteSentence();
+            Assert.Equal(peeked, doc.GetTextToSpeak(out int offset));   // same text, so a prepared clip is found
+            Assert.Equal(0, offset);
+        }
+    }
+
     public class SentenceTests
     {
         [Fact]

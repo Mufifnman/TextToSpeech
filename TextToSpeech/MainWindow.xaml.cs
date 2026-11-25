@@ -85,6 +85,7 @@ namespace TextToSpeech
             catalog.Refresh();
             string? wanted = selectedVoice?.Id ?? settings.VoiceId;
             selectedVoice = catalog.PickInitial(wanted);
+            catalog.EngineFor(selectedVoice).Prewarm(selectedVoice);
             BuildVoiceMenu();
             if (catalog.LastError != null) statusText.Text = catalog.LastError;
         }
@@ -138,6 +139,7 @@ namespace TextToSpeech
         private void SelectVoice(VoiceInfo v)
         {
             selectedVoice = v;
+            catalog.EngineFor(v).Prewarm(v);
             settings.VoiceId = v.Id;
             settings.Save();
             BuildVoiceMenu(); // refresh the check mark; takes effect from the next sentence
@@ -404,6 +406,9 @@ namespace TextToSpeech
                 WindowState = System.Windows.WindowState.Normal; // reading started: bring the window up
             }
 
+            // Tell the engine what comes next so it can prepare it while this sentence plays.
+            catalog.EngineFor(selectedVoice).SetUpcoming(document.PeekUpcomingTexts(2), selectedVoice, rate);
+
             int generation = ++speakGeneration;
             var cts = new CancellationTokenSource();
             speechCts = cts;
@@ -553,6 +558,7 @@ namespace TextToSpeech
         private void ClearList(object? sender = null, RoutedEventArgs? e = null)
         {
             CancelSpeech();
+            catalog.ClearUpcoming();
             document.Clear();
             paused = false;
             UpdatePauseButton();

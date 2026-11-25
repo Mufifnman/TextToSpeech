@@ -171,3 +171,48 @@ public class KokoroNamesTests
         Assert.Equal(11, NeuralModelFolder.KokoroEnV019.Distinct().Count());
     }
 }
+
+
+public class LookAheadCacheTests
+{
+    [Fact]
+    public async Task SameKey_StartsTheWorkOnlyOnce_AndSharesTheResult()
+    {
+        var cache = new LookAheadCache<int>(4);
+        int runs = 0;
+        var first = cache.GetOrStart("a", () => { Interlocked.Increment(ref runs); return 41; });
+        var second = cache.GetOrStart("a", () => { Interlocked.Increment(ref runs); return 99; });
+
+        Assert.Equal(41, await first);
+        Assert.Equal(41, await second);
+        Assert.Equal(1, runs);
+    }
+
+    [Fact]
+    public async Task OnlyTheNewestEntriesAreKept()
+    {
+        var cache = new LookAheadCache<int>(2);
+        await cache.GetOrStart("a", () => 1);
+        await cache.GetOrStart("b", () => 2);
+        await cache.GetOrStart("c", () => 3);
+
+        Assert.Equal(2, cache.Count);
+        Assert.False(cache.Contains("a"));
+        Assert.True(cache.Contains("b"));
+        Assert.True(cache.Contains("c"));
+    }
+
+    [Fact]
+    public async Task RemoveAndClear_ForgetEntries_SoTheyRunAgain()
+    {
+        var cache = new LookAheadCache<int>(4);
+        int runs = 0;
+        await cache.GetOrStart("a", () => ++runs);
+        cache.Remove("a");
+        await cache.GetOrStart("a", () => ++runs);
+        Assert.Equal(2, runs);
+
+        cache.Clear();
+        Assert.Equal(0, cache.Count);
+    }
+}

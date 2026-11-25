@@ -105,6 +105,10 @@ namespace TextToSpeech.Speech
             }
         }
 
+        public void Prewarm(VoiceInfo? voice) { }
+        public void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate) { }
+        public void ClearUpcoming() { }
+
         public void Dispose() { }
     }
 }
