@@ -6,7 +6,7 @@ using TextToSpeech.Core.Reading;
 namespace TextToSpeech
 {
     /// <summary>What the popup's buttons do. The main window supplies these.</summary>
-    internal sealed record PopupActions(
+    public sealed record PopupActions(
         Action Back,
         Action PlayPause,
         Action Skip,
@@ -19,9 +19,9 @@ namespace TextToSpeech
     /// A small always-on-top window in the bottom right corner (above the tray) that shows the reading text with the
     /// current word highlighted. Clicking a word jumps there. It never takes focus.
     /// </summary>
-    internal partial class ReadingPopupWindow : Window
+    public partial class ReadingPopupWindow : Window
     {
-        private const double Margin = 12;
+        private const double EdgeGap = 12;
 
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_NOACTIVATE = 0x08000000;
@@ -54,8 +54,8 @@ namespace TextToSpeech
         private void Anchor()
         {
             var work = SystemParameters.WorkArea;
-            Left = work.Right - ActualWidth - Margin;
-            Top = work.Bottom - ActualHeight - Margin;
+            Left = work.Right - ActualWidth - EdgeGap;
+            Top = work.Bottom - ActualHeight - EdgeGap;
         }
 
         public void SetPlaying(bool playing) => playGlyph.Text = playing ? "" : "";   // pause / play
