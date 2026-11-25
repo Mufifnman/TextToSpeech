@@ -95,7 +95,7 @@ namespace TextToSpeech.Speech
             }
         }
 
-        /// <summary>SAPI's volume is 0 to 100, so a setting above 100 plays at 100 for Windows voices.</summary>
+        /// <summary>SAPI's volume is 0 to 100, so a setting above 100 plays at 100 for Windows voices. A change reaches the next sentence, not the one being spoken.</summary>
         public void SetVolume(int percent)
         {
             lock (gate)

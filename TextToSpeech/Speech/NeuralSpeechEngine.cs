@@ -40,6 +40,7 @@ namespace TextToSpeech.Speech
                     for (int sid = 0; sid < model.SpeakerNames.Count; sid++)
                     {
                         string speaker = model.SpeakerNames[sid];
+                        if (model.Kind == NeuralModelKind.Kokoro) speaker = KokoroNames.Friendly(speaker);
                         string label = string.IsNullOrEmpty(speaker) ? model.DisplayName : $"{model.DisplayName}: {speaker}";
                         voices.Add(new VoiceInfo($"{IdPrefix}{sid}|{dir}", $"{label} ({Name})", Name, IsNeural: true));
                     }
@@ -131,7 +132,7 @@ namespace TextToSpeech.Speech
         public bool IsPaused => player.IsPaused;
         public void Pause() => player.Pause();
         public void Resume() => player.Resume();
-        /// <summary>Gain with a soft limiter, so 100 to 120 percent is real extra loudness without harsh clipping.</summary>
+        /// <summary>Gain with a soft limiter, so 100 to 120 percent is real extra loudness without harsh clipping. Applies live.</summary>
         public void SetVolume(int percent) => player.Gain = Math.Clamp(percent, 0, 120) / 100f;
 
         public void SetRate(int rate) { /* applies from the next sentence, since audio is generated per sentence */ }

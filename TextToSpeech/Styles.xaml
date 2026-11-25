@@ -64,6 +64,10 @@
         <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
     </Style>
 
+    <Style TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+    </Style>
+
     <!-- Popup menus (voice, filters, OCR engine): rounded, themed, with a check mark column and submenus. -->
     <Style TargetType="ContextMenu">
         <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>

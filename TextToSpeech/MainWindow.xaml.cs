@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using TextToSpeech.Speech;
 using TextToSpeech.Core.Reading;
 
@@ -57,9 +58,11 @@ namespace TextToSpeech
             __ReadListDisplay__.WordClicked += JumpTo;
 
             BuildFiltersMenu();
-            BuildOcrMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); };
+            StateChanged += Window_StateChanged;
+            Activated += (_, _) => raise.Activated();
+            PreviewMouseDown += (_, _) => raise.UserInteracted();
             ThemeManager.Changed += () => __ReadListDisplay__.RefreshTheme();
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
@@ -186,11 +189,18 @@ namespace TextToSpeech
         /// <summary>Set by the region-OCR overlay work; until then the hotkey uses the Read Image button flow.</summary>
         public IRegionReader RegionReader { get; set; }
 
+        // Hotkeys another app already owns (shown in the title and in Settings).
+        private readonly List<string> failedHotkeys = new();
+
+        private string? HotkeyConflicts() =>
+            failedHotkeys.Count == 0 ? null : "In use by another app: " + string.Join(", ", failedHotkeys);
+
         private void SetupHotkeys()
         {
             hotkeys ??= new GlobalHotkeyManager(this);
             hotkeys.UnregisterAll();
-            var failed = new List<string>();
+            failedHotkeys.Clear();
+            var failed = failedHotkeys;
             if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey(showWindow: false)))
                 failed.Add(hotkeySettings.GetReadSelection().ToString());
             if (!hotkeys.Register(hotkeySettings.GetReadSelectionAndShow(), () => _ = ReadSelectionHotkey(showWindow: true)))
@@ -224,8 +234,9 @@ namespace TextToSpeech
             Focus();
         }
 
-        // Set when a hotkey brought a hidden window up; the window goes back down when reading ends.
-        bool minimizeWhenDone = false;
+        // Set when the app brought a hidden window up for this read (hotkey or "bring up while playing");
+        // the window goes back down when reading ends, unless the user took over the window meanwhile.
+        readonly RaiseTracker raise = new(() => DateTime.UtcNow);
 
         private async Task ReadSelectionHotkey(bool showWindow)
         {
@@ -234,7 +245,7 @@ namespace TextToSpeech
             if (showWindow)
             {
                 // Only re-minimize if the window wasn't already up (if the user had it open, leave it alone).
-                minimizeWhenDone = WindowState == System.Windows.WindowState.Minimized || !IsVisible;
+                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) raise.AppRaised();
                 ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(2);
                 BringToFront();
             }
@@ -261,11 +272,6 @@ namespace TextToSpeech
             ReadText(this, new RoutedEventArgs());
         }
 
-        private void HotkeySettings_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new HotkeySettingsWindow(hotkeySettings) { Owner = this };
-            if (dlg.ShowDialog() == true) SetupHotkeys();
-        }
 
         // ---- the editable box: one line while idle, the whole window while you edit ----
         private const double OneLineHeight = 30;
@@ -378,10 +384,9 @@ namespace TextToSpeech
             string? text = document.GetTextToSpeak(out spokenOffset);
             if (text == null)
             {
-                if (minimizeWhenDone || settings.AutoShowWhilePlaying)
+                if (raise.TakeMinimize())
                 {
-                    // The hotkey brought the window up for this read; put it away again.
-                    minimizeWhenDone = false;
+                    // The app brought the window up for this read and nobody touched it: put it away again.
                     this.WindowState = System.Windows.WindowState.Minimized;
                 }
                 // Done: maximize so next image can be scanned or line can be copied
@@ -395,6 +400,7 @@ namespace TextToSpeech
 
             if (settings.AutoShowWhilePlaying && WindowState == System.Windows.WindowState.Minimized)
             {
+                raise.AppRaised();
                 WindowState = System.Windows.WindowState.Normal; // reading started: bring the window up
             }
 
@@ -694,52 +700,37 @@ namespace TextToSpeech
             speedPlus.Visibility = visibility;
         }
 
+        // ---- title bar (the window draws its own so that the opacity setting can work) ----
+        private void TitleMinimize_Click(object sender, RoutedEventArgs e) => WindowState = System.Windows.WindowState.Minimized;
+
+        private void TitleMaximize_Click(object sender, RoutedEventArgs e) =>
+            WindowState = WindowState == System.Windows.WindowState.Maximized ? System.Windows.WindowState.Normal : System.Windows.WindowState.Maximized;
+
+        private void TitleClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        private void Window_StateChanged(object? sender, EventArgs e)
+        {
+            bool maximized = WindowState == System.Windows.WindowState.Maximized;
+            maximizeGlyph.Text = maximized ? "\uE923" : "\uE922";          // restore / maximize
+            windowBorder.CornerRadius = new CornerRadius(maximized ? 0 : 8);
+            // A borderless window overshoots the screen by its resize border when maximized; pull it back in.
+            double overshoot = 8 / VisualTreeHelper.GetDpi(this).DpiScaleX;
+            windowBorder.Margin = maximized ? new Thickness(overshoot) : new Thickness(0);
+        }
+
         // ---- settings: opacity and "bring up while playing" ----
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new SettingsWindow(settings, ApplyWindowSettings) { Owner = this };
+            var dialog = new SettingsWindow(settings, hotkeySettings, ApplyWindowSettings, SetupHotkeys, HotkeyConflicts) { Owner = this };
             dialog.ShowDialog();
         }
 
         private void ApplyWindowSettings()
         {
-            WindowAppearance.SetOpacity(this, settings.WindowOpacity);
+            Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
         }
 
-        private OcrOptions selectedOCROption = OcrOptions.Windows;
-
-        /// <summary>One checkable item per OCR engine; the gear button next to Read Region opens it.</summary>
-        private void BuildOcrMenu()
-        {
-            ocrMenu.Items.Clear();
-            AddMenuHeading(ocrMenu, "OCR engine");
-            foreach (OcrOptions option in Enum.GetValues<OcrOptions>())
-            {
-                var item = new MenuItem
-                {
-                    Header = option.ToString(),
-                    IsCheckable = true,
-                    IsChecked = option == selectedOCROption,
-                    Tag = option,
-                };
-                item.Click += OcrMenuItem_Click;
-                ocrMenu.Items.Add(item);
-            }
-            ocrButton.ToolTip = "OCR engine for Read Region: " + selectedOCROption;
-        }
-
-        private void OcrButton_Click(object sender, RoutedEventArgs e)
-        {
-            ocrMenu.PlacementTarget = ocrButton;
-            ocrMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-            ocrMenu.IsOpen = true;
-        }
-
-        private void OcrMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            selectedOCROption = (OcrOptions)((MenuItem)sender).Tag;
-            BuildOcrMenu(); // refresh the check mark
-        }
+        private OcrOptions selectedOCROption => settings.GetOcrOption();
 
         private bool isCapturing;
 
@@ -850,6 +841,7 @@ namespace TextToSpeech
         /// </summary>
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            raise.UserInteracted();
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
             bool typing = Keyboard.FocusedElement is TextBox && !ctrl;
             if (typing)

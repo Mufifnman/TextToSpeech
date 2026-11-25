@@ -15,8 +15,20 @@ namespace TextToSpeech
         /// <summary>Whole-window opacity, 0.3 to 1.0.</summary>
         public double WindowOpacity { get; set; } = 1.0;
 
-        /// <summary>Bring the window up when reading starts and minimize it when reading ends.</summary>
+        /// <summary>OCR engine used by Read Region: "Windows" or "Tesseract".</summary>
+        public string OcrEngine { get; set; } = "Windows";
+
+        public OcrOptions GetOcrOption() =>
+            Enum.TryParse<OcrOptions>(OcrEngine, ignoreCase: true, out var option) && Enum.IsDefined(option) ? option : OcrOptions.Windows;
+
+        /// <summary>Bring the window up when reading starts and minimize it when reading ends (only when the app raised the window itself).</summary>
         public bool AutoShowWhilePlaying { get; set; } = false;
+
+        /// <summary>Save somewhere else (used by tests so they never touch the real settings file).</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? PathOverride { get; set; }
+
+        private string FilePathFor() => PathOverride ?? FilePath;
 
         private static string FilePath =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TextToSpeech", "settings.json");
@@ -36,8 +48,8 @@ namespace TextToSpeech
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePathFor())!);
+                File.WriteAllText(FilePathFor(), JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch (Exception) { /* settings are a convenience; never crash over them */ }
         }

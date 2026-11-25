@@ -82,3 +82,92 @@ public class AudioGainTests
         Assert.Equal(-AudioGain.Apply(0.9f, 1.2f), AudioGain.Apply(-0.9f, 1.2f), 6); // symmetric
     }
 }
+
+
+public class GainSampleProviderTests
+{
+    private static float[] ReadAll(GainSampleProvider provider, int chunk = 64)
+    {
+        var all = new List<float>();
+        var buffer = new float[chunk];
+        int n;
+        while ((n = provider.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            all.AddRange(buffer.Take(n));
+        }
+        return all.ToArray();
+    }
+
+    [Fact]
+    public void SteadyGain_MatchesTheGainFunction_FromTheFirstSample()
+    {
+        var samples = Enumerable.Range(0, 500).Select(i => (float)Math.Sin(i / 20.0) * 0.5f).ToArray();
+        var output = ReadAll(new GainSampleProvider(samples, 22050, () => 0.5f));
+
+        Assert.Equal(samples.Length, output.Length);
+        for (int i = 0; i < samples.Length; i++)
+        {
+            Assert.Equal(AudioGain.Apply(samples[i], 0.5f), output[i], 5);
+        }
+    }
+
+    [Fact]
+    public void ChangingTheGainWhilePlaying_RampsInsteadOfJumping_AndSettlesOnTheTarget()
+    {
+        var samples = Enumerable.Repeat(0.5f, 5000).ToArray();   // constant signal: output level = gain * 0.5
+        float gain = 1.0f;
+        var provider = new GainSampleProvider(samples, 22050, () => gain);
+        var first = new float[1000];
+        provider.Read(first, 0, first.Length);
+        Assert.Equal(0.5f, first[^1], 3);
+
+        gain = 0.2f;                                              // the user drags the slider down
+        var rest = new float[4000];
+        int n = provider.Read(rest, 0, rest.Length);
+        Assert.Equal(4000, n);
+
+        float biggestStep = 0;
+        for (int i = 1; i < n; i++) biggestStep = Math.Max(biggestStep, Math.Abs(rest[i] - rest[i - 1]));
+        Assert.True(biggestStep < 0.01f, "gain jumped instead of ramping: " + biggestStep); // no click
+        Assert.True(rest[0] > 0.3f);                              // still close to the old level at the start
+        Assert.Equal(0.1f, rest[^1], 2);                          // and settled on the new one
+    }
+
+    [Fact]
+    public void EndOfClip_ReturnsZero()
+    {
+        var provider = new GainSampleProvider(new float[10], 22050, () => 1f);
+        var buffer = new float[32];
+        Assert.Equal(10, provider.Read(buffer, 0, 32));
+        Assert.Equal(0, provider.Read(buffer, 0, 32));
+    }
+}
+
+public class KokoroNamesTests
+{
+    [Theory]
+    [InlineData("af_bella", "Bella (US, female)")]
+    [InlineData("bm_george", "George (UK, male)")]
+    [InlineData("bf_emma", "Emma (UK, female)")]
+    [InlineData("am_adam", "Adam (US, male)")]
+    [InlineData("af", "Default (US, female)")]
+    [InlineData("Custom Voice", "Custom Voice")]   // names from a speakers.txt are left alone
+    [InlineData("", "")]
+    public void FriendlyNames(string id, string expected)
+    {
+        Assert.Equal(expected, KokoroNames.Friendly(id));
+    }
+
+    [Fact]
+    public void EveryVoiceOfTheV019Release_GetsAReadableName()
+    {
+        Assert.Equal(11, NeuralModelFolder.KokoroEnV019.Length);
+        Assert.All(NeuralModelFolder.KokoroEnV019, id =>
+        {
+            string friendly = KokoroNames.Friendly(id);
+            Assert.NotEqual(id, friendly);
+            Assert.Contains("(", friendly);
+        });
+        Assert.Equal(11, NeuralModelFolder.KokoroEnV019.Distinct().Count());
+    }
+}

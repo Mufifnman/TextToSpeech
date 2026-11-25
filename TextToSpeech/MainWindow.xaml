@@ -3,9 +3,60 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Background="{DynamicResource ThemeBackground}" Foreground="{DynamicResource ThemeText}"
-        Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown" SizeChanged="Window_SizeChanged">
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Foreground="{DynamicResource ThemeText}"
+        Title="Text to Speech" Height="466" Width="423" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown" SizeChanged="Window_SizeChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
+        <!-- Title bar buttons (minimize, maximize, close) -->
+        <Style x:Key="TitleButton" TargetType="Button">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatPressed}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CloseTitleButton" TargetType="Button" BasedOn="{StaticResource TitleButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#C42B1C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#A32316"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- Bottom option row: flat (same color as the window), small, with a subtle hover and pressed highlight. -->
         <Style x:Key="BarButton" TargetType="Button">
             <Setter Property="Height" Value="26"/>
@@ -38,7 +89,33 @@
             </Setter>
         </Style>
     </Window.Resources>
+    <Border x:Name="windowBorder" Background="{DynamicResource ThemeBackground}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <!-- Title bar: title (also shows hotkey conflicts) and the window buttons -->
+        <Grid Background="Transparent">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" Margin="12,0" VerticalAlignment="Center"
+                       FontSize="12" Foreground="{DynamicResource ThemeSubtle}" TextTrimming="CharacterEllipsis"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource TitleButton}" Click="TitleMinimize_Click" ToolTip="Minimize">
+                    <TextBlock Text="&#xE921;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+                <Button Style="{StaticResource TitleButton}" Click="TitleMaximize_Click" ToolTip="Maximize or restore">
+                    <TextBlock x:Name="maximizeGlyph" Text="&#xE922;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+                <Button Style="{StaticResource CloseTitleButton}" Click="TitleClose_Click" ToolTip="Close">
+                    <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+    <Grid Grid.Row="1">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -125,7 +202,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel x:Name="optionsLeft" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- Speed: [-] (only when the window is narrow)  gauge + number (click for a slider)  [+] -->
                     <Button x:Name="speedMinus" Content="&#x2212;" Click="SpeedMinus_Click" Style="{StaticResource BarButton}" MinWidth="26"
                             Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Slower" Visibility="Collapsed"/>
@@ -176,16 +253,8 @@
                             <ContextMenu x:Name="filtersMenu" />
                         </Button.ContextMenu>
                     </Button>
-                    <Button Content="&#xE765;" FontFamily="{StaticResource IconFont}" Click="HotkeySettings_Click" Style="{StaticResource BarButton}"
-                            ToolTip="Hotkeys: choose the global shortcuts"/>
-                    <Button x:Name="ocrButton" Content="OCR" Click="OcrButton_Click" Style="{StaticResource BarButton}"
-                            ToolTip="Choose the OCR engine used by Read Region">
-                        <Button.ContextMenu>
-                            <ContextMenu x:Name="ocrMenu" />
-                        </Button.ContextMenu>
-                    </Button>
                     <Button x:Name="settingsButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="Settings_Click" Style="{StaticResource BarButton}"
-                            ToolTip="Settings: window opacity, bring up while playing"/>
+                            ToolTip="Settings: OCR engine, window opacity, bring up while playing"/>
                 </StackPanel>
                 <Button x:Name="__ImageRead" Grid.Column="1" Content="Read Region" Click="ImageRead" Focusable="False" Height="28" Padding="12,0" Margin="8,0,0,0" VerticalAlignment="Center"
                         ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
@@ -203,4 +272,6 @@
             </TextBlock>
         </Grid>
     </Grid>
+    </Grid>
+    </Border>
 </Window>
