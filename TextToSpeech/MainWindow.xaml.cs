@@ -46,7 +46,6 @@ namespace TextToSpeech
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
             InitializeComponent();
             SetSpeed(settings.Rate, save: false);
-            speedSlider.ValueChanged += (_, e) => { if (!updatingSpeedUi) SetSpeed((int)Math.Round(e.NewValue)); };
             RefreshVoices();
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
@@ -539,7 +538,6 @@ namespace TextToSpeech
 
         // ---- speaking speed: SAPI scale, -2 (slow) to 10 (fast); one step per +/- click ----
         private const int MinRate = -2, MaxRate = 10, RateStep = 1;
-        private bool updatingSpeedUi = false;
 
         private void SetSpeed(int value, bool save = true)
         {
@@ -550,14 +548,9 @@ namespace TextToSpeech
                 settings.Rate = rate;
                 settings.Save();
             }
-            updatingSpeedUi = true;
             speedText.Text = rate.ToString();
-            speedSlider.Value = rate;
-            speedButton.ToolTip = "Speaking speed: " + rate + " (click to change)";
-            updatingSpeedUi = false;
+            speedDisplay.ToolTip = "Speaking speed: " + rate + " (use \u2212 and + to change)";
         }
-
-        private void SpeedButton_Click(object sender, RoutedEventArgs e) => speedPopup.IsOpen = true;
 
         private void SpeedMinus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate - RateStep);
 
