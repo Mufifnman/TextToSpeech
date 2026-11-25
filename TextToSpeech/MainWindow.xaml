@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Title="Text to Speech" Height="383" Width="525" GotFocus="Window_GotFocus_1" KeyUp="Window_KeyDown_1">
+        Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" KeyUp="Window_KeyDown_1">
     <Window.Resources>
         <l:StringToXamlConverter x:Key="CONVERTERS_StringToXaml" />
         <local:EnumToEnumerableConverter x:Key="EnumToEnumerableConverter" />
@@ -11,7 +11,7 @@
     <Grid Margin="0,0,0,-5">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="60"/>
+            <RowDefinition Height="80"/>
         </Grid.RowDefinitions>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -27,6 +27,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -47,6 +48,9 @@
                 </Grid.ColumnDefinitions>
                 <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal"  HorizontalAlignment="Right" >
+                    <TextBlock Text="Voice: " Margin="0,3,0,4" />
+                    <ComboBox x:Name="voiceComboBox" MinWidth="220" SelectionChanged="VoiceComboBox_SelectionChanged" />
+                    <Button Content="More voices..." Margin="4,0,12,0" Padding="6,0" Click="MoreVoices_Click" />
                     <TextBlock Text="OCR: " Margin="0,3,0,4" />
                     <ComboBox x:Name="ocrOptionsComboBox" SelectionChanged="OcrOptionsComboBox_SelectionChanged" 
                         ItemsSource="{Binding Source={x:Type local:OcrOptions}, Converter={StaticResource EnumToEnumerableConverter}}"
@@ -54,6 +58,7 @@
                     </ComboBox>
                 </StackPanel>
             </Grid>
+            <TextBlock Grid.Row="2" Text="{Binding Status}" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
         </Grid>
     </Grid>
 </Window>

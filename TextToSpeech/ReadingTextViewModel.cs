@@ -24,6 +24,14 @@ namespace TextToSpeech
             }
         }
 
+        private String status = "";
+        /// <summary>One line shown under the buttons, e.g. when a voice falls back.</summary>
+        public String Status
+        {
+            get { return status; }
+            set { status = value; NotifyPropertyChanged(); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         public virtual void NotifyPropertyChanged([CallerMemberName] String propertyName = "")

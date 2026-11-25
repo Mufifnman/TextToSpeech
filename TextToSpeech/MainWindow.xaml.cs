@@ -3,7 +3,7 @@
 using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
-using System.Speech.Synthesis;
+using TextToSpeech.Speech;
 using System.Text;
 
 using System.Windows.Controls;
@@ -18,10 +18,15 @@ namespace TextToSpeech
     public partial class MainWindow : System.Windows.Window
     {
         // objects
-        SpeechSynthesizer reader = null;
+        VoiceCatalog catalog = new VoiceCatalog();
+        AppSettings settings = AppSettings.Load();
+        VoiceInfo selectedVoice = null;
+        CancellationTokenSource readCts = null;
+        bool isReading = false;
         Queue<string> readList = new Queue<string>();
         Object readLock = new Object();
         int rate = 4;
+        bool loadingVoices = false;
         string savedEnd = null;
         StringBuilder sb = new StringBuilder();
 
@@ -31,7 +36,49 @@ namespace TextToSpeech
         {
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
             DataContext = readingTextView;
+            int savedRate = settings.Rate;
             InitializeComponent();
+            __Speed__.Value = savedRate; // the XAML default fires SpeedChanged first, so set it after
+            RefreshVoices();
+            Closed += (s, e) => { StopRead(); catalog.Dispose(); };
+        }
+
+        /// <summary>Rebuilds the voice picker from what is installed, keeping the current choice if it still exists.</summary>
+        private void RefreshVoices()
+        {
+            loadingVoices = true;
+            try
+            {
+                catalog.Refresh();
+                string wanted = selectedVoice?.Id ?? settings.VoiceId;
+                voiceComboBox.ItemsSource = catalog.Voices;
+                selectedVoice = catalog.PickInitial(wanted);
+                voiceComboBox.SelectedItem = selectedVoice;
+                if (catalog.LastError != null) voiceComboBox.ToolTip = catalog.LastError;
+            }
+            finally
+            {
+                loadingVoices = false;
+            }
+        }
+
+        private void VoiceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (loadingVoices) return;
+            if (voiceComboBox.SelectedItem is VoiceInfo v)
+            {
+                selectedVoice = v;
+                settings.VoiceId = v.Id;
+                settings.Save();
+                // takes effect from the next sentence
+            }
+        }
+
+        private void MoreVoices_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new VoiceDownloadWindow { Owner = this };
+            dialog.ShowDialog();
+            RefreshVoices();
         }
 
         private void ReadText(object sender, RoutedEventArgs e)
@@ -51,91 +98,136 @@ namespace TextToSpeech
                     }
                     textbox.Text = "";
                 }
-                if (reader == null) // if we aren't already reading
+                if (!isReading) // if we aren't already reading
                 {
-                    ReadList();
+                    StartReading();
                 }
             }
             UpdateTextBlock();
         }
 
         /// <summary>
-        /// This is a recursive call
+        /// Speaks the queue one sentence at a time until it is empty or stopped. Runs on the UI thread between awaits.
+        /// A sentence stays at the head of the queue until it has finished, so Stop then Go repeats it.
         /// </summary>
-        /// <param name="sender">
-        /// Must be null on first call for it to function properly
-        /// todo: /\ chnge that and arguments /\
-        /// currently garenteed to be called on main thread
-        /// </param>
-        /// <param name="e"></param>
-        private void ReadList(object sender = null, SpeakCompletedEventArgs e = null)
+        private async void StartReading()
         {
-            lock (readLock)
+            var cts = new CancellationTokenSource();
+            readCts = cts;
+            isReading = true;
+            try
             {
-                if (sender != null) // first call
+                while (!cts.IsCancellationRequested)
                 {
-                    if (0 < readList.Count)
+                    string line;
+                    lock (readLock)
                     {
-                        readList.Dequeue();
-                    }
-                }
-                else
-                {
-                    CreateReader();
-                }
-                if (0 < readList.Count && reader != null) // one because not dequeued until after this
-                {
-                    wordCount = 0;
-                    if (shouldUnderlineWord)
-                    {
-                        StringToXamlConverter.currentWordIndex = wordCount;
-                    }
-                    else
-                    {
-                        StringToXamlConverter.currentWordIndex = -1;
-                    }
-                    reader.SpeakAsync(readList.Peek());
-                    UpdateTextBlock();
-                    if (1 == readList.Count)
-                    {
-                        savedEnd = readList.Peek();
-                    }
-                }
-                else
-                {
-                    if (reader != null)
-                    {
-                        reader.Dispose();
-                        reader = null; // to keep track of the fact that we aren't currently readings
+                        if (readList.Count == 0) break;
+                        line = readList.Peek();
+                        if (1 == readList.Count)
+                        {
+                            savedEnd = line;
+                        }
                     }
 
-                    // Maximize on done so next image can be scanned or line can be coppied
-                    if (this.WindowState == System.Windows.WindowState.Minimized)
+                    StringToXamlConverter.currentWordIndex = shouldUnderlineWord ? 0 : -1;
+                    UpdateTextBlock();
+
+                    if (!string.IsNullOrWhiteSpace(line))
                     {
-                        this.WindowState = System.Windows.WindowState.Normal;
+                        await SpeakWithFallback(line, cts.Token);
+                        if (cts.IsCancellationRequested) return; // stopped: keep the line queued
                     }
+
+                    lock (readLock)
+                    {
+                        if (readList.Count > 0) readList.Dequeue();
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            finally
+            {
+                if (readCts == cts)
+                {
+                    isReading = false;
+                    readCts = null;
+                }
+            }
+
+            if (!cts.IsCancellationRequested)
+            {
+                UpdateTextBlock();
+                // Maximize on done so next image can be scanned or line can be coppied
+                if (this.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    this.WindowState = System.Windows.WindowState.Normal;
                 }
             }
         }
 
-        int wordCount = 0;
-        private void reader_SpeakProgress(object sender, SpeakProgressEventArgs e)
+        /// <summary>Speaks with the chosen voice; if a neural voice fails, falls back to a Windows voice instead of going silent.</summary>
+        private async Task SpeakWithFallback(string line, CancellationToken token)
         {
-            wordCount++;
-            if (shouldUnderlineWord)
+            VoiceInfo voice = selectedVoice;
+            try
             {
-                StringToXamlConverter.currentWordIndex = wordCount;
-                readingTextView.Text = sb.ToString();
-                //readingTextView.NotifyPropertyChanged();
-                //UpdateTextBlock();
+                await catalog.EngineFor(voice).SpeakAsync(line, voice, rate, offset => OnWord(line, offset), token);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                VoiceInfo fallback = catalog.DefaultFallbackVoice;
+                if (voice != null && voice.IsNeural && fallback != null)
+                {
+                    readingTextView.Status = "Neural voice failed (" + ex.Message + "); using " + fallback.DisplayName;
+                    selectedVoice = fallback;
+                    loadingVoices = true;
+                    voiceComboBox.SelectedItem = fallback;
+                    loadingVoices = false;
+                    await catalog.EngineFor(fallback).SpeakAsync(line, fallback, rate, offset => OnWord(line, offset), token);
+                }
+                else
+                {
+                    readingTextView.Status = "Speech failed: " + ex.Message;
+                }
+            }
+        }
+
+        private void OnWord(string line, WordBoundary boundary)
+        {
+            if (!shouldUnderlineWord) return;
+            int index = WordIndexAt(line, boundary.CharOffset);
+            Dispatcher.BeginInvoke(() =>
+            {
+                StringToXamlConverter.currentWordIndex = index;
+                readingTextView.Text = sb.ToString();
+            });
+        }
+
+        /// <summary>Zero based index of the whitespace separated word that starts at (or contains) charOffset.</summary>
+        private static int WordIndexAt(string text, int charOffset)
+        {
+            int index = -1;
+            bool inWord = false;
+            for (int i = 0; i < text.Length && i <= charOffset; i++)
+            {
+                bool ws = char.IsWhiteSpace(text[i]);
+                if (!ws && !inWord) index++;
+                inWord = !ws;
+            }
+            return Math.Max(index, 0);
         }
 
         /// <summary>
         ///  clears the list of items to be read
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
         private void ClearList(object sender = null, RoutedEventArgs e = null)
         {
             StopRead();
@@ -149,16 +241,10 @@ namespace TextToSpeech
 
         private void StopRead(object sender = null, RoutedEventArgs e = null)
         {
-            // Initialize new Reader
-            lock (readLock)
-            {
-                if (reader != null)
-                {
-                    reader.Pause();
-                    reader.Dispose();
-                    reader = null;
-                }
-            }
+            var cts = readCts;
+            readCts = null;
+            isReading = false;
+            cts?.Cancel();
         }
 
         private void Window_GotFocus_1(object sender, RoutedEventArgs e)
@@ -252,18 +338,6 @@ namespace TextToSpeech
             }
         }
 
-        private void CreateReader()
-        {
-            reader = new SpeechSynthesizer();
-            reader.Rate = rate;
-            reader.SpeakCompleted += 
-                (sender, e) =>
-                {
-                    Dispatcher.Invoke(() => ReadList(sender, e));
-                };
-            reader.SpeakProgress += reader_SpeakProgress;
-        }
-
         private void SpeedChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (e.NewValue == e.OldValue)
@@ -274,10 +348,9 @@ namespace TextToSpeech
   //          {
                 rate = (int)e.NewValue;
 
-                if (reader != null)
-                {
-                    reader.Rate = (int)e.NewValue;
-                }
+                catalog.EngineFor(selectedVoice).SetRate(rate);
+                settings.Rate = rate;
+                settings.Save();
     //        }
         }
 
@@ -360,23 +433,11 @@ namespace TextToSpeech
             }
         }
 
-        // TODO: make this actually work whenever you press [space] or find another solution.
         private void TogglePlayPause()
         {
-            lock (readLock)
-            {
-                if (reader != null)
-                {
-                    if (reader.State == SynthesizerState.Speaking)
-                    {
-                        reader.Pause();
-                    }
-                    else if (reader.State == SynthesizerState.Paused)
-                    {
-                        reader.Resume();
-                    }
-                }
-            }
+            var engine = catalog.EngineFor(selectedVoice);
+            if (engine.IsPaused) engine.Resume();
+            else engine.Pause();
         }
     }
 }

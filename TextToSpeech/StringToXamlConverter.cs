@@ -41,16 +41,17 @@ namespace TextToSpeech
                                                   escapedXml.IndexOf(EndHighlightToken) - (escapedXml.IndexOf(BeginHighlightToken) + BeginHighlightToken.Length));
                     if (currentWordIndex != -1)
                     {
-                        int startUnderline = GetNthIndex(highlihgtedSubstring, ' ', currentWordIndex);
-                        if (startUnderline == highlihgtedSubstring.Length 
-                            || startUnderline == -1 
-                            || highlihgtedSubstring.Length == 0) // do not hilight at all after finishing the last word
+                        // currentWordIndex is the zero based word to underline; word 0 has no space before it (start = -1)
+                        int startUnderline = currentWordIndex == 0 ? -1 : GetNthIndex(highlihgtedSubstring, ' ', currentWordIndex);
+                        if (highlihgtedSubstring.Length == 0
+                            || (currentWordIndex != 0 && (startUnderline == highlihgtedSubstring.Length || startUnderline == -1))) // do not hilight at all after finishing the last word
                         {
                             textBlock.Inlines.Add(new Run(highlihgtedSubstring));
                         }
                         else
                         { 
                             int endUnderline = GetNthIndex(highlihgtedSubstring, ' ', currentWordIndex + 1);
+                            if (endUnderline == -1) endUnderline = highlihgtedSubstring.Length;
 
                             textBlock.Inlines.Add(new Run(highlihgtedSubstring.Substring(0, startUnderline + 1)) // 1 for the space itself
                             { Background = HighlightBrush });
