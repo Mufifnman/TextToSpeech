@@ -213,7 +213,7 @@
                         </StackPanel>
                     </Button>
                     <Popup x:Name="speedPopup" PlacementTarget="{Binding ElementName=speedButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{DynamicResource ThemeSurface}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                        <Border Style="{StaticResource PopupPanel}">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="speedPopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                 <Slider x:Name="speedSlider" Orientation="Vertical" Minimum="-2" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
@@ -231,7 +231,7 @@
                         </StackPanel>
                     </Button>
                     <Popup x:Name="volumePopup" PlacementTarget="{Binding ElementName=volumeButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{DynamicResource ThemeSurface}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                        <Border Style="{StaticResource PopupPanel}">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="volumePopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                 <Slider x:Name="volumeSlider" Orientation="Vertical" Minimum="0" Maximum="120" TickFrequency="1" IsSnapToTickEnabled="True"

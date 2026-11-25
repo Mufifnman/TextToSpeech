@@ -79,18 +79,6 @@ namespace TextToSpeech
             Closed += (_, _) => { reading.Dispose(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
 
-        /// <summary>A bold, unclickable title at the top of a popup menu so people know what they are choosing.</summary>
-        private static void AddMenuHeading(ContextMenu menu, string title)
-        {
-            menu.Items.Add(new MenuItem
-            {
-                Header = title,
-                IsEnabled = false,
-                FontWeight = FontWeights.SemiBold,
-            });
-            menu.Items.Add(new Separator());
-        }
-
         /// <summary>Rebuilds the voice menu from what is installed, keeping the current choice if it still exists.</summary>
         private void RefreshVoices()
         {
@@ -106,7 +94,7 @@ namespace TextToSpeech
         private void BuildVoiceMenu()
         {
             voiceMenu.Items.Clear();
-            AddMenuHeading(voiceMenu, "Voice");
+            PopupMenus.AddHeading(voiceMenu, "Voice");
             foreach (VoiceInfo voice in catalog.Voices)
             {
                 var item = new MenuItem
@@ -126,19 +114,11 @@ namespace TextToSpeech
             voiceButton.ToolTip = selectedVoice != null ? "Voice: " + selectedVoice.DisplayName : "Choose the voice";
         }
 
-        private void FiltersButton_Click(object sender, RoutedEventArgs e)
-        {
-            filtersMenu.PlacementTarget = filtersButton;
-            filtersMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
-            filtersMenu.IsOpen = true;
-        }
+        private void FiltersButton_Click(object sender, RoutedEventArgs e) =>
+            PopupMenus.Open(filtersMenu, filtersButton, System.Windows.Controls.Primitives.PlacementMode.Top);
 
-        private void VoiceButton_Click(object sender, RoutedEventArgs e)
-        {
-            voiceMenu.PlacementTarget = voiceButton;
-            voiceMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-            voiceMenu.IsOpen = true;
-        }
+        private void VoiceButton_Click(object sender, RoutedEventArgs e) =>
+            PopupMenus.Open(voiceMenu, voiceButton, System.Windows.Controls.Primitives.PlacementMode.Top);
 
         private void VoiceMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -168,7 +148,7 @@ namespace TextToSpeech
         private void BuildFiltersMenu()
         {
             filtersMenu.Items.Clear();
-            AddMenuHeading(filtersMenu, "Filters");
+            PopupMenus.AddHeading(filtersMenu, "Filters");
             foreach (string group in FilterRegistry.Groups)
             {
                 var groupItem = new MenuItem { Header = group };
@@ -459,41 +439,17 @@ namespace TextToSpeech
             {
                 return;
             }
-            // Retrieves data
-            IDataObject iData = Clipboard.GetDataObject();
-            // Is Data Text?
-            if (iData.GetDataPresent(DataFormats.Text))
+            IDataObject data = Clipboard.GetDataObject();
+            if (data.GetDataPresent(DataFormats.Text))
             {
-                string[] textList = textbox.Text.Split('\n');
-                string copyData = GetLongest((String)iData.GetData(DataFormats.Text));
-
-                if (!(textList.Contains(copyData) || document.ContainsUnread(copyData)))
+                string clipboardText = (string)data.GetData(DataFormats.Text);
+                string? prepared = ClipboardIntake.Prepare(clipboardText, textbox.Text, document, filterSettings);
+                if (prepared != null)
                 {
-                    string preFiltered = (String)iData.GetData(DataFormats.Text) + "\n";
-
-                    Filters.ApplyClipboardFilters(ref preFiltered, filterSettings);
-
-                    textbox.Text = textbox.Text + "\n" + preFiltered;
+                    textbox.Text = textbox.Text + "\n" + prepared;
                     Clipboard.Clear();
                 }
             }
-        }
-
-        /// <summary>
-        /// Current repeat prevention technique (not great).
-        /// More complex logic needed i.e. for each split if not in list insert (but where? after one that was?)
-        /// </summary>
-        private string GetLongest(string p)
-        {
-            string longest = "";
-            foreach (string item in SentenceSplitter.Split(p))
-            {
-                if (item.Length > longest.Length)
-                {
-                    longest = item;
-                }
-            }
-            return longest;
         }
 
         // ---- speaking speed: SAPI scale, -2 (slow) to 10 (fast) ----
@@ -668,19 +624,9 @@ namespace TextToSpeech
                 return;
             }
 
-            string readText = outcome.Text;
             // A sentence cut off at the bottom of the last capture continues at the top of this one.
             // GUESS: only joins when we are on or past the last sentence, as the old savedEnd did.
-            string? tail = document.TakeIncompleteTail();
-            if (tail != null)
-            {
-                readText = tail + " " + readText;
-            }
-
-            Filters.CombineLines(ref readText);
-            readText = readText.Replace('\u00A1', 'i');
-
-            Filters.ApplyOcrFilters(ref readText, filterSettings);
+            string readText = OcrTextProcessor.Process(outcome.Text, document.TakeIncompleteTail(), filterSettings);
 
             textbox.Text = readText;
 

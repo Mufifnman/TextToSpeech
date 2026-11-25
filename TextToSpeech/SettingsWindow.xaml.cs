@@ -91,10 +91,10 @@ namespace TextToSpeech
 
         private void OcrButton_Click(object sender, RoutedEventArgs e)
         {
-            if (ocrButton.ContextMenu == null) return;
-            ocrButton.ContextMenu.PlacementTarget = ocrButton;
-            ocrButton.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-            ocrButton.ContextMenu.IsOpen = true;
+            if (ocrButton.ContextMenu != null)
+            {
+                PopupMenus.Open(ocrButton.ContextMenu, ocrButton, System.Windows.Controls.Primitives.PlacementMode.Bottom);
+            }
         }
 
         private void ChooseOcr(OcrOptions option)
