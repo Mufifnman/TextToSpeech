@@ -14,11 +14,12 @@ namespace TextToSpeech
     /// </summary>
     public sealed class ReadingDisplay : ScrollViewer
     {
-        // GUESS: colours chosen for contrast on a light theme; easy to change here.
-        private static readonly Brush SentenceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xF3, 0xB0));
-        private static readonly Brush WordBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00));
-        private static readonly Brush HoverBrush = new SolidColorBrush(Color.FromRgb(0xCF, 0xE8, 0xFF));
-        private static readonly Brush ReadBrush = new SolidColorBrush(Color.FromRgb(0x70, 0x70, 0x70));
+        // Colors come from the theme (light or dark); the fallbacks only matter if a resource is missing.
+        private Brush SentenceBrush => (Brush?)TryFindResource("ReadSentenceBrush") ?? Brushes.Khaki;
+        private Brush WordBrush => (Brush?)TryFindResource("ReadWordBrush") ?? Brushes.Orange;
+        private Brush HoverBrush => (Brush?)TryFindResource("ReadHoverBrush") ?? Brushes.LightSkyBlue;
+        private Brush ReadBrush => (Brush?)TryFindResource("ReadReadBrush") ?? Brushes.Gray;
+        private Brush TextBrush => (Brush?)TryFindResource("ThemeText") ?? Brushes.Black;
 
         private readonly TextBlock textBlock = new() { TextWrapping = TextWrapping.Wrap, Padding = new Thickness(6) };
         private readonly List<List<Run>> runs = new();
@@ -29,7 +30,7 @@ namespace TextToSpeech
         {
             Content = textBlock;
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-            Background = Brushes.WhiteSmoke;
+            SetResourceReference(BackgroundProperty, "ThemeSurface");
         }
 
         /// <summary>Raised when the user clicks a word. Arguments are the sentence and word index.</summary>
@@ -52,6 +53,15 @@ namespace TextToSpeech
                     document.PositionChanged += OnPositionChanged;
                 }
                 Rebuild();
+            }
+        }
+
+        /// <summary>Re-applies colors after the Windows theme changed.</summary>
+        public void RefreshTheme()
+        {
+            if (document != null && runs.Count > 0)
+            {
+                RestyleAll();
             }
         }
 
@@ -157,7 +167,7 @@ namespace TextToSpeech
             run.Background = isCurrentWord ? WordBrush : isCurrentSentence ? SentenceBrush : null;
             run.FontWeight = isCurrentWord ? FontWeights.Bold : FontWeights.Normal;
             run.TextDecorations = isCurrentWord ? TextDecorations.Underline : null;
-            run.Foreground = s < current ? ReadBrush : Brushes.Black;
+            run.Foreground = s < current ? ReadBrush : TextBrush;
         }
 
         private void ScrollCurrentIntoView()

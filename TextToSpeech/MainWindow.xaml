@@ -3,40 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
+        Background="{DynamicResource ThemeBackground}" Foreground="{DynamicResource ThemeText}"
         Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown" SizeChanged="Window_SizeChanged">
     <Window.Resources>
-        <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
-
-        <!-- Every button in the window: rounded corners, light hover / pressed colors. -->
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#FFE1E1E1"/>
-            <Setter Property="BorderBrush" Value="#FFADADAD"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" CornerRadius="6" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#FFE5F1FB"/>
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#FF0078D7"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#FFCCE4F7"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <!-- Bottom option row: flat (same color as the window), small, with a subtle hover and pressed highlight. -->
         <Style x:Key="BarButton" TargetType="Button">
             <Setter Property="Height" Value="26"/>
@@ -46,6 +15,7 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -57,10 +27,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#1F000000"/>
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatHover}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#38000000"/>
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatPressed}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -82,11 +52,11 @@
             <!-- Top middle: send text from the reading pane back to the editable box -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" Panel.ZIndex="2">
                 <Button x:Name="bringBackLeft" Click="BringBackLeft_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
-                        Background="#D9FFFFFF" ToolTip="Bring back what is left to read (from the current sentence on) into the edit box">
+                        Background="{DynamicResource ThemeOverlay}" ToolTip="Bring back what is left to read (from the current sentence on) into the edit box">
                     <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
                 </Button>
                 <Button x:Name="bringBackAll" Click="BringBackAll_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
-                        Background="#D9FFFFFF" ToolTip="Bring back all the text (read and unread) into the edit box">
+                        Background="{DynamicResource ThemeOverlay}" ToolTip="Bring back all the text (read and unread) into the edit box">
                     <StackPanel>
                         <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-1,0,-5"/>
                         <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-5,0,-1"/>
@@ -101,7 +71,7 @@
             <!-- Bottom right of the edit box, only while it is expanded: shrink it back to one line -->
             <Button x:Name="shrinkInput" Grid.Row="1" Click="ShrinkInput_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="26"
                     HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,4" Panel.ZIndex="2" Visibility="Collapsed"
-                    Background="#D9FFFFFF" ToolTip="Shrink the edit box back to one line">
+                    Background="{DynamicResource ThemeOverlay}" ToolTip="Shrink the edit box back to one line">
                 <TextBlock Text="&#xE73F;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
             </Button>
         </Grid>
@@ -166,7 +136,7 @@
                         </StackPanel>
                     </Button>
                     <Popup x:Name="speedPopup" PlacementTarget="{Binding ElementName=speedButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                        <Border Background="{DynamicResource ThemeSurface}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="speedPopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                 <Slider x:Name="speedSlider" Orientation="Vertical" Minimum="-2" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
@@ -184,7 +154,7 @@
                         </StackPanel>
                     </Button>
                     <Popup x:Name="volumePopup" PlacementTarget="{Binding ElementName=volumeButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
-                        <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                        <Border Background="{DynamicResource ThemeSurface}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock x:Name="volumePopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                 <Slider x:Name="volumeSlider" Orientation="Vertical" Minimum="0" Maximum="120" TickFrequency="5" IsSnapToTickEnabled="True"

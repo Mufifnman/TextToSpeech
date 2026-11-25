@@ -57,6 +57,7 @@ namespace TextToSpeech
             BuildOcrMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); };
+            ThemeManager.Changed += () => __ReadListDisplay__.RefreshTheme();
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
 
