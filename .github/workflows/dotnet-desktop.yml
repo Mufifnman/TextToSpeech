@@ -5,43 +5,51 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
 
     env:
-      Solution_Name: TextToSpeech.sln   # Replace with your solution name
+      Solution_Name: TextToSpeech.sln
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    # Install the .NET Core
-    - name: Install .NET Core
-      uses: actions/setup-dotnet@v3
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'  # Specify your .NET version
+        dotnet-version: '8.0.x'
 
-    # Add MSBuild to the PATH
     - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v1.0.2
-          
-    # Restore NuGet packages
+      uses: microsoft/setup-msbuild@v2
+
     - name: Restore NuGet packages
       run: dotnet restore $env:Solution_Name
 
-    # Build the solution
     - name: Build the application
       run: msbuild $env:Solution_Name /p:Configuration=Release
 
+    - name: Run tests
+      run: dotnet test TextToSpeech.Tests/TextToSpeech.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Test Results
+        path: TestResults/*.trx
+        if-no-files-found: ignore
+
     # Upload build artifacts (the built executable files)
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Executable Files
         path: |
-          **\bin\Release\**\*.exe
-          **\bin\Release\**\*.dll
+          TextToSpeech/bin/Release/**/*
+        if-no-files-found: error
