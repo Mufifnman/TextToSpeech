@@ -52,6 +52,7 @@ namespace TextToSpeech
             __ReadListDisplay__.WordClicked += JumpTo;
 
             BuildFiltersMenu();
+            BuildOcrMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => SetupHotkeys();
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
@@ -496,21 +497,39 @@ namespace TextToSpeech
             settings.Save();
         }
 
-        private OcrOptions selectedOCROption = new OcrOptions();
+        private OcrOptions selectedOCROption = OcrOptions.Windows;
 
-        private void OcrOptionsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        /// <summary>One checkable item per OCR engine; the gear button next to Read Region opens it.</summary>
+        private void BuildOcrMenu()
         {
-            var comboBox = sender as ComboBox;
-            var selectedItem = comboBox.SelectedItem;
-
-            if (selectedItem != null)
+            ocrMenu.Items.Clear();
+            foreach (OcrOptions option in Enum.GetValues<OcrOptions>())
             {
-                selectedOCROption = (OcrOptions)comboBox.SelectedItem;
+                var item = new MenuItem
+                {
+                    Header = option.ToString(),
+                    IsCheckable = true,
+                    IsChecked = option == selectedOCROption,
+                    Tag = option,
+                };
+                item.Click += OcrMenuItem_Click;
+                ocrMenu.Items.Add(item);
             }
+            ocrButton.ToolTip = "OCR engine for Read Region: " + selectedOCROption;
         }
 
-        /// <summary>Screen region last picked by the user, so "Again" can re-read it (e.g. after scrolling).</summary>
-        private System.Drawing.Rectangle? lastRegion;
+        private void OcrButton_Click(object sender, RoutedEventArgs e)
+        {
+            ocrMenu.PlacementTarget = ocrButton;
+            ocrMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            ocrMenu.IsOpen = true;
+        }
+
+        private void OcrMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            selectedOCROption = (OcrOptions)((MenuItem)sender).Tag;
+            BuildOcrMenu(); // refresh the check mark
+        }
 
         private bool isCapturing;
 
@@ -536,8 +555,6 @@ namespace TextToSpeech
                     return;
                 }
 
-                lastRegion = region;
-                __ReadAgain.IsEnabled = true;
                 await CaptureAndReadAsync(region.Value);
             }
             finally
@@ -567,8 +584,6 @@ namespace TextToSpeech
                 {
                     return null;
                 }
-                lastRegion = region;
-                __ReadAgain.IsEnabled = true;
                 await Task.Delay(150);
                 using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Value.Location, region.Value.Size);
                 var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
@@ -577,26 +592,6 @@ namespace TextToSpeech
             finally
             {
                 WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
-                isCapturing = false;
-            }
-        }
-
-        /// <summary>"Again": re-capture the last region without picking it again.</summary>
-        private async void ReadSameRegion(object sender, RoutedEventArgs e)
-        {
-            if (isCapturing || lastRegion == null)
-            {
-                return;
-            }
-            isCapturing = true;
-            try
-            {
-                WindowState = WindowState.Minimized;
-                await Task.Delay(200);
-                await CaptureAndReadAsync(lastRegion.Value);
-            }
-            finally
-            {
                 isCapturing = false;
             }
         }

@@ -4,9 +4,6 @@
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
         Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
-    <Window.Resources>
-        <local:EnumToEnumerableConverter x:Key="EnumToEnumerableConverter" />
-    </Window.Resources>
     <Grid Margin="0,0,0,-5">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -33,9 +30,6 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" Focusable="False"/>
                 <Button x:Name="___RewindButton_" Content="&#9198; Back" Grid.Column="1" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)"/>
@@ -43,8 +37,6 @@
                 <Button x:Name="___SkipButton_" Content="Skip &#9197;" Grid.Column="3" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)"/>
                 <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="4" Click="StopRead" Focusable="False"/>
                 <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="5" Click="ClearList" Focusable="False"/>
-                <Button x:Name="__ImageRead" Content="Read Region" Grid.Column="6" Click="ImageRead" Focusable="False" ToolTip="Drag a box around text on screen to read it aloud"/>
-                <Button x:Name="__ReadAgain" Content="Again" Grid.Column="7" Padding="8,0" IsEnabled="False" Click="ReadSameRegion" Focusable="False" ToolTip="Read the same screen region again (for example after scrolling)"/>
                 </Grid>
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
@@ -69,11 +61,14 @@
                             <ContextMenu x:Name="voiceMenu" />
                         </Button.ContextMenu>
                     </Button>
-                    <TextBlock Text="OCR: " Margin="0,3,0,4" />
-                    <ComboBox x:Name="ocrOptionsComboBox" SelectionChanged="OcrOptionsComboBox_SelectionChanged" 
-                        ItemsSource="{Binding Source={x:Type local:OcrOptions}, Converter={StaticResource EnumToEnumerableConverter}}"
-                        SelectedIndex="0">
-                    </ComboBox>
+                    <Button x:Name="__ImageRead" Content="Read Region" Click="ImageRead" Focusable="False" Margin="0,0,4,0" Padding="8,0"
+                            ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
+                    <Button x:Name="ocrButton" Content="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Click="OcrButton_Click" Focusable="False" Padding="8,0"
+                            ToolTip="Choose the OCR engine used by Read Region">
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="ocrMenu" />
+                        </Button.ContextMenu>
+                    </Button>
                 </StackPanel>
             </Grid>
             <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
