@@ -16,7 +16,7 @@ namespace TextToSpeech
     /// The text being read lives in <see cref="ReadingDocument"/> (TextToSpeech.Core); this
     /// class only turns document positions into speech and user input into document moves.
     /// </summary>
-    public partial class MainWindow : System.Windows.Window
+    public partial class MainWindow : System.Windows.Window, IRegionReader
     {
         // objects
         SpeechSynthesizer? reader = null;
@@ -45,6 +45,7 @@ namespace TextToSpeech
             psychologyFilterItem.IsChecked = filterSettings.PsychologyCitations;
             governmentFilterItem.IsChecked = filterSettings.GovernmentCitations;
             ahitFilterItem.IsChecked = filterSettings.AhitStarredQuestions;
+            RegionReader = this;
             SourceInitialized += (_, _) => SetupHotkeys();
             Closed += (_, _) => hotkeys?.Dispose();
         }
@@ -361,31 +362,113 @@ namespace TextToSpeech
             }
         }
 
-        private void ImageRead(object sender, RoutedEventArgs e)
+        /// <summary>Screen region last picked by the user, so "Again" can re-read it (e.g. after scrolling).</summary>
+        private System.Drawing.Rectangle? lastRegion;
+
+        private bool isCapturing;
+
+        /// <summary>"Read Region": let the user drag a box around text, then OCR and read it.</summary>
+        private async void ImageRead(object sender, RoutedEventArgs e)
         {
-            Bitmap bitmap = CaptureScreenBehindWinodw();
-
-            string readText, errorMessage;
-
-            bool ocrTextReadSucceded = false;
-            switch (selectedOCROption)
+            if (isCapturing)
             {
-                case OcrOptions.OneNote:
-                    ocrTextReadSucceded = OneNoteOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
-                    break;
-                case OcrOptions.Tesseract:
-                    ocrTextReadSucceded = TesseractOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                return;
             }
-
-            if (!ocrTextReadSucceded)
+            isCapturing = true;
+            try
             {
-                textbox.Text = errorMessage;
+                // Get our own window out of the way while the user picks a region.
+                var previousState = WindowState;
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200); // let the minimize animation finish
+
+                var region = RegionSelectWindow.Pick();
+                if (region == null)
+                {
+                    WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
+                    return;
+                }
+
+                lastRegion = region;
+                __ReadAgain.IsEnabled = true;
+                await CaptureAndReadAsync(region.Value);
+            }
+            finally
+            {
+                isCapturing = false;
+            }
+        }
+
+        /// <summary>
+        /// Lets the user drag a region, OCRs it and returns the recognized text (not yet queued for reading).
+        /// Returns null if the user cancels or nothing was recognized. Used by other entry points such as hotkeys.
+        /// </summary>
+        public async Task<string?> SelectRegionAndReadAsync()
+        {
+            if (isCapturing)
+            {
+                return null;
+            }
+            isCapturing = true;
+            var previousState = WindowState;
+            try
+            {
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200);
+                var region = RegionSelectWindow.Pick();
+                if (region == null)
+                {
+                    return null;
+                }
+                lastRegion = region;
+                __ReadAgain.IsEnabled = true;
+                await Task.Delay(150);
+                using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Value.Location, region.Value.Size);
+                var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+                return outcome.Succeeded && !string.IsNullOrWhiteSpace(outcome.Text) ? outcome.Text : null;
+            }
+            finally
+            {
+                WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
+                isCapturing = false;
+            }
+        }
+
+        /// <summary>"Again": re-capture the last region without picking it again.</summary>
+        private async void ReadSameRegion(object sender, RoutedEventArgs e)
+        {
+            if (isCapturing || lastRegion == null)
+            {
+                return;
+            }
+            isCapturing = true;
+            try
+            {
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200);
+                await CaptureAndReadAsync(lastRegion.Value);
+            }
+            finally
+            {
+                isCapturing = false;
+            }
+        }
+
+        private async Task CaptureAndReadAsync(System.Drawing.Rectangle region)
+        {
+            // Give the desktop a moment to repaint after the overlay closes, so it isn't captured.
+            await Task.Delay(150);
+            using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Location, region.Size);
+
+            var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+            if (!outcome.Succeeded || string.IsNullOrWhiteSpace(outcome.Text))
+            {
+                WindowState = WindowState.Normal;
+                textbox.Text = outcome.ErrorMessage ?? "No text found in that region. Try a bigger box, or switch the OCR engine.";
                 return;
             }
 
+            string readText = outcome.Text;
             // A sentence cut off at the bottom of the last capture continues at the top of this one.
             // GUESS: only joins when we are on or past the last sentence, as the old savedEnd did.
             string? tail = document.TakeIncompleteTail();
@@ -401,24 +484,8 @@ namespace TextToSpeech
 
             textbox.Text = readText;
 
-            //Minimize then read
-            this.WindowState = System.Windows.WindowState.Minimized;
-            this.ReadText(sender, e);
-        }
-
-        private Bitmap CaptureScreenBehindWinodw()
-        {
-            System.Drawing.Size size = new System.Drawing.Size((int)this.ActualWidth, (int)this.ActualHeight);
-            System.Drawing.Point origin = new System.Drawing.Point((int)this.Left, (int)this.Top);
-
-            // move window up for capture
-            this.Top = this.Top + size.Height;
-
-            var bitmap = Utilities.CaptureScreenInArea(origin, size);
-
-            // move window back down
-            this.Top = this.Top - size.Height;
-            return bitmap;
+            // Stay minimized while reading; ReadList restores the window when it finishes.
+            this.ReadText(this, new RoutedEventArgs());
         }
 
         /// <summary>

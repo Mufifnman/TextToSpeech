@@ -15,7 +15,7 @@ namespace TextToSpeech
 
         private TesseractOCRManager() : base ()
         {
-            tesseractEngine = new TesseractEngine(@"./tessdata", "eng", EngineMode.LstmOnly);
+            tesseractEngine = new TesseractEngine(System.IO.Path.Combine(AppContext.BaseDirectory, "tessdata"), "eng", EngineMode.LstmOnly);
             tesseractEngine.DefaultPageSegMode = PageSegMode.Auto;
         }
 
