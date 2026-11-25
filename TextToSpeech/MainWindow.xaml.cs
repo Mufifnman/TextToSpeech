@@ -7,6 +7,7 @@ using System.Speech.Synthesis;
 using System.Text;
 
 using System.Windows.Controls;
+using TextToSpeech.Hotkeys;
 
 
 namespace TextToSpeech
@@ -32,6 +33,82 @@ namespace TextToSpeech
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
             DataContext = readingTextView;
             InitializeComponent();
+            SourceInitialized += (_, _) => SetupHotkeys();
+            Closed += (_, _) => hotkeys?.Dispose();
+        }
+
+        // ---- global hotkeys (logic lives in the Hotkeys folder) ----
+        HotkeySettings hotkeySettings = HotkeySettings.Load();
+        GlobalHotkeyManager hotkeys;
+
+        /// <summary>Set by the region-OCR overlay work; until then the hotkey uses the Read Image button flow.</summary>
+        public IRegionReader RegionReader { get; set; }
+
+        private void SetupHotkeys()
+        {
+            hotkeys ??= new GlobalHotkeyManager(this);
+            hotkeys.UnregisterAll();
+            var failed = new List<string>();
+            if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey()))
+                failed.Add(hotkeySettings.GetReadSelection().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetSummonWindow(), BringToFront))
+                failed.Add(hotkeySettings.GetSummonWindow().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey()))
+                failed.Add(hotkeySettings.GetReadRegion().ToString());
+            if (failed.Count > 0)
+            {
+                Title = "Text to Speech (hotkey in use by another app: " + string.Join(", ", failed) + ")";
+            }
+            else
+            {
+                Title = "Text to Speech";
+            }
+        }
+
+        private void BringToFront()
+        {
+            if (WindowState == System.Windows.WindowState.Minimized)
+                WindowState = System.Windows.WindowState.Normal;
+            Show();
+            Topmost = true;   // reliable way to beat foreground-lock rules
+            Topmost = false;
+            Activate();
+            Focus();
+        }
+
+        private async Task ReadSelectionHotkey()
+        {
+            string text = await SelectionCapture.GetSelectedTextAsync();
+            if (text == null) return;
+            QueueTextAndRead(text);
+        }
+
+        private async Task ReadRegionHotkey()
+        {
+            if (RegionReader == null)
+            {
+                BringToFront(); // fallback: the existing Read Image flow captures the screen behind the window
+                ImageRead(this, new RoutedEventArgs());
+                return;
+            }
+            string text = await RegionReader.SelectRegionAndReadAsync();
+            if (string.IsNullOrWhiteSpace(text)) return;
+            QueueTextAndRead(text);
+        }
+
+        private void QueueTextAndRead(string text)
+        {
+            Filters.WikipediaCitation(ref text);
+            Filters.GovernmentFilter(ref text);
+            textbox.Text = text;
+            if (hotkeySettings.ReadingSummonsWindow) BringToFront();
+            ReadText(this, new RoutedEventArgs());
+        }
+
+        private void HotkeySettings_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new HotkeySettingsWindow(hotkeySettings) { Owner = this };
+            if (dlg.ShowDialog() == true) SetupHotkeys();
         }
 
         private void ReadText(object sender, RoutedEventArgs e)
