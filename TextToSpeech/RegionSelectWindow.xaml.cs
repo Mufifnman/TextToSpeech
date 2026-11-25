@@ -17,8 +17,10 @@ namespace TextToSpeech
 
         private WpfPoint? dragStart;
 
-        /// <summary>The selected region in screen pixels, or null if the user cancelled.</summary>
-        public DrawingRectangle? SelectedRegion { get; private set; }
+        /// <summary>The selected region as pixels of the frozen screenshot, or null if the user cancelled.</summary>
+        public DrawingRectangle? SelectedCrop { get; private set; }
+
+        private System.Drawing.Size frozenSize;
 
         public RegionSelectWindow()
         {
@@ -40,17 +42,39 @@ namespace TextToSpeech
             };
         }
 
-        /// <summary>Shows the overlay and returns the region the user picked, in screen pixels.</summary>
-        public static DrawingRectangle? Pick(Window? owner = null)
+        /// <summary>
+        /// Shows the frozen screenshot full screen and lets the user drag a box on it. Returns the box as pixels
+        /// of <paramref name="frozen"/>, or null if the user cancelled. No owner is set, so a hidden or minimized
+        /// main window stays exactly where it is.
+        /// </summary>
+        public static DrawingRectangle? PickFrozen(System.Drawing.Bitmap frozen)
         {
-            var picker = new RegionSelectWindow();
-            if (owner != null && owner.IsVisible)
-            {
-                picker.Owner = owner;
-            }
+            var picker = new RegionSelectWindow { frozenSize = frozen.Size };
+            picker.Backdrop.Source = ToBitmapSource(frozen);
+            picker.Backdrop.Width = picker.Width;
+            picker.Backdrop.Height = picker.Height;
             picker.ShowDialog();
-            return picker.SelectedRegion;
+            return picker.SelectedCrop;
         }
+
+        private static System.Windows.Media.Imaging.BitmapSource ToBitmapSource(System.Drawing.Bitmap bitmap)
+        {
+            IntPtr handle = bitmap.GetHbitmap();
+            try
+            {
+                var source = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                    handle, IntPtr.Zero, Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+                source.Freeze();
+                return source;
+            }
+            finally
+            {
+                DeleteObject(handle);
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr handle);
 
         private void PlaceHint()
         {
@@ -98,15 +122,8 @@ namespace TextToSpeech
                 return;
             }
 
-            // PointToScreen converts DIPs to the device pixels CopyFromScreen expects,
-            // which keeps this correct on high-DPI displays.
-            var topLeft = Root.PointToScreen(rect.TopLeft);
-            var bottomRight = Root.PointToScreen(rect.BottomRight);
-            SelectedRegion = new DrawingRectangle(
-                (int)Math.Round(topLeft.X),
-                (int)Math.Round(topLeft.Y),
-                (int)Math.Round(bottomRight.X - topLeft.X),
-                (int)Math.Round(bottomRight.Y - topLeft.Y));
+            SelectedCrop = RegionMath.ToBitmapRect(rect.X, rect.Y, rect.Width, rect.Height,
+                Root.ActualWidth, Root.ActualHeight, frozenSize.Width, frozenSize.Height);
 
             Close();
         }
@@ -140,7 +157,7 @@ namespace TextToSpeech
 
         private void Cancel()
         {
-            SelectedRegion = null;
+            SelectedCrop = null;
             if (IsMouseCaptured)
             {
                 ReleaseMouseCapture();

@@ -391,11 +391,6 @@ namespace TextToSpeech
                     // The app brought the window up for this read and nobody touched it: put it away again.
                     this.WindowState = System.Windows.WindowState.Minimized;
                 }
-                // Done: maximize so next image can be scanned or line can be copied
-                else if (this.WindowState == System.Windows.WindowState.Minimized)
-                {
-                    this.WindowState = System.Windows.WindowState.Normal;
-                }
                 UpdatePauseButton();
                 return;
             }
@@ -760,7 +755,20 @@ namespace TextToSpeech
 
         private bool isCapturing;
 
-        /// <summary>"Read Region": let the user drag a box around text, then OCR and read it.</summary>
+        /// <summary>
+        /// Takes the screenshot first (before any of our own UI exists), shows it frozen full screen, lets the user drag
+        /// a box on it and returns just that part. The main window is never shown, restored or minimized for this.
+        /// Returns null if the user cancels. The caller disposes the bitmap.
+        /// </summary>
+        private System.Drawing.Bitmap? PickFrozenCrop()
+        {
+            var bounds = ScreenGeometry.VirtualScreenPixels();
+            using System.Drawing.Bitmap frozen = Utilities.CaptureScreenInArea(bounds.Location, bounds.Size);
+            var crop = RegionSelectWindow.PickFrozen(frozen);
+            return crop == null ? null : frozen.Clone(crop.Value, frozen.PixelFormat);
+        }
+
+        /// <summary>"Read Region": freeze the screen, let the user drag a box around text, then OCR and read it.</summary>
         private async void ImageRead(object sender, RoutedEventArgs e)
         {
             if (isCapturing)
@@ -770,19 +778,12 @@ namespace TextToSpeech
             isCapturing = true;
             try
             {
-                // Get our own window out of the way while the user picks a region.
-                var previousState = WindowState;
-                WindowState = WindowState.Minimized;
-                await Task.Delay(200); // let the minimize animation finish
-
-                var region = RegionSelectWindow.Pick();
-                if (region == null)
+                using var crop = PickFrozenCrop();
+                if (crop == null)
                 {
-                    WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
                     return;
                 }
-
-                await CaptureAndReadAsync(region.Value);
+                await ReadCropAsync(crop);
             }
             finally
             {
@@ -791,7 +792,7 @@ namespace TextToSpeech
         }
 
         /// <summary>
-        /// Lets the user drag a region, OCRs it and returns the recognized text (not yet queued for reading).
+        /// Same as Read Region but returns the recognized text instead of reading it (not yet queued).
         /// Returns null if the user cancels or nothing was recognized. Used by other entry points such as hotkeys.
         /// </summary>
         public async Task<string?> SelectRegionAndReadAsync()
@@ -801,39 +802,30 @@ namespace TextToSpeech
                 return null;
             }
             isCapturing = true;
-            var previousState = WindowState;
             try
             {
-                WindowState = WindowState.Minimized;
-                await Task.Delay(200);
-                var region = RegionSelectWindow.Pick();
-                if (region == null)
+                using var crop = PickFrozenCrop();
+                if (crop == null)
                 {
                     return null;
                 }
-                await Task.Delay(150);
-                using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Value.Location, region.Value.Size);
-                var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+                var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(crop);
                 return outcome.Succeeded && !string.IsNullOrWhiteSpace(outcome.Text) ? outcome.Text : null;
             }
             finally
             {
-                WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
                 isCapturing = false;
             }
         }
 
-        private async Task CaptureAndReadAsync(System.Drawing.Rectangle region)
+        private async Task ReadCropAsync(Bitmap crop)
         {
-            // Give the desktop a moment to repaint after the overlay closes, so it isn't captured.
-            await Task.Delay(150);
-            using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Location, region.Size);
-
-            var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+            var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(crop);
             if (!outcome.Succeeded || string.IsNullOrWhiteSpace(outcome.Text))
             {
-                WindowState = WindowState.Normal;
-                textbox.Text = outcome.ErrorMessage ?? "No text found in that region. Try a bigger box, or switch the OCR engine.";
+                string message = outcome.ErrorMessage ?? "No text found in that region. Try a bigger box, or switch the OCR engine.";
+                textbox.Text = message;
+                statusText.Text = message;
                 return;
             }
 
@@ -853,7 +845,6 @@ namespace TextToSpeech
 
             textbox.Text = readText;
 
-            // Stay minimized while reading; ReadList restores the window when it finishes.
             this.ReadText(this, new RoutedEventArgs());
         }
 

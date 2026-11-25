@@ -216,3 +216,46 @@ public class LookAheadCacheTests
         Assert.Equal(0, cache.Count);
     }
 }
+
+
+public class RegionMathTests
+{
+    [Fact]
+    public void SelectionOnAScaledScreen_MapsToTheRightPixels()
+    {
+        // Overlay is 1920 x 1080 units, the screenshot 3840 x 2160 pixels (200% scaling).
+        var r = TextToSpeech.RegionMath.ToBitmapRect(100, 50, 400, 200, 1920, 1080, 3840, 2160);
+        Assert.Equal(new System.Drawing.Rectangle(200, 100, 800, 400), r);
+    }
+
+    [Fact]
+    public void SameSizeSurfaceAndScreenshot_IsAStraightCopy()
+    {
+        var r = TextToSpeech.RegionMath.ToBitmapRect(10, 20, 30, 40, 800, 600, 800, 600);
+        Assert.Equal(new System.Drawing.Rectangle(10, 20, 30, 40), r);
+    }
+
+    [Fact]
+    public void SelectionPastTheEdge_IsClampedInsideTheScreenshot()
+    {
+        var r = TextToSpeech.RegionMath.ToBitmapRect(700, 500, 400, 400, 800, 600, 800, 600);
+        Assert.Equal(new System.Drawing.Rectangle(700, 500, 100, 100), r);
+        Assert.True(r.Right <= 800 && r.Bottom <= 600);
+    }
+
+    [Fact]
+    public void TinyOrNegativeSelection_StillHasAtLeastOnePixel()
+    {
+        var r = TextToSpeech.RegionMath.ToBitmapRect(-5, -5, 0.2, 0.2, 800, 600, 800, 600);
+        Assert.True(r.Width >= 1 && r.Height >= 1);
+        Assert.True(r.X >= 0 && r.Y >= 0);
+    }
+
+    [Fact]
+    public void OverlayAndScreenshotOfDifferentShape_StillMapCornersToCorners()
+    {
+        // Mixed-DPI setups can make the two disagree on aspect; the ratio still maps corner to corner.
+        var r = TextToSpeech.RegionMath.ToBitmapRect(0, 0, 1000, 500, 1000, 500, 4000, 1500);
+        Assert.Equal(new System.Drawing.Rectangle(0, 0, 4000, 1500), r);
+    }
+}
