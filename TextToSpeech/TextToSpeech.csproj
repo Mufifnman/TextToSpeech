@@ -41,6 +41,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TextToSpeech.Core\TextToSpeech.Core.csproj" />
+    <ProjectReference Include="..\PlainRules\src\PlainRules\PlainRules.csproj" />
   </ItemGroup>
 
   <ItemGroup>

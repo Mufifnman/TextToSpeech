@@ -69,6 +69,7 @@ namespace TextToSpeech
             UpdateBringBackVisibility();
             __ReadListDisplay__.WordClicked += reading.JumpTo;
 
+            CustomFilterManager.Reload();
             BuildFiltersMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); };
@@ -166,6 +167,89 @@ namespace TextToSpeech
                     groupItem.Items.Add(item);
                 }
                 filtersMenu.Items.Add(groupItem);
+            }
+            AddCustomFilterCommands();
+        }
+
+        // ---- custom filters (editor and files live in CustomFilters/ and FilterEditorWindow) ----
+
+        private void AddCustomFilterCommands()
+        {
+            filtersMenu.Items.Add(new Separator());
+            var add = new MenuItem { Header = "+ New filter..." };
+            add.Click += (_, _) => OpenFilterEditor(null);
+            filtersMenu.Items.Add(add);
+
+            if (CustomFilterManager.Entries.Count > 0)
+            {
+                var edit = new MenuItem { Header = "Edit a filter" };
+                foreach (var entry in CustomFilterManager.Entries)
+                {
+                    var item = new MenuItem
+                    {
+                        Header = entry.IsUsable ? entry.DisplayName : entry.DisplayName + " (has a problem)",
+                        ToolTip = entry.Error,
+                    };
+                    var chosen = entry;
+                    item.Click += (_, _) => OpenFilterEditor(chosen);
+                    edit.Items.Add(item);
+                }
+                filtersMenu.Items.Add(edit);
+            }
+
+            var reload = new MenuItem { Header = "Reload filter files" };
+            reload.Click += (_, _) => ReloadCustomFilters();
+            filtersMenu.Items.Add(reload);
+
+            var open = new MenuItem { Header = "Open filters folder" };
+            open.Click += (_, _) => OpenFiltersFolder();
+            filtersMenu.Items.Add(open);
+
+            int problems = CustomFilterManager.Problems.Count();
+            if (problems > 0)
+            {
+                filtersMenu.Items.Add(new MenuItem
+                {
+                    Header = problems + (problems == 1 ? " filter file has a problem and is skipped" : " filter files have problems and are skipped"),
+                    IsEnabled = false,
+                    ToolTip = string.Join("\n", CustomFilterManager.Problems.Select(p => Path.GetFileName(p.FilePath) + ": " + p.Error)),
+                });
+            }
+        }
+
+        private void AddFilter_Click(object sender, RoutedEventArgs e) => OpenFilterEditor(null);
+
+        private void OpenFilterEditor(Core.CustomFilters.CustomFilterEntry? entry)
+        {
+            if (entry != null && entry.Set == null)
+            {
+                // The file could not even be read as a filter: let the person fix it by hand.
+                OpenFiltersFolder();
+                return;
+            }
+            string sample = textbox.Text ?? "";
+            if (sample.Length > 3000) sample = sample.Substring(0, 3000);
+            var editor = new FilterEditorWindow(CustomFilterManager.Library, entry, sample) { Owner = this };
+            editor.ShowDialog();
+            if (editor.Changed) ReloadCustomFilters();
+        }
+
+        private void ReloadCustomFilters()
+        {
+            CustomFilterManager.Reload();
+            BuildFiltersMenu();
+        }
+
+        private void OpenFiltersFolder()
+        {
+            try
+            {
+                Directory.CreateDirectory(CustomFilterManager.Library.Folder);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(CustomFilterManager.Library.Folder) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Could not open the filters folder: " + ex.Message, "Filters", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
