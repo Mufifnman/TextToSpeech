@@ -50,6 +50,15 @@ namespace TextToSpeech
         /// <summary>Seconds to wait after reading finishes before clearing, 1 to 60.</summary>
         public int AutoClearDelaySeconds { get; set; } = 3;
 
+        /// <summary>Also show the popup while the full window is open but not the window being used.</summary>
+        public bool ShowPopupWhenWindowUnfocused { get; set; } = false;
+
+        /// <summary>Popup width in pixels, 280 to 900.</summary>
+        public double PopupMaxWidth { get; set; } = 420;
+
+        /// <summary>Largest popup height in pixels, 90 to 700 (it is shorter when the text is short).</summary>
+        public double PopupMaxHeight { get; set; } = 260;
+
         /// <summary>Font size of the text in the reading popup, 10 to 32.</summary>
         public double PopupTextSize { get; set; } = 14;
 

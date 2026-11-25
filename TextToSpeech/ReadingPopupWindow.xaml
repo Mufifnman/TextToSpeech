@@ -5,7 +5,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" ShowActivated="False" Topmost="True" ResizeMode="NoResize"
         Foreground="{DynamicResource ThemeText}"
-        Width="420" MinHeight="90" MaxHeight="260" SizeToContent="Height" Title="Text to Speech">
+        Width="420" MinHeight="90" SizeToContent="Height" Title="Text to Speech">
     <!-- The compact reading view above the tray. It never takes focus (see OnSourceInitialized), so reading and
          typing elsewhere carry on undisturbed; clicks still work. -->
     <Border x:Name="panel" Style="{StaticResource PopupPanel}" Padding="6">

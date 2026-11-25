@@ -63,6 +63,28 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void With_the_unfocused_setting_the_popup_shows_beside_an_open_window_that_is_not_in_focus()
+        {
+            policy.ReadingChanged(true, true);
+            policy.FullWindowShown = true;
+            policy.ShowWhenWindowUnfocused = true;
+            policy.FullWindowFocused = false;
+            Assert.True(policy.IsVisible(true, true));
+            policy.FullWindowFocused = true;
+            Assert.False(policy.IsVisible(true, true));
+        }
+
+        [Fact]
+        public void The_popup_stays_up_while_settings_are_open_even_when_nothing_is_reading()
+        {
+            policy.FullWindowShown = true;
+            policy.KeepForSettings = true;
+            Assert.True(policy.IsVisible(false, false));
+            policy.Enabled = false;
+            Assert.False(policy.IsVisible(false, false));
+        }
+
+        [Fact]
         public void Stays_open_while_paused_by_default_and_hides_when_the_setting_is_off()
         {
             policy.ReadingChanged(true, true);

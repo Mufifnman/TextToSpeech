@@ -81,6 +81,8 @@ namespace TextToSpeech
             SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); SetupShell(); };
             StateChanged += Window_StateChanged;
             StateChanged += (_, _) => UpdateFullWindowShown();
+            Activated += (_, _) => UpdateFullWindowShown();
+            Deactivated += (_, _) => UpdateFullWindowShown();
             IsVisibleChanged += (_, _) => UpdateFullWindowShown();
             Closing += MainWindow_Closing;
             reading.StateChanged += OnReadingStateForShell;
@@ -156,6 +158,7 @@ namespace TextToSpeech
             popupPolicy.Enabled = settings.ShowReadingPopup;
             popupPolicy.AutoHide = settings.PopupAutoHide;
             popupPolicy.KeepOpenWhenPaused = settings.PopupKeepOpenWhenPaused;
+            popupPolicy.ShowWhenWindowUnfocused = settings.ShowPopupWhenWindowUnfocused;
             StartupRegistration.Apply(settings.StartWithWindows);
             tray?.SetChecks(settings.ShowReadingPopup, settings.StartWithWindows);
             ApplyApiSetting();
@@ -230,6 +233,7 @@ namespace TextToSpeech
 
         private void UpdateFullWindowShown()
         {
+            popupPolicy.FullWindowFocused = IsActive;
             popupPolicy.FullWindowShown = IsVisible && WindowState != System.Windows.WindowState.Minimized;
             RefreshPopup();
         }
@@ -289,6 +293,7 @@ namespace TextToSpeech
                 TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); }));
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
             p.SetTextSize(settings.PopupTextSize);
+            p.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
             return p;
         }
 
@@ -864,7 +869,14 @@ namespace TextToSpeech
         {
             var dialog = new SettingsWindow(settings, hotkeySettings, ApplyWindowSettings, SetupHotkeys, HotkeyConflicts) { Owner = this };
             dialog.ApiInfo = () => (api?.IsRunning == true, api?.Port ?? 0, api?.Token);
-            dialog.ShowDialog();
+            popupPolicy.KeepForSettings = true;
+            RefreshPopup();
+            try { dialog.ShowDialog(); }
+            finally
+            {
+                popupPolicy.KeepForSettings = false;
+                RefreshPopup();
+            }
         }
 
         private void ApplyWindowSettings()
@@ -876,6 +888,7 @@ namespace TextToSpeech
             if (volumePopup.Child is UIElement volumePanel) volumePanel.Opacity = popup;
             this.popup?.SetPanelOpacity(popup);
             this.popup?.SetTextSize(settings.PopupTextSize);
+            this.popup?.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
             ApplyShellSettings();
         }
 
