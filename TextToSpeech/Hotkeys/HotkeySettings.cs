@@ -43,12 +43,19 @@ namespace TextToSpeech.Hotkeys
             return new();
         }
 
+        // Relaxed escaping so '+' stays '+' (not +) and the file is easy to edit by hand.
+        public static readonly JsonSerializerOptions WriteOptions = new()
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+
         public void Save()
         {
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(this, WriteOptions));
             }
             catch { /* best effort */ }
         }
