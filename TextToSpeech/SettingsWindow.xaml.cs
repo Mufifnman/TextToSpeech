@@ -18,6 +18,9 @@ namespace TextToSpeech
         private readonly Func<string?> hotkeyConflicts;
         private bool loading = true;
 
+        /// <summary>Set by the main window: whether the local API is running, its port and token (for the connection line).</summary>
+        public Func<(bool Running, int Port, string? Token)>? ApiInfo { get; set; }
+
         public SettingsWindow(AppSettings settings, Action onChanged)
             : this(settings, new HotkeySettings(), onChanged, () => { }, () => null)
         {
@@ -35,6 +38,18 @@ namespace TextToSpeech
             opacitySlider.Value = Math.Round(settings.WindowOpacity * 100);
             opacityText.Text = (int)opacitySlider.Value + "%";
             autoShowBox.IsChecked = settings.AutoShowWhilePlaying;
+            startWithWindowsBox.IsChecked = settings.StartWithWindows;
+            closeToTrayBox.IsChecked = settings.CloseToTray;
+            showPopupBox.IsChecked = settings.ShowReadingPopup;
+            popupAutoHideBox.IsChecked = settings.PopupAutoHide;
+            popupKeepBox.IsChecked = settings.PopupKeepOpenWhenPaused;
+            apiBox.IsChecked = settings.ApiEnabled;
+            foreach (CheckBox box in new[] { startWithWindowsBox, closeToTrayBox, showPopupBox, popupAutoHideBox, popupKeepBox, apiBox })
+            {
+                box.Click += (_, _) => Changed();
+            }
+            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = showPopupBox.IsChecked == true;
+            ContentRendered += (_, _) => ShowApiInfo();
             gapSlider.Value = Math.Clamp(settings.SentenceGapMs, SentencePacing.MinGapMs, SentencePacing.MaxGapMs);
             gapText.Text = (int)gapSlider.Value + " ms";
             gapSlider.ValueChanged += (_, _) => Changed();
@@ -52,7 +67,7 @@ namespace TextToSpeech
             ShowConflicts();
 
             // Sections that take more than a line are collapsible; the open ones are remembered.
-            foreach (Expander section in new[] { opacityExpander, hotkeyExpander })
+            foreach (Expander section in new[] { shellExpander, opacityExpander, hotkeyExpander })
             {
                 section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
                 section.Expanded += (_, _) => RememberSection(section, true);
@@ -66,6 +81,13 @@ namespace TextToSpeech
             if (loading) return;
             settings.WindowOpacity = Math.Clamp(opacitySlider.Value / 100.0, 0.3, 1.0);
             settings.AutoShowWhilePlaying = autoShowBox.IsChecked == true;
+            settings.StartWithWindows = startWithWindowsBox.IsChecked == true;
+            settings.CloseToTray = closeToTrayBox.IsChecked == true;
+            settings.ShowReadingPopup = showPopupBox.IsChecked == true;
+            settings.PopupAutoHide = popupAutoHideBox.IsChecked == true;
+            settings.PopupKeepOpenWhenPaused = popupKeepBox.IsChecked == true;
+            settings.ApiEnabled = apiBox.IsChecked == true;
+            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
             gapText.Text = settings.SentenceGapMs + " ms";
             settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
@@ -73,6 +95,39 @@ namespace TextToSpeech
             opacityText.Text = (int)opacitySlider.Value + "%";
             settings.Save();
             onChanged();
+            ShowApiInfo();
+        }
+
+        private void ShowApiInfo()
+        {
+            var info = ApiInfo?.Invoke();
+            if (settings.ApiEnabled && info is { Running: true })
+            {
+                apiInfoText.Text = $"Running on 127.0.0.1:{info.Value.Port}. Programs read the port and token from %LocalAppData%\\TextToSpeech\\api.json.";
+                copyTokenButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                apiInfoText.Text = settings.ApiEnabled ? "Starting... (if this stays, the port could not be opened; see the status line in the main window)" : "Off.";
+                copyTokenButton.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Opens the folder with api.json, selected. The token is deliberately not put on the clipboard: the main window
+        /// reads new clipboard text aloud, which would speak (and keep) the token.
+        /// </summary>
+        private void ShowConnectionFile_Click(object sender, RoutedEventArgs e)
+        {
+            string path = TextToSpeech.Api.ConnectionInfo.DefaultPath;
+            try
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+                }
+            }
+            catch (Exception) { /* nothing useful to do if Explorer cannot start */ }
         }
 
         // ---- OCR engine: a small drop-down (a button that opens a themed menu) ----

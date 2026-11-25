@@ -4,6 +4,13 @@ namespace TextToSpeech.Core.Reading
     public readonly record struct ReadingPosition(int Sentence, int Word);
 
     /// <summary>
+    /// One owner's text divided into what has been read and what has not. <see cref="FirstIndex"/> is the document
+    /// index of the first unread sentence (-1 when everything was read), <see cref="Word"/> the word in it the
+    /// remainder starts at, <see cref="CharOffset"/> the start of the remainder inside the owner's full text.
+    /// </summary>
+    public readonly record struct OwnerSplit(string ReadText, string Remainder, int FirstIndex, int Word, int CharOffset);
+
+    /// <summary>
     /// The text being read, as a list of sentences, plus where the reader is.
     ///
     /// Replaces the old <c>Queue&lt;string&gt;</c> in MainWindow. Nothing is removed as it is
@@ -48,25 +55,178 @@ namespace TextToSpeech.Core.Reading
         public int HighlightedWord => SpokenWord >= 0 ? SpokenWord : Position.Word;
 
         /// <summary>Splits <paramref name="text"/> into sentences and adds them at the end. Returns how many were added.</summary>
-        public int Append(string? text, Func<string, bool>? keepSentence = null)
+        public int Append(string? text, Func<string, bool>? keepSentence = null, string? owner = null) =>
+            InsertAt(sentences.Count, text, keepSentence, owner);
+
+        /// <summary>
+        /// Splits <paramref name="text"/> and inserts the sentences at <paramref name="index"/> (clamped to the end).
+        /// Inserting before the reader shifts its position along; inserting exactly at the reader puts the new
+        /// text next to be read (the reader starts at the first new sentence, at its first word).
+        /// Returns how many sentences were added.
+        /// </summary>
+        public int InsertAt(int index, string? text, Func<string, bool>? keepSentence = null, string? owner = null)
         {
-            int added = 0;
+            index = Math.Clamp(index, 0, sentences.Count);
+            var added = new List<Sentence>();
             foreach (var s in SentenceSplitter.Split(text))
             {
                 if (keepSentence != null && !keepSentence(s))
                 {
                     continue;
                 }
-                sentences.Add(new Sentence(s));
-                added++;
+                added.Add(new Sentence(s, owner));
             }
-            if (added > 0)
+            if (added.Count == 0)
             {
+                return 0;
+            }
+            sentences.InsertRange(index, added);
+            if (index < Position.Sentence)
+            {
+                Position = new ReadingPosition(Position.Sentence + added.Count, Position.Word);
+            }
+            else if (index == Position.Sentence && index < sentences.Count - added.Count)
+            {
+                // New text goes in front of a sentence the reader was on (maybe part way through): start the new text.
+                Position = new ReadingPosition(index, 0);
+                SpokenWord = -1;
+            }
+            ContentChanged?.Invoke(this, EventArgs.Empty);
+            // When the reader was at the end, Position now points at the first new sentence.
+            PositionChanged?.Invoke(this, EventArgs.Empty);
+            return added.Count;
+        }
+
+        /// <summary>The full text of one owner's sentences, joined with single spaces.</summary>
+        public string OwnerText(string owner) =>
+            string.Join(" ", sentences.Where(s => s.Owner == owner).Select(s => s.Text));
+
+        /// <summary>How many sentences belong to <paramref name="owner"/>.</summary>
+        public int OwnerSentenceCount(string owner) => sentences.Count(s => s.Owner == owner);
+
+        /// <summary>Owner of the sentence the reader is on (null at the end, or for text not added by the API).</summary>
+        public string? CurrentOwner => CurrentSentence?.Owner;
+
+        /// <summary>
+        /// Where one owner's unread text starts, without changing anything. <see cref="OwnerSplit.ReadText"/> plus
+        /// <see cref="OwnerSplit.Remainder"/> is always <see cref="OwnerText"/>. With
+        /// <paramref name="fromSentenceStart"/> the remainder begins at the start of its first unread sentence;
+        /// otherwise at the word the reader is on, when that sentence is the current one.
+        /// </summary>
+        public OwnerSplit PeekOwner(string owner, bool fromSentenceStart = false)
+        {
+            var mine = new List<(int Index, Sentence Sentence)>();
+            for (int i = 0; i < sentences.Count; i++)
+            {
+                if (sentences[i].Owner == owner)
+                {
+                    mine.Add((i, sentences[i]));
+                }
+            }
+            string full = string.Join(" ", mine.Select(m => m.Sentence.Text));
+
+            int first = mine.FindIndex(m => m.Index >= Position.Sentence);
+            if (first < 0)
+            {
+                return new OwnerSplit(full, "", -1, 0, full.Length);
+            }
+
+            int before = 0;
+            for (int k = 0; k < first; k++)
+            {
+                before += mine[k].Sentence.Text.Length + 1;
+            }
+
+            var (index, sentence) = mine[first];
+            int word = 0;
+            if (!fromSentenceStart && index == Position.Sentence && Position.Word > 0 && Position.Word < sentence.Words.Count)
+            {
+                word = Position.Word;
+            }
+            int readChars = before + (word > 0 ? sentence.Words[word].Start : 0);
+            return new OwnerSplit(full.Substring(0, readChars), full.Substring(readChars), index, word, readChars);
+        }
+
+        /// <summary>
+        /// Removes every sentence of <paramref name="owner"/> from document index <paramref name="index"/> on (used to
+        /// replace the not yet read tail of an API session). Keeps the reader on the same sentence, or on whatever
+        /// follows when its own sentence was removed. Returns how many were removed.
+        /// </summary>
+        public int RemoveOwnerFrom(string owner, int index)
+        {
+            index = Math.Max(0, index);
+            bool readerRemoved = Position.Sentence >= index && Position.Sentence < sentences.Count
+                                 && sentences[Position.Sentence].Owner == owner;
+            int removed = 0, removedBeforeReader = 0;
+            for (int i = sentences.Count - 1; i >= index; i--)
+            {
+                if (sentences[i].Owner == owner)
+                {
+                    if (i < Position.Sentence)
+                    {
+                        removedBeforeReader++;
+                    }
+                    sentences.RemoveAt(i);
+                    removed++;
+                }
+            }
+            if (removed > 0)
+            {
+                Position = new ReadingPosition(Math.Min(Position.Sentence - removedBeforeReader, sentences.Count), readerRemoved ? 0 : Position.Word);
+                if (readerRemoved)
+                {
+                    SpokenWord = -1;
+                }
                 ContentChanged?.Invoke(this, EventArgs.Empty);
-                // When the reader was at the end, Position now points at the first new sentence.
                 PositionChanged?.Invoke(this, EventArgs.Empty);
             }
-            return added;
+            return removed;
+        }
+
+        /// <summary>
+        /// Takes one owner's unread text out of the document and returns the split (see <see cref="PeekOwner"/>).
+        /// A sentence that was started keeps its read words as a shorter finished sentence. If the reader was on
+        /// that owner's text it now points at whatever follows; the caller decides whether to keep reading it.
+        /// </summary>
+        public OwnerSplit TakeOwnerRemainder(string owner, bool fromSentenceStart = false)
+        {
+            var split = PeekOwner(owner, fromSentenceStart);
+            if (split.Remainder.Length == 0 || split.FirstIndex < 0)
+            {
+                return split;
+            }
+
+            int firstIndex = split.FirstIndex;
+            bool readerOnIt = Position.Sentence == firstIndex;
+            var kept = new List<Sentence>();
+            for (int i = 0; i < sentences.Count; i++)
+            {
+                var s = sentences[i];
+                if (s.Owner != owner || i < firstIndex)
+                {
+                    kept.Add(s);
+                }
+                else if (i == firstIndex && split.Word > 0)
+                {
+                    string head = s.Text.Substring(0, s.Words[split.Word].Start).TrimEnd();
+                    kept.Add(new Sentence(head, owner));
+                }
+            }
+
+            sentences.Clear();
+            sentences.AddRange(kept);
+            if (readerOnIt)
+            {
+                Position = new ReadingPosition(Math.Min(firstIndex + (split.Word > 0 ? 1 : 0), sentences.Count), 0);
+            }
+            else if (Position.Sentence > sentences.Count)
+            {
+                Position = new ReadingPosition(sentences.Count, 0);
+            }
+            SpokenWord = -1;
+            ContentChanged?.Invoke(this, EventArgs.Empty);
+            PositionChanged?.Invoke(this, EventArgs.Empty);
+            return split;
         }
 
         public void Clear()
