@@ -54,11 +54,16 @@
                 <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal"  HorizontalAlignment="Right" >
                     <Menu Background="Transparent" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <!-- Icon-only header; set Header="Filters" to get the text label back. -->
-                        <MenuItem x:Name="filtersMenu" Header="&#x1F9F9;" ToolTip="Filters: choose which clean-up filters run on copied or scanned text"><!-- items are built from FilterRegistry in code --></MenuItem>
+                        <!-- Icon-only header (funnel glyph); swap it for plain text like "Filters" to get the label back. -->
+                        <MenuItem x:Name="filtersMenu" ToolTip="Filters: choose which clean-up filters run on copied or scanned text">
+                            <MenuItem.Header>
+                                <TextBlock Text="&#xE71C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
+                            </MenuItem.Header>
+                            <!-- items are built from FilterRegistry in code -->
+                        </MenuItem>
                     </Menu>
                     <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
-                    <Button x:Name="voiceButton" Content="&#x1F50A;" Click="VoiceButton_Click" Margin="0,0,8,0" Padding="8,0"
+                    <Button x:Name="voiceButton" Content="&#x1F5E3;" Click="VoiceButton_Click" Margin="0,0,8,0" Padding="8,0"
                             ToolTip="Choose the voice">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="voiceMenu" />
