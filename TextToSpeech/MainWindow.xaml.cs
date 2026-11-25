@@ -331,6 +331,41 @@ namespace TextToSpeech
             }
         }
 
+        /// <summary>
+        /// Lets the user drag a region, OCRs it and returns the recognized text (not yet queued for reading).
+        /// Returns null if the user cancels or nothing was recognized. Used by other entry points such as hotkeys.
+        /// </summary>
+        public async Task<string?> SelectRegionAndReadAsync()
+        {
+            if (isCapturing)
+            {
+                return null;
+            }
+            isCapturing = true;
+            var previousState = WindowState;
+            try
+            {
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200);
+                var region = RegionSelectWindow.Pick();
+                if (region == null)
+                {
+                    return null;
+                }
+                lastRegion = region;
+                __ReadAgain.IsEnabled = true;
+                await Task.Delay(150);
+                using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Value.Location, region.Value.Size);
+                var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+                return outcome.Succeeded && !string.IsNullOrWhiteSpace(outcome.Text) ? outcome.Text : null;
+            }
+            finally
+            {
+                WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
+                isCapturing = false;
+            }
+        }
+
         /// <summary>"Again": re-capture the last region without picking it again.</summary>
         private async void ReadSameRegion(object sender, RoutedEventArgs e)
         {
