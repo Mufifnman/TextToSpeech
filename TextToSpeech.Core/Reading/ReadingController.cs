@@ -1,0 +1,287 @@
+using TextToSpeech.Speech;
+
+namespace TextToSpeech.Core.Reading
+{
+    /// <summary>
+    /// Drives reading: speaks the <see cref="ReadingDocument"/> sentence by sentence through a speech engine,
+    /// with play, pause, skip, rewind, jump, the pause between sentences, a fallback voice, and look-ahead hints.
+    ///
+    /// It has no UI and no knowledge of WPF, Windows or any concrete engine, so the window, a hotkey handler,
+    /// a pop-up or a local API can all use the same instance and it can be unit tested with a fake engine.
+    /// Everything it is given must be called from one thread (the UI thread); engines may report words from any
+    /// thread and the controller hands those back through <c>post</c>.
+    /// </summary>
+    public sealed class ReadingController : IDisposable
+    {
+        private readonly ReadingDocument document;
+        private readonly Func<VoiceInfo?, ISpeechEngine> engineFor;
+        private readonly Func<VoiceInfo?> fallbackVoice;
+        private readonly Action clearPreparedAudio;
+        private readonly Action<Action> post;
+        private readonly Func<TimeSpan, CancellationToken, Task> delay;
+
+        private CancellationTokenSource? speechCts;
+        private int generation;      // bumped for every utterance and every cancel; late events from old ones are ignored
+        private bool paused;         // true after the user paused or stopped: nothing speaks until they resume or jump
+
+        /// <param name="engineFor">The engine that speaks a given voice.</param>
+        /// <param name="fallbackVoice">A voice that always works, used when a neural voice fails (null if there is none).</param>
+        /// <param name="clearPreparedAudio">Forgets audio engines prepared ahead of time (called when the list is cleared).</param>
+        /// <param name="post">Runs an action on the UI thread. Defaults to running it right away.</param>
+        /// <param name="delay">Waits between sentences. Defaults to <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</param>
+        public ReadingController(
+            ReadingDocument document,
+            Func<VoiceInfo?, ISpeechEngine> engineFor,
+            Func<VoiceInfo?>? fallbackVoice = null,
+            Action? clearPreparedAudio = null,
+            Action<Action>? post = null,
+            Func<TimeSpan, CancellationToken, Task>? delay = null)
+        {
+            this.document = document;
+            this.engineFor = engineFor;
+            this.fallbackVoice = fallbackVoice ?? (() => null);
+            this.clearPreparedAudio = clearPreparedAudio ?? (() => { });
+            this.post = post ?? (action => action());
+            this.delay = delay ?? Task.Delay;
+        }
+
+        public ReadingDocument Document => document;
+
+        /// <summary>The voice used for the next sentence. Changing it takes effect from the next sentence.</summary>
+        public VoiceInfo? Voice { get; set; }
+
+        /// <summary>Speaking rate on the SAPI scale.</summary>
+        public int Rate { get; set; } = 4;
+
+        /// <summary>Silence after each sentence, in milliseconds.</summary>
+        public int GapMs { get; set; } = SentencePacing.DefaultGapMs;
+
+        /// <summary>Something is being spoken or waited on (this stays true while paused only until the pause cancels it).</summary>
+        public bool IsSpeaking => speechCts != null;
+
+        /// <summary>Speaking and not paused: what the play/pause button should show as "playing".</summary>
+        public bool IsPlaying => IsSpeaking && !paused;
+
+        /// <summary>The play or pause state changed.</summary>
+        public event Action? StateChanged;
+
+        /// <summary>A sentence is about to be spoken (the window may want to come up).</summary>
+        public event Action? SentenceStarting;
+
+        /// <summary>The end of the document was reached.</summary>
+        public event Action? Finished;
+
+        /// <summary>A short message for the status line (a voice failed, speech failed).</summary>
+        public event Action<string>? Notice;
+
+        /// <summary>A neural voice failed and <see cref="Voice"/> was switched to the fallback.</summary>
+        public event Action<VoiceInfo>? VoiceFellBack;
+
+        // ---------- commands ----------
+
+        /// <summary>Starts or continues reading from the current position (does nothing if already speaking).</summary>
+        public void Play()
+        {
+            paused = false;
+            if (!IsSpeaking)
+            {
+                SpeakCurrent();
+            }
+        }
+
+        /// <summary>Pauses. The position is kept at the word being spoken, so Play continues from there.</summary>
+        public void Pause()
+        {
+            paused = true;
+            CancelSpeech();
+            document.MarkStoppedAtSpokenWord();
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>Pauses while playing, otherwise resumes from the saved position (if anything is left).</summary>
+        public void TogglePlayPause()
+        {
+            if (IsPlaying)
+            {
+                Pause();
+            }
+            else if (!document.IsAtEnd)
+            {
+                paused = false;
+                SpeakCurrent();
+            }
+        }
+
+        public void Rewind()
+        {
+            document.Rewind();
+            AfterMove();
+        }
+
+        public void Skip()
+        {
+            if (document.Skip())
+            {
+                AfterMove();
+            }
+        }
+
+        /// <summary>Reads from a word the user picked, even when paused or stopped.</summary>
+        public void JumpTo(int sentence, int word)
+        {
+            document.JumpTo(sentence, word);
+            paused = false;
+            SpeakCurrent();
+        }
+
+        /// <summary>Stops everything and empties the document.</summary>
+        public void Clear()
+        {
+            CancelSpeech();
+            clearPreparedAudio();
+            document.Clear();
+            paused = false;
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>Stops speaking and holds, without moving the position (used when text is taken out of the document).</summary>
+        public void Interrupt()
+        {
+            CancelSpeech();
+            paused = true;
+            StateChanged?.Invoke();
+        }
+
+        public void Dispose() => CancelSpeech();
+
+        // ---------- internals ----------
+
+        /// <summary>After the position moved: keep reading from there, unless the user is paused.</summary>
+        private void AfterMove()
+        {
+            if (paused)
+            {
+                CancelSpeech();
+                StateChanged?.Invoke();
+            }
+            else
+            {
+                SpeakCurrent();
+            }
+        }
+
+        private void CancelSpeech()
+        {
+            generation++;   // events from the utterance being cancelled are ignored from now on
+            var cts = speechCts;
+            speechCts = null;
+            cts?.Cancel();
+        }
+
+        /// <summary>Speaks the document from its current position, cancelling anything already going. Calls itself as sentences finish.</summary>
+        private void SpeakCurrent()
+        {
+            CancelSpeech();
+
+            string? text = document.GetTextToSpeak(out int offset);
+            if (text == null)
+            {
+                Finished?.Invoke();
+                StateChanged?.Invoke();
+                return;
+            }
+
+            SentenceStarting?.Invoke();
+
+            // Tell the engine what comes next so it can prepare it while this sentence plays.
+            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(2), Voice, Rate);
+
+            int myGeneration = ++generation;
+            var cts = new CancellationTokenSource();
+            speechCts = cts;
+            _ = SpeakSentenceAsync(text, offset, myGeneration, cts);
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Speaks one chunk with the chosen voice, then moves the document on and speaks the next. If a neural
+        /// voice fails, falls back to the fallback voice instead of going silent.
+        /// </summary>
+        private async Task SpeakSentenceAsync(string text, int offset, int myGeneration, CancellationTokenSource cts)
+        {
+            VoiceInfo? voice = Voice;
+            try
+            {
+                try
+                {
+                    await SpeakWith(voice, text, offset, myGeneration, cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex) when (voice != null && voice.IsNeural && fallbackVoice() != null)
+                {
+                    VoiceInfo fallback = fallbackVoice()!;
+                    Notice?.Invoke("Neural voice failed (" + ex.Message + "); using " + fallback.DisplayName);
+                    Voice = fallback;
+                    VoiceFellBack?.Invoke(fallback);
+                    await SpeakWith(fallback, text, offset, myGeneration, cts.Token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return; // paused, stopped, or moved: whoever cancelled decides what happens next
+            }
+            catch (Exception ex)
+            {
+                if (myGeneration == generation)
+                {
+                    Notice?.Invoke("Speech failed: " + ex.Message);
+                    CancelSpeech();
+                    paused = true;
+                    StateChanged?.Invoke();
+                }
+                return;
+            }
+
+            if (myGeneration != generation || cts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
+            document.CompleteSentence();
+            var gap = SentencePacing.GapAfter(document.IsAtEnd, GapMs);
+            if (gap > TimeSpan.Zero)
+            {
+                try
+                {
+                    await delay(gap, cts.Token);   // jump, pause, stop and clear all cancel the wait
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                if (myGeneration != generation)
+                {
+                    return;
+                }
+            }
+            SpeakCurrent();
+        }
+
+        private Task SpeakWith(VoiceInfo? voice, string text, int offset, int myGeneration, CancellationToken token) =>
+            engineFor(voice).SpeakAsync(text, voice, Rate, boundary =>
+            {
+                // engines report words from their own threads
+                post(() =>
+                {
+                    if (myGeneration == generation)
+                    {
+                        document.ReportSpokenCharacter(offset + boundary.CharOffset);
+                    }
+                });
+            }, token);
+    }
+}

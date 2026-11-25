@@ -22,30 +22,42 @@ namespace TextToSpeech
         // objects
         readonly VoiceCatalog catalog = new VoiceCatalog();
         readonly AppSettings settings = AppSettings.Load();
-        VoiceInfo? selectedVoice = null;
-
-        // Cancels the sentence being spoken; null when nothing is speaking.
-        CancellationTokenSource? speechCts = null;
-        bool IsSpeaking => speechCts != null;
-
         readonly ReadingDocument document = new ReadingDocument();
+
+        // Reading itself (play, pause, jump, voices, the pause between sentences) lives in ReadingController
+        // (TextToSpeech.Core). The window only turns clicks into commands and shows the state.
+        readonly ReadingController reading;
+
+        VoiceInfo? selectedVoice
+        {
+            get => reading.Voice;
+            set => reading.Voice = value;
+        }
+
         int rate = 4;
-
-        // Characters at the start of the current sentence that were not sent to the engine
-        // (when starting from the middle of a sentence). Engine positions are relative to what we sent.
-        int spokenOffset = 0;
-
-        // Incremented for every utterance; events from cancelled utterances are ignored.
-        int speakGeneration = 0;
-
-        // True after the user paused or stopped; nothing speaks until they resume or click a word.
-        bool paused = false;
         FilterSettings filterSettings = FilterSettingsStore.Load();
 
         public MainWindow()
         {
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
             InitializeComponent();
+
+            reading = new ReadingController(
+                document,
+                engineFor: catalog.EngineFor,
+                fallbackVoice: () => catalog.DefaultFallbackVoice,
+                clearPreparedAudio: catalog.ClearUpcoming,
+                post: action => Dispatcher.BeginInvoke(action),
+                delay: Task.Delay)
+            {
+                GapMs = settings.SentenceGapMs,
+            };
+            reading.StateChanged += UpdatePauseButton;
+            reading.SentenceStarting += OnSentenceStarting;
+            reading.Finished += OnReadingFinished;
+            reading.Notice += message => statusText.Text = message;
+            reading.VoiceFellBack += _ => BuildVoiceMenu();
+
             SetSpeed(settings.Rate, save: false);
             SetVolume(settings.Volume, save: false);
             speedSlider.ValueChanged += (_, e) => { if (!updatingSpeedUi) SetSpeed((int)Math.Round(e.NewValue)); };
@@ -55,7 +67,7 @@ namespace TextToSpeech
             __ReadListDisplay__.Document = document;
             document.ContentChanged += (_, _) => UpdateBringBackVisibility();
             UpdateBringBackVisibility();
-            __ReadListDisplay__.WordClicked += JumpTo;
+            __ReadListDisplay__.WordClicked += reading.JumpTo;
 
             BuildFiltersMenu();
             RegionReader = this;
@@ -64,7 +76,7 @@ namespace TextToSpeech
             Activated += (_, _) => raise.Activated();
             PreviewMouseDown += (_, _) => raise.UserInteracted();
             ThemeManager.Changed += () => __ReadListDisplay__.RefreshTheme();
-            Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
+            Closed += (_, _) => { reading.Dispose(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
 
         /// <summary>A bold, unclickable title at the top of a popup menu so people know what they are choosing.</summary>
@@ -337,9 +349,7 @@ namespace TextToSpeech
             {
                 return;
             }
-            CancelSpeech();
-            paused = true;
-            UpdatePauseButton();
+            reading.Interrupt();
 
             textbox.Text = textbox.Text == "" ? text : text + "\n" + textbox.Text;
             SetInputExpanded(true);
@@ -377,165 +387,31 @@ namespace TextToSpeech
                 textbox.Text = "";
                 SetInputExpanded(false); // the text moved over: back to the small one-line box
             }
-            paused = false;
-            if (!IsSpeaking) // if we aren't already reading
-            {
-                SpeakCurrent();
-            }
+            reading.Play();
         }
 
-        /// <summary>
-        /// Speaks the document from its current position (sentence and word), cancelling
-        /// anything already being spoken. Calls itself when a sentence completes. UI thread only.
-        /// </summary>
-        private void SpeakCurrent()
+        /// <summary>Reading is about to speak a sentence: bring the window up if the setting says so.</summary>
+        private void OnSentenceStarting()
         {
-            CancelSpeech();
-
-            string? text = document.GetTextToSpeak(out spokenOffset);
-            if (text == null)
-            {
-                if (raise.TakeMinimize())
-                {
-                    // The app brought the window up for this read and nobody touched it: put it away again.
-                    this.WindowState = System.Windows.WindowState.Minimized;
-                }
-                UpdatePauseButton();
-                return;
-            }
-
             if (settings.AutoShowWhilePlaying && WindowState == System.Windows.WindowState.Minimized)
             {
                 raise.AppRaised();
-                WindowState = System.Windows.WindowState.Normal; // reading started: bring the window up
+                WindowState = System.Windows.WindowState.Normal;
             }
-
-            // Tell the engine what comes next so it can prepare it while this sentence plays.
-            catalog.EngineFor(selectedVoice).SetUpcoming(document.PeekUpcomingTexts(2), selectedVoice, rate);
-
-            int generation = ++speakGeneration;
-            var cts = new CancellationTokenSource();
-            speechCts = cts;
-            string sentenceText = text;
-            int offset = spokenOffset;
-            _ = SpeakSentenceAsync(sentenceText, offset, generation, cts);
-            UpdatePauseButton();
         }
 
-        /// <summary>
-        /// Speaks one chunk of text with the chosen voice, then moves the document on and speaks the next.
-        /// If a neural voice fails, falls back to a Windows voice instead of going silent.
-        /// </summary>
-        private async Task SpeakSentenceAsync(string text, int offset, int generation, CancellationTokenSource cts)
+        /// <summary>Reading reached the end: put the window away only if the app raised it and nobody touched it.</summary>
+        private void OnReadingFinished()
         {
-            VoiceInfo? voice = selectedVoice;
-            try
+            if (raise.TakeMinimize())
             {
-                try
-                {
-                    await SpeakWith(voice, text, offset, generation, cts.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex) when (voice != null && voice.IsNeural && catalog.DefaultFallbackVoice != null)
-                {
-                    VoiceInfo fallback = catalog.DefaultFallbackVoice!;
-                    statusText.Text = "Neural voice failed (" + ex.Message + "); using " + fallback.DisplayName;
-                    selectedVoice = fallback;
-                    BuildVoiceMenu();
-                    await SpeakWith(fallback, text, offset, generation, cts.Token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return; // paused, stopped, or moved: whoever cancelled decides what happens next
-            }
-            catch (Exception ex)
-            {
-                if (generation == speakGeneration)
-                {
-                    statusText.Text = "Speech failed: " + ex.Message;
-                    CancelSpeech();
-                    paused = true;
-                    UpdatePauseButton();
-                }
-                return;
-            }
-
-            if (generation != speakGeneration || cts.IsCancellationRequested)
-            {
-                return;
-            }
-            // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
-            document.CompleteSentence();
-            var gap = SentencePacing.GapAfter(document.IsAtEnd, settings.SentenceGapMs);
-            if (gap > TimeSpan.Zero)
-            {
-                try
-                {
-                    await Task.Delay(gap, cts.Token);   // jump, pause, stop and clear all cancel the wait
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-                if (generation != speakGeneration)
-                {
-                    return;
-                }
-            }
-            SpeakCurrent();
-        }
-
-        private Task SpeakWith(VoiceInfo? voice, string text, int offset, int generation, CancellationToken token) =>
-            catalog.EngineFor(voice).SpeakAsync(text, voice, rate, boundary =>
-            {
-                // engines report words off the UI thread
-                Dispatcher.BeginInvoke(() =>
-                {
-                    if (generation == speakGeneration)
-                    {
-                        document.ReportSpokenCharacter(offset + boundary.CharOffset);
-                    }
-                });
-            }, token);
-
-        /// <summary>Stops speaking without moving the reading position.</summary>
-        private void CancelSpeech()
-        {
-            speakGeneration++; // ignore events from the utterance being cancelled
-            var cts = speechCts;
-            speechCts = null;
-            cts?.Cancel();
-        }
-
-        /// <summary>After the position moved: keep reading from there, unless the user is paused.</summary>
-        private void AfterMove()
-        {
-            if (paused)
-            {
-                CancelSpeech();
-                UpdatePauseButton();
-            }
-            else
-            {
-                SpeakCurrent();
+                WindowState = System.Windows.WindowState.Minimized;
             }
         }
 
-        private void JumpTo(int sentence, int word)
-        {
-            document.JumpTo(sentence, word);
-            // Clicking a word means "read from here", even when paused or stopped.
-            paused = false;
-            SpeakCurrent();
-        }
+        private void Rewind_Click(object sender, RoutedEventArgs e) => reading.Rewind();
 
-        private void Rewind_Click(object sender, RoutedEventArgs e) => Rewind();
-
-        private void Skip_Click(object sender, RoutedEventArgs e) => Skip();
+        private void Skip_Click(object sender, RoutedEventArgs e) => reading.Skip();
 
         private void PlayPause_Click(object sender, RoutedEventArgs e) => PlayOrPause();
 
@@ -545,9 +421,9 @@ namespace TextToSpeech
         /// </summary>
         private void PlayOrPause()
         {
-            if (IsSpeaking && !paused)
+            if (reading.IsPlaying)
             {
-                Pause();
+                reading.Pause();
             }
             else if (textbox.Text != "")
             {
@@ -555,66 +431,18 @@ namespace TextToSpeech
             }
             else
             {
-                TogglePlayPause();
+                reading.TogglePlayPause();
             }
         }
 
-        private void Rewind()
-        {
-            document.Rewind();
-            AfterMove();
-        }
-
-        private void Skip()
-        {
-            if (document.Skip())
-            {
-                AfterMove();
-            }
-        }
-
-        /// <summary>
-        ///  clears the list of items to be read
-        /// </summary>
-        private void ClearList(object? sender = null, RoutedEventArgs? e = null)
-        {
-            CancelSpeech();
-            catalog.ClearUpcoming();
-            document.Clear();
-            paused = false;
-            UpdatePauseButton();
-        }
+        private void ClearList(object? sender = null, RoutedEventArgs? e = null) => reading.Clear();
 
         /// <summary>Stops speaking. The position is kept, so Pause/Play (or clicking a word) continues from here.</summary>
-        private void StopRead(object? sender = null, RoutedEventArgs? e = null)
-        {
-            Pause();
-        }
-
-        private void Pause()
-        {
-            paused = true;
-            CancelSpeech();
-            document.MarkStoppedAtSpokenWord(); // resume from the word we were on
-            UpdatePauseButton();
-        }
-
-        private void TogglePlayPause()
-        {
-            if (IsSpeaking && !paused)
-            {
-                Pause();
-            }
-            else if (!document.IsAtEnd)
-            {
-                paused = false;
-                SpeakCurrent();
-            }
-        }
+        private void StopRead(object? sender = null, RoutedEventArgs? e = null) => reading.Pause();
 
         private void UpdatePauseButton()
         {
-            bool playing = IsSpeaking && !paused;
+            bool playing = reading.IsPlaying;
             pauseGlyph.Text = playing ? "\uE769" : "\uE768";        // pause / play
             pauseGlyph.Foreground = new System.Windows.Media.SolidColorBrush(
                 (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(playing ? "#E0A010" : "#2E9E4F"));
@@ -675,6 +503,7 @@ namespace TextToSpeech
         private void SetSpeed(int value, bool save = true)
         {
             rate = Math.Clamp(value, MinRate, MaxRate);
+            reading.Rate = rate;
             catalog.EngineFor(selectedVoice).SetRate(rate); // GUESS: engines apply it from the next sentence
             if (save)
             {
@@ -754,6 +583,7 @@ namespace TextToSpeech
 
         private void ApplyWindowSettings()
         {
+            reading.GapMs = settings.SentenceGapMs;
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
@@ -882,11 +712,11 @@ namespace TextToSpeech
                     e.Handled = true;
                     break;
                 case Key.Left:
-                    Rewind();
+                    reading.Rewind();
                     e.Handled = true;
                     break;
                 case Key.Right:
-                    Skip();
+                    reading.Skip();
                     e.Handled = true;
                     break;
             }
