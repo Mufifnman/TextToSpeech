@@ -85,6 +85,15 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void The_popup_stays_up_while_it_is_being_resized()
+        {
+            policy.KeepForResize = true;
+            Assert.True(policy.IsVisible(false, false));
+            policy.KeepForResize = false;
+            Assert.False(policy.IsVisible(false, false));
+        }
+
+        [Fact]
         public void Stays_open_while_paused_by_default_and_hides_when_the_setting_is_off()
         {
             policy.ReadingChanged(true, true);

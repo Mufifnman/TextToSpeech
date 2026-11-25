@@ -266,6 +266,7 @@ namespace TextToSpeech
                     p.SetInfo(active != null && active.Id != "ui" ? "From " + active.Source : null, canTakeBack: false);
                 }
                 p.SetPlaying(playing);
+                p.SetPreview(previewingPopup);
                 p.ShowPopup();
             }
             else
@@ -280,13 +281,27 @@ namespace TextToSpeech
             }
         }
 
+        private readonly System.Windows.Threading.DispatcherTimer resizeHoldTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+        private bool previewingPopup;
+
         private ReadingPopupWindow CreatePopup()
         {
+            resizeHoldTimer.Tick -= ResizeHoldElapsed;
+            resizeHoldTimer.Tick += ResizeHoldElapsed;
             var p = new ReadingPopupWindow(document, new PopupActions(
                 Back: () => reading.Rewind(),
                 PlayPause: PlayOrPause,
                 Skip: () => reading.Skip(),
                 Clear: () => reading.Clear(),
+                ResizeStarted: () => { resizeHoldTimer.Stop(); popupPolicy.KeepForResize = true; },
+                ResizeCompleted: (w, h) =>
+                {
+                    settings.PopupMaxWidth = w;
+                    settings.PopupMaxHeight = h;
+                    settings.Save();
+                    resizeHoldTimer.Stop();
+                    resizeHoldTimer.Start();   // the popup may hide again after a short wait, like after reading
+                },
                 JumpTo: (sentence, word) => reading.JumpTo(sentence, word),
                 OpenFullWindow: ShowFullWindow,
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
@@ -870,13 +885,23 @@ namespace TextToSpeech
             var dialog = new SettingsWindow(settings, hotkeySettings, ApplyWindowSettings, SetupHotkeys, HotkeyConflicts) { Owner = this };
             dialog.ApiInfo = () => (api?.IsRunning == true, api?.Port ?? 0, api?.Token);
             popupPolicy.KeepForSettings = true;
+            previewingPopup = true;
             RefreshPopup();
             try { dialog.ShowDialog(); }
             finally
             {
                 popupPolicy.KeepForSettings = false;
+                previewingPopup = false;
+                popup?.SetPreview(false);
                 RefreshPopup();
             }
+        }
+
+        private void ResizeHoldElapsed(object? sender, EventArgs e)
+        {
+            resizeHoldTimer.Stop();
+            popupPolicy.KeepForResize = false;
+            RefreshPopup();
         }
 
         private void ApplyWindowSettings()

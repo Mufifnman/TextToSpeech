@@ -42,6 +42,9 @@ namespace TextToSpeech.Core.Shell
         /// <summary>The Settings window is open: keep the popup up so changes can be seen as they are made.</summary>
         public bool KeepForSettings { get; set; }
 
+        /// <summary>The popup is being resized (or just was): keep it up until the wait after the resize is over.</summary>
+        public bool KeepForResize { get; set; }
+
         /// <summary>An API client has taken the remainder and not returned it yet.</summary>
         public bool HandoffOpen { get; set; }
 
@@ -82,7 +85,7 @@ namespace TextToSpeech.Core.Shell
 
         public bool IsVisible(bool isPlaying, bool hasUnread)
         {
-            if (KeepForSettings)
+            if (KeepForSettings || KeepForResize)
             {
                 return Enabled;
             }

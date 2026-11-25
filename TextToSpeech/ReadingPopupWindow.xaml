@@ -25,6 +25,16 @@
             </DockPanel>
 
             <local:ReadingDisplay x:Name="display" Grid.Row="1"/>
+            <TextBlock x:Name="sampleText" Grid.Row="1" Visibility="Collapsed" TextWrapping="Wrap" Padding="6"
+                       Foreground="{DynamicResource ThemeSubtle}"
+                       Text="Preview. This is sample text so you can try the text size and the height of the popup. The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump. Sphinx of black quartz, judge my vow. The five boxing wizards jump quickly. Waltz, bad nymph, for quick jigs vex. Drag the corner at the top left to resize the popup."/>
+
+            <!-- drag to resize: grows up and to the left because the popup is anchored bottom right -->
+            <Border x:Name="resizeGrip" Grid.RowSpan="3" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Background="Transparent" Cursor="SizeNWSE" ToolTip="Drag to resize"
+                    MouseLeftButtonDown="Grip_MouseDown" MouseMove="Grip_MouseMove" MouseLeftButtonUp="Grip_MouseUp">
+                <Path Data="M2,12 L12,2 M2,7 L7,2" Stroke="{DynamicResource ThemeSubtle}" StrokeThickness="1.5"/>
+            </Border>
 
             <Grid Grid.Row="2" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
