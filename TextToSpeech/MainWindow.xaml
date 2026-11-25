@@ -253,6 +253,8 @@
                             <ContextMenu x:Name="filtersMenu" />
                         </Button.ContextMenu>
                     </Button>
+                    <Button x:Name="addFilterButton" Content="+" FontSize="16" Click="AddFilter_Click" Style="{StaticResource BarButton}"
+                            ToolTip="New filter: make your own clean-up filter and add it to the Filters menu"/>
                     <Button x:Name="settingsButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="Settings_Click" Style="{StaticResource BarButton}"
                             ToolTip="Settings: OCR engine, window opacity, bring up while playing"/>
                 </StackPanel>

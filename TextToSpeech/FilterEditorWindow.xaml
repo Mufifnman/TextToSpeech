@@ -1,0 +1,139 @@
+<Window x:Class="TextToSpeech.FilterEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource ThemeBackground}" Foreground="{DynamicResource ThemeText}"
+        Title="Filter editor" Height="680" Width="860" MinHeight="520" MinWidth="680"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="90"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- name and menu group -->
+        <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
+            <TextBox x:Name="nameBox" Grid.Column="1" Height="26" VerticalContentAlignment="Center"
+                     ToolTip="How the filter is named in the Filters menu"/>
+            <TextBlock Text="Menu group" Grid.Column="2" VerticalAlignment="Center" Margin="16,0,8,0" FontWeight="SemiBold"/>
+            <TextBox x:Name="groupBox" Grid.Column="3" Height="26" VerticalContentAlignment="Center"
+                     ToolTip="The Filters submenu it appears under. Type a new name to start a new submenu."/>
+            <Button x:Name="groupPickButton" Grid.Column="4" Content="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                    Width="26" Height="26" Margin="4,0,0,0" Click="GroupPick_Click" ToolTip="Pick an existing group"/>
+        </Grid>
+
+        <!-- rule list header -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="+ Rule" Padding="12,3" Margin="0,0,6,0" Click="AddRule_Click"
+                        ToolTip="Add a rule: remove text, replace, remove lines, ..."/>
+                <Button Content="+ Common cleanup" Padding="12,3" Click="AddPreset_Click"
+                        ToolTip="Add a ready-made cleanup such as web links, citation numbers or markdown symbols"/>
+            </StackPanel>
+            <TextBlock Text="Rules (run from top to bottom)" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- rules -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="rulesList" Margin="4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="200"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Height="26" Margin="0,0,6,0" HorizontalContentAlignment="Left" Padding="8,0"
+                                        Click="KindButton_Click" ToolTip="Kind of rule">
+                                    <TextBlock Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis"/>
+                                </Button>
+                                <Grid Grid.Column="1" Margin="0,0,6,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="26" VerticalContentAlignment="Center"
+                                             Visibility="{Binding ShowValueBox, Converter={StaticResource BoolToVis}}"
+                                             ToolTip="{Binding ValueHint}"/>
+                                    <Button Height="26" HorizontalContentAlignment="Left" Padding="8,0" Click="PresetButton_Click"
+                                            Visibility="{Binding IsPreset, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding PresetLabel}" TextTrimming="CharacterEllipsis"/>
+                                    </Button>
+                                    <TextBox Grid.Column="1" Width="170" Margin="6,0,0,0" Text="{Binding Extra, UpdateSourceTrigger=PropertyChanged}"
+                                             Height="26" VerticalContentAlignment="Center"
+                                             Visibility="{Binding ShowExtra, Converter={StaticResource BoolToVis}}"
+                                             ToolTip="{Binding ExtraHint}"/>
+                                </Grid>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0"
+                                            Visibility="{Binding ShowCaseOptions, Converter={StaticResource BoolToVis}}">
+                                    <CheckBox Content="Ignore case" IsChecked="{Binding IgnoreCase}" Margin="0,0,8,0"/>
+                                    <CheckBox Content="Whole words" IsChecked="{Binding WholeWords}"
+                                              Visibility="{Binding ShowWholeWords, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="MoveUp_Click" ToolTip="Move up"/>
+                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down"/>
+                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="RemoveRule_Click" ToolTip="Remove this rule"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- lint -->
+        <ScrollViewer Grid.Row="3" MaxHeight="84" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="lintText" TextWrapping="Wrap"/>
+        </ScrollViewer>
+
+        <!-- live preview -->
+        <Grid Grid.Row="4" Margin="0,8,0,0" Height="170">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Sample text (type or paste)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBlock Grid.Column="2" Text="Result after this filter" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBox x:Name="sampleBox" Grid.Row="1" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            <TextBox x:Name="resultBox" Grid.Row="1" Grid.Column="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"/>
+        </Grid>
+
+        <!-- buttons -->
+        <DockPanel Grid.Row="5" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="saveButton" Content="Save" Padding="18,4" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>
+                <Button Content="Cancel" Padding="18,4" IsCancel="True" Click="Cancel_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="deleteButton" Content="Delete filter" Padding="12,4" Click="Delete_Click" Visibility="Collapsed"
+                        ToolTip="Delete this filter and its file"/>
+                <TextBlock x:Name="fileText" Foreground="{DynamicResource ThemeSubtle}" VerticalAlignment="Center" Margin="12,0,0,0"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

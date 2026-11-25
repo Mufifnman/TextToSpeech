@@ -249,4 +249,39 @@ public class FilterToggleTests
         Assert.False(back.IsEnabled("wikipedia"));
         Assert.True(back.IsEnabled("page-citations"));
     }
+
+    // Custom filters (made in the filter editor) join the registry after the built-in ones.
+    // These live in this class so they never run in parallel with the other registry tests.
+    [Fact]
+    public void CustomFiltersJoinTheRegistryAndRunThroughTheSamePipeline()
+    {
+        try
+        {
+            FilterRegistry.SetCustom(new[]
+            {
+                new FilterDefinition("custom:ads", "My filters", "Strip ads", FilterStage.Clipboard | FilterStage.Ocr,
+                    (ref string t) => { t = t.Replace("ADVERT", ""); }),
+            });
+
+            Assert.Equal("custom:ads", FilterRegistry.All[^1].Id);
+            Assert.Contains("My filters", FilterRegistry.Groups);
+
+            string text = "keep ADVERT this";
+            Filters.ApplyClipboardFilters(ref text, new FilterSettings());
+            Assert.Equal("keep  this", text);
+
+            string off = "keep ADVERT this";
+            Filters.ApplyClipboardFilters(ref off, Off("custom:ads"));
+            Assert.Equal("keep ADVERT this", off);
+
+            string ocr = "keep ADVERT this";
+            Filters.ApplyOcrFilters(ref ocr, new FilterSettings());
+            Assert.Equal("keep  this", ocr);
+        }
+        finally
+        {
+            FilterRegistry.SetCustom(Array.Empty<FilterDefinition>());
+        }
+        Assert.Equal(new[] { "Citations", "Quiz material" }, FilterRegistry.Groups.ToArray());
+    }
 }
