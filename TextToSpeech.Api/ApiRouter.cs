@@ -94,7 +94,7 @@ namespace TextToSpeech.Api
 
                 case "volume" when parts.Length == 2:
                     Expect(method, "PUT");
-                    return Ok(await host.SetVolumeAsync(InRange(Body<VolumeRequest>(request).Volume, "volume", 0, 100)));
+                    return Ok(await host.SetVolumeAsync(InRange(Body<VolumeRequest>(request).Volume, "volume", 0, 120)));
 
                 case "sessions" when parts.Length == 3:
                     if (method == "GET")
@@ -141,8 +141,10 @@ namespace TextToSpeech.Api
             {
                 throw ApiException.BadRequest("mode must be queue, interrupt or if-idle.");
             }
-            if (r.Rate.HasValue) InRange(r.Rate, "rate", -10, 10);
-            if (r.Volume.HasValue) InRange(r.Volume, "volume", 0, 100);
+            if (r.Voice != null || r.Rate.HasValue || r.Volume.HasValue)
+            {
+                throw ApiException.BadRequest("Per-request voice, rate and volume are not supported yet. Use PUT /v1/voice, /v1/rate and /v1/volume.", "unsupported_override");
+            }
             return r with { Mode = mode };
         }
 

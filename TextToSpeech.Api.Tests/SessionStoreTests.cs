@@ -187,5 +187,41 @@ namespace TextToSpeech.Api.Tests
             var e = Assert.Throws<ApiException>(() => store.Get("s_missing"));
             Assert.Equal(404, e.HttpStatus);
         }
+
+        [Fact]
+        public void SyncText_aligns_an_active_session_with_the_list_but_not_a_taken_one()
+        {
+            var s = NewSession();
+            store.SyncText(s.Id, "Different text now.", 10);
+            Assert.Equal("Different text now.", s.Text);
+            Assert.Equal(10, s.ReadChars);
+
+            store.Take(s.Id, 0);
+            store.SyncText(s.Id, "ignored", 3);
+            Assert.Equal("Different text now.", s.Text);
+        }
+
+        [Fact]
+        public void Revise_changes_the_text_bumps_the_revision_and_refuses_a_taken_session()
+        {
+            var s = NewSession();
+            store.Revise(s.Id, "New text.", 0);
+            Assert.Equal(2, s.Revision);
+            Assert.Equal("New text.", s.Text);
+            store.Take(s.Id, 0);
+            var e = Assert.Throws<ApiException>(() => store.Revise(s.Id, "x", 0));
+            Assert.Equal("already_taken", e.Code);
+        }
+
+        [Fact]
+        public void Prune_drops_active_sessions_with_nothing_left_but_keeps_taken_ones()
+        {
+            var gone = NewSession();
+            var taken = NewSession();
+            store.Take(taken.Id, 0);
+            store.Prune(_ => false);
+            Assert.Throws<ApiException>(() => store.Get(gone.Id));
+            Assert.Equal(SessionState.HandedOff, store.Get(taken.Id).State);
+        }
     }
 }

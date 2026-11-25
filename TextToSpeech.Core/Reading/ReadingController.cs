@@ -71,6 +71,9 @@ namespace TextToSpeech.Core.Reading
         /// <summary>The end of the document was reached.</summary>
         public event Action? Finished;
 
+        /// <summary>The list was emptied by <see cref="Clear"/> (window button, hotkey or API).</summary>
+        public event Action? Cleared;
+
         /// <summary>A short message for the status line (a voice failed, speech failed).</summary>
         public event Action<string>? Notice;
 
@@ -142,6 +145,7 @@ namespace TextToSpeech.Core.Reading
             document.Clear();
             paused = false;
             StateChanged?.Invoke();
+            Cleared?.Invoke();
         }
 
         /// <summary>Stops speaking and holds, without moving the position (used when text is taken out of the document).</summary>

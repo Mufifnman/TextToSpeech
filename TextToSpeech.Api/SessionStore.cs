@@ -88,6 +88,47 @@ namespace TextToSpeech.Api
 
         public void Remove(string id) => sessions.Remove(id);
 
+        /// <summary>
+        /// Aligns an Active session with what the reading list really holds (the list is the truth while a
+        /// session is being read: sentences are re-split, trimmed and re-ordered there). Ignored while taken.
+        /// </summary>
+        public void SyncText(string id, string text, int readChars)
+        {
+            var s = Get(id);
+            if (s.State != SessionState.Active)
+            {
+                return;
+            }
+            s.Text = text;
+            s.ReadChars = Math.Clamp(readChars, 0, text.Length);
+        }
+
+        /// <summary>The unread part of an Active session was changed in place: new text, next revision.</summary>
+        public SessionRecord Revise(string id, string newText, int readChars)
+        {
+            var s = Get(id);
+            if (s.State != SessionState.Active)
+            {
+                throw ApiException.Conflict("already_taken", "The remainder of this session is taken; return or release it first.");
+            }
+            s.Text = newText;
+            s.ReadChars = Math.Clamp(readChars, 0, newText.Length);
+            s.Revision++;
+            return s;
+        }
+
+        /// <summary>Drops sessions that are Active but have nothing left in the reading list (read and cleared away).</summary>
+        public void Prune(Func<string, bool> hasSentences)
+        {
+            foreach (var s in sessions.Values.ToList())
+            {
+                if (s.State == SessionState.Active && !hasSentences(s.Id))
+                {
+                    sessions.Remove(s.Id);
+                }
+            }
+        }
+
         /// <summary>The reader reached character <paramref name="readChars"/> (clamped, never moves backwards unless <paramref name="allowBackwards"/>).</summary>
         public void ReportProgress(string id, int readChars, bool allowBackwards = false)
         {

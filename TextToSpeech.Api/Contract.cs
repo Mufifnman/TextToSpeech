@@ -34,6 +34,7 @@ namespace TextToSpeech.Api
     /// <param name="Mode">queue (default), interrupt or if-idle.</param>
     /// <param name="ApplyFilters">Run the app's text filters on the text. Default false for API text.</param>
     /// <param name="Popup">false reads without showing the reading popup. Default true.</param>
+    /// <param name="Voice">Reserved: rejected for now (use PUT /v1/voice). Same for Rate and Volume.</param>
     public sealed record SpeakRequest(string? Text, string? Source, string? Mode, bool? ApplyFilters, bool? Popup,
         string? Voice, int? Rate, int? Volume);
 

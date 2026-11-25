@@ -47,8 +47,9 @@ namespace TextToSpeech.Api.Tests
         [InlineData("{}")]
         [InlineData("{\"text\":\"  \"}")]
         [InlineData("{\"text\":\"hi\",\"mode\":\"shout\"}")]
-        [InlineData("{\"text\":\"hi\",\"rate\":11}")]
-        [InlineData("{\"text\":\"hi\",\"volume\":101}")]
+        [InlineData("{\"text\":\"hi\",\"rate\":3}")]      // per-request overrides are not supported yet
+        [InlineData("{\"text\":\"hi\",\"volume\":50}")]
+        [InlineData("{\"text\":\"hi\",\"voice\":\"x\"}")]
         public async Task Bad_speak_requests_are_400_and_not_forwarded(string body)
         {
             var r = await Send("POST", "/v1/speak", body);
@@ -109,10 +110,12 @@ namespace TextToSpeech.Api.Tests
             Assert.Equal(200, (await Send("PUT", "/v1/voice", "{\"id\":\"piper-amy\"}")).Status);
             Assert.Equal(200, (await Send("PUT", "/v1/rate", "{\"rate\":-3}")).Status);
             Assert.Equal(200, (await Send("PUT", "/v1/volume", "{\"volume\":0}")).Status);
-            Assert.Equal(new[] { "voice:piper-amy", "rate:-3", "volume:0" }, host.Calls);
+            Assert.Equal(200, (await Send("PUT", "/v1/volume", "{\"volume\":120}")).Status);
+            Assert.Equal(new[] { "voice:piper-amy", "rate:-3", "volume:0", "volume:120" }, host.Calls);
 
             Assert.Equal(400, (await Send("PUT", "/v1/rate", "{\"rate\":99}")).Status);
             Assert.Equal(400, (await Send("PUT", "/v1/volume", "{}")).Status);
+            Assert.Equal(400, (await Send("PUT", "/v1/volume", "{\"volume\":121}")).Status);
             Assert.Equal(400, (await Send("PUT", "/v1/voice", "{}")).Status);
         }
 
