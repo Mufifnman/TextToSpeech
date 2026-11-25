@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 namespace TextToSpeech.Tests;
 
@@ -158,14 +158,32 @@ public class FilterToggleTests
     private const string Sample =
         "Unset starred question\nLocke (1632-1704) said so.[1] Others agreed (Smith, 2004). Fill in _____.";
 
+    private static FilterSettings Off(params string[] ids)
+    {
+        var s = new FilterSettings();
+        foreach (var id in ids) s.SetEnabled(id, false);
+        return s;
+    }
+
     [Fact]
     public void AllFiltersAreOnByDefault()
     {
         var settings = new FilterSettings();
-        Assert.True(settings.WikipediaCitations);
-        Assert.True(settings.PsychologyCitations);
-        Assert.True(settings.GovernmentCitations);
-        Assert.True(settings.AhitStarredQuestions);
+        Assert.All(FilterRegistry.All, f => Assert.True(settings.IsEnabled(f.Id)));
+    }
+
+    [Fact]
+    public void UnknownFilterIdsDefaultToOn()
+    {
+        Assert.True(new FilterSettings().IsEnabled("some-filter-added-later"));
+    }
+
+    [Fact]
+    public void RegistryIdsAreUniqueAndGroupedForSubmenus()
+    {
+        Assert.Equal(FilterRegistry.All.Count, FilterRegistry.All.Select(f => f.Id).Distinct().Count());
+        Assert.Equal(new[] { "Citations", "Quiz material" }, FilterRegistry.Groups.ToArray());
+        Assert.All(FilterRegistry.All, f => Assert.False(string.IsNullOrWhiteSpace(f.Label)));
     }
 
     [Fact]
@@ -188,15 +206,8 @@ public class FilterToggleTests
     [Fact]
     public void AllFiltersOffLeavesTextUnchanged()
     {
-        var settings = new FilterSettings
-        {
-            WikipediaCitations = false,
-            PsychologyCitations = false,
-            GovernmentCitations = false,
-            AhitStarredQuestions = false,
-        };
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, settings);
+        Filters.ApplyClipboardFilters(ref text, Off(FilterRegistry.All.Select(f => f.Id).ToArray()));
         Assert.Equal(Sample, text);
     }
 
@@ -204,25 +215,25 @@ public class FilterToggleTests
     public void WikipediaToggleOnlyAffectsWikipediaCitations()
     {
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, new FilterSettings { WikipediaCitations = false });
+        Filters.ApplyClipboardFilters(ref text, Off("wikipedia"));
         Assert.Contains("[1]", text);
         Assert.DoesNotContain("(Smith, 2004)", text);
     }
 
     [Fact]
-    public void PsychologyToggleKeepsAuthorYearCitations()
+    public void AuthorYearToggleKeepsAuthorYearCitations()
     {
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, new FilterSettings { PsychologyCitations = false });
+        Filters.ApplyClipboardFilters(ref text, Off("author-year"));
         Assert.Contains("(Smith, 2004)", text);
         Assert.DoesNotContain("(1632-1704)", text);
     }
 
     [Fact]
-    public void GovernmentToggleKeepsLifetimes()
+    public void PageCitationToggleKeepsLifetimes()
     {
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, new FilterSettings { GovernmentCitations = false });
+        Filters.ApplyClipboardFilters(ref text, Off("page-citations"));
         Assert.Contains("(1632-1704)", text);
         Assert.DoesNotContain("(Smith, 2004)", text);
     }
@@ -231,20 +242,38 @@ public class FilterToggleTests
     public void AhitToggleKeepsBlanksAndStarText()
     {
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, new FilterSettings { AhitStarredQuestions = false });
+        Filters.ApplyClipboardFilters(ref text, Off("ahit"));
         Assert.Contains("Unset starred question", text);
         Assert.Contains("_____", text);
     }
 
     [Fact]
-    public void OcrFiltersRespectThePsychologyToggle()
+    public void OcrFiltersRespectTheAuthorYearToggle()
     {
         string on = "Known (Smith, 2004).";
         Filters.ApplyOcrFilters(ref on, new FilterSettings());
         Assert.Equal("Known .", on);
 
         string off = "Known (Smith, 2004).";
-        Filters.ApplyOcrFilters(ref off, new FilterSettings { PsychologyCitations = false });
+        Filters.ApplyOcrFilters(ref off, Off("author-year"));
         Assert.Equal("Known (Smith, 2004).", off);
+    }
+
+    [Fact]
+    public void OcrStageSkipsClipboardOnlyFilters()
+    {
+        string text = "Fill in _____.[1]";
+        Filters.ApplyOcrFilters(ref text, new FilterSettings());
+        Assert.Equal("Fill in _____.[1]", text);
+    }
+
+    [Fact]
+    public void SettingsSurviveJsonRoundTrip()
+    {
+        var s = Off("ahit", "wikipedia");
+        var back = System.Text.Json.JsonSerializer.Deserialize<FilterSettings>(System.Text.Json.JsonSerializer.Serialize(s))!;
+        Assert.False(back.IsEnabled("ahit"));
+        Assert.False(back.IsEnabled("wikipedia"));
+        Assert.True(back.IsEnabled("page-citations"));
     }
 }

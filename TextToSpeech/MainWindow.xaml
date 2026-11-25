@@ -53,12 +53,7 @@
                 <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal"  HorizontalAlignment="Right" >
                     <Menu Background="Transparent" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <MenuItem Header="Filters" ToolTip="Choose which clean-up filters run on copied or scanned text">
-                            <MenuItem x:Name="wikipediaFilterItem" Header="Wikipedia citations ([1], [edit])" IsCheckable="True" Click="FilterMenuItem_Click" StaysOpenOnClick="True"/>
-                            <MenuItem x:Name="psychologyFilterItem" Header="Author-year citations (Smith, 2004)" IsCheckable="True" Click="FilterMenuItem_Click" StaysOpenOnClick="True"/>
-                            <MenuItem x:Name="governmentFilterItem" Header="Page citations, lifetimes (p. 12)" IsCheckable="True" Click="FilterMenuItem_Click" StaysOpenOnClick="True"/>
-                            <MenuItem x:Name="ahitFilterItem" Header="AHIT starred questions / blanks" IsCheckable="True" Click="FilterMenuItem_Click" StaysOpenOnClick="True"/>
-                        </MenuItem>
+                        <MenuItem x:Name="filtersMenu" Header="Filters" ToolTip="Choose which clean-up filters run on copied or scanned text"><!-- items are built from FilterRegistry in code --></MenuItem>
                     </Menu>
                     <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
                     <TextBlock Text="OCR: " Margin="0,3,0,4" />

@@ -41,21 +41,40 @@ namespace TextToSpeech
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
 
-            wikipediaFilterItem.IsChecked = filterSettings.WikipediaCitations;
-            psychologyFilterItem.IsChecked = filterSettings.PsychologyCitations;
-            governmentFilterItem.IsChecked = filterSettings.GovernmentCitations;
-            ahitFilterItem.IsChecked = filterSettings.AhitStarredQuestions;
+            BuildFiltersMenu();
             RegionReader = this;
             SourceInitialized += (_, _) => SetupHotkeys();
             Closed += (_, _) => hotkeys?.Dispose();
         }
 
+        // One submenu per FilterRegistry group, one checkable item per filter.
+        private void BuildFiltersMenu()
+        {
+            filtersMenu.Items.Clear();
+            foreach (string group in FilterRegistry.Groups)
+            {
+                var groupItem = new MenuItem { Header = group };
+                foreach (var filter in FilterRegistry.All.Where(f => f.Group == group))
+                {
+                    var item = new MenuItem
+                    {
+                        Header = filter.Label,
+                        IsCheckable = true,
+                        StaysOpenOnClick = true,
+                        IsChecked = filterSettings.IsEnabled(filter.Id),
+                        Tag = filter.Id,
+                    };
+                    item.Click += FilterMenuItem_Click;
+                    groupItem.Items.Add(item);
+                }
+                filtersMenu.Items.Add(groupItem);
+            }
+        }
+
         private void FilterMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            filterSettings.WikipediaCitations = wikipediaFilterItem.IsChecked;
-            filterSettings.PsychologyCitations = psychologyFilterItem.IsChecked;
-            filterSettings.GovernmentCitations = governmentFilterItem.IsChecked;
-            filterSettings.AhitStarredQuestions = ahitFilterItem.IsChecked;
+            var item = (MenuItem)sender;
+            filterSettings.SetEnabled((string)item.Tag, item.IsChecked);
             FilterSettingsStore.Save(filterSettings);
         }
 
@@ -71,8 +90,10 @@ namespace TextToSpeech
             hotkeys ??= new GlobalHotkeyManager(this);
             hotkeys.UnregisterAll();
             var failed = new List<string>();
-            if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey()))
+            if (!hotkeys.Register(hotkeySettings.GetReadSelection(), () => _ = ReadSelectionHotkey(showWindow: false)))
                 failed.Add(hotkeySettings.GetReadSelection().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetReadSelectionAndShow(), () => _ = ReadSelectionHotkey(showWindow: true)))
+                failed.Add(hotkeySettings.GetReadSelectionAndShow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetSummonWindow(), BringToFront))
                 failed.Add(hotkeySettings.GetSummonWindow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey()))
@@ -98,10 +119,19 @@ namespace TextToSpeech
             Focus();
         }
 
-        private async Task ReadSelectionHotkey()
+        // Set when a hotkey brought a hidden window up; the window goes back down when reading ends.
+        bool minimizeWhenDone = false;
+
+        private async Task ReadSelectionHotkey(bool showWindow)
         {
             string text = await SelectionCapture.GetSelectedTextAsync();
             if (text == null) return;
+            if (showWindow)
+            {
+                // Only re-minimize if the window wasn't already up (if the user had it open, leave it alone).
+                minimizeWhenDone = WindowState == System.Windows.WindowState.Minimized || !IsVisible;
+                BringToFront();
+            }
             QueueTextAndRead(text);
         }
 
@@ -122,7 +152,6 @@ namespace TextToSpeech
         {
             Filters.ApplyClipboardFilters(ref text, filterSettings);
             textbox.Text = text;
-            if (hotkeySettings.ReadingSummonsWindow) BringToFront();
             ReadText(this, new RoutedEventArgs());
         }
 
@@ -160,8 +189,14 @@ namespace TextToSpeech
             string? text = document.GetTextToSpeak(out spokenOffset);
             if (text == null)
             {
+                if (minimizeWhenDone)
+                {
+                    // The hotkey brought the window up for this read; put it away again.
+                    minimizeWhenDone = false;
+                    this.WindowState = System.Windows.WindowState.Minimized;
+                }
                 // Done: maximize so next image can be scanned or line can be copied
-                if (this.WindowState == System.Windows.WindowState.Minimized)
+                else if (this.WindowState == System.Windows.WindowState.Minimized)
                 {
                     this.WindowState = System.Windows.WindowState.Normal;
                 }

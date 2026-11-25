@@ -2,37 +2,78 @@
 
 namespace TextToSpeech
 {
+    /// <summary>Signature shared by every text clean-up filter.</summary>
+    internal delegate void TextFilter(ref string text);
+
+    /// <summary>Where a filter runs: on pasted/copied text, on OCR output, or both.</summary>
+    [Flags]
+    internal enum FilterStage
+    {
+        Clipboard = 1,
+        Ocr = 2,
+    }
+
+    /// <summary>One clean-up filter as shown in the Filters menu. Group becomes a submenu.</summary>
+    internal sealed record FilterDefinition(string Id, string Group, string Label, FilterStage Stages, TextFilter Apply);
+
     /// <summary>
-    /// Which clipboard/OCR clean-up filters are switched on. Each filter can be toggled from the
-    /// Filters menu in the main window; all are on by default to match the original behaviour.
+    /// The list of all filters, in the order they run. The Filters menu, the on/off settings and
+    /// the clipboard/OCR pipelines are all driven from this list, so adding a filter means writing
+    /// its method and adding one line to <see cref="All"/>.
+    /// </summary>
+    internal static class FilterRegistry
+    {
+        public static readonly IReadOnlyList<FilterDefinition> All = new FilterDefinition[]
+        {
+            new("wikipedia", "Citations", "Wikipedia citations ([1], [edit])", FilterStage.Clipboard, Filters.WikipediaCitation),
+            new("author-year", "Citations", "Author-year citations (Smith, 2004)", FilterStage.Clipboard | FilterStage.Ocr, Filters.PsychologyFilter),
+            new("page-citations", "Citations", "Page citations, lifetimes (p. 12)", FilterStage.Clipboard, Filters.GovernmentFilter),
+            new("ahit", "Quiz material", "AHIT starred questions / blanks", FilterStage.Clipboard, Filters.AHITStarredQuestion),
+        };
+
+        /// <summary>Distinct group names in first-seen order (one submenu each).</summary>
+        public static IEnumerable<string> Groups => All.Select(f => f.Group).Distinct();
+    }
+
+    /// <summary>
+    /// Which filters are switched off. Everything is on by default (including filters added later),
+    /// so only the ids the user turned off are stored.
     /// </summary>
     public class FilterSettings
     {
-        public bool WikipediaCitations { get; set; } = true;
-        public bool PsychologyCitations { get; set; } = true;
-        public bool GovernmentCitations { get; set; } = true;
-        public bool AhitStarredQuestions { get; set; } = true;
+        public HashSet<string> Disabled { get; set; } = new();
+
+        internal bool IsEnabled(string id) => !Disabled.Contains(id);
+
+        internal void SetEnabled(string id, bool enabled)
+        {
+            if (enabled) Disabled.Remove(id); else Disabled.Add(id);
+        }
     }
 
     static internal class Filters
     {
         /// <summary>
-        /// Runs every enabled filter over text pasted from the clipboard, in the original order.
+        /// Runs every enabled filter over text pasted from the clipboard, in registry order.
         /// </summary>
-        internal static void ApplyClipboardFilters(ref string text, FilterSettings settings)
-        {
-            if (settings.WikipediaCitations) WikipediaCitation(ref text);
-            if (settings.PsychologyCitations) PsychologyFilter(ref text);
-            if (settings.GovernmentCitations) GovernmentFilter(ref text);
-            if (settings.AhitStarredQuestions) AHITStarredQuestion(ref text);
-        }
+        internal static void ApplyClipboardFilters(ref string text, FilterSettings settings) =>
+            Apply(ref text, settings, FilterStage.Clipboard);
 
         /// <summary>
         /// Runs the enabled filters that apply to OCR output (after lines have been combined).
         /// </summary>
-        internal static void ApplyOcrFilters(ref string text, FilterSettings settings)
+        internal static void ApplyOcrFilters(ref string text, FilterSettings settings) =>
+            Apply(ref text, settings, FilterStage.Ocr);
+
+        private static void Apply(ref string text, FilterSettings settings, FilterStage stage)
         {
-            if (settings.PsychologyCitations) PsychologyFilter(ref text);
+            foreach (var filter in FilterRegistry.All)
+            {
+                if ((filter.Stages & stage) != 0 && settings.IsEnabled(filter.Id))
+                {
+                    filter.Apply(ref text);
+                }
+            }
         }
 
         internal static void PsychologyFilter(ref string readText)
