@@ -166,16 +166,11 @@ public class FilterToggleTests
     }
 
     [Fact]
-    public void AllFiltersAreOnByDefault()
+    public void AllFiltersAreOnByDefault_IncludingOnesAddedLater()
     {
         var settings = new FilterSettings();
         Assert.All(FilterRegistry.All, f => Assert.True(settings.IsEnabled(f.Id)));
-    }
-
-    [Fact]
-    public void UnknownFilterIdsDefaultToOn()
-    {
-        Assert.True(new FilterSettings().IsEnabled("some-filter-added-later"));
+        Assert.True(settings.IsEnabled("some-filter-added-later"));
     }
 
     [Fact]
@@ -211,40 +206,18 @@ public class FilterToggleTests
         Assert.Equal(Sample, text);
     }
 
-    [Fact]
-    public void WikipediaToggleOnlyAffectsWikipediaCitations()
+    // Turning one filter off keeps exactly its own marks in the text; the other filters still run.
+    [Theory]
+    [InlineData("wikipedia", "[1]", "(Smith, 2004)")]
+    [InlineData("author-year", "(Smith, 2004)", "(1632-1704)")]
+    [InlineData("page-citations", "(1632-1704)", "(Smith, 2004)")]
+    [InlineData("ahit", "_____", "[1]")]
+    public void TurningOneFilterOffKeepsOnlyItsOwnMarks(string offId, string stillThere, string stillRemoved)
     {
         string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, Off("wikipedia"));
-        Assert.Contains("[1]", text);
-        Assert.DoesNotContain("(Smith, 2004)", text);
-    }
-
-    [Fact]
-    public void AuthorYearToggleKeepsAuthorYearCitations()
-    {
-        string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, Off("author-year"));
-        Assert.Contains("(Smith, 2004)", text);
-        Assert.DoesNotContain("(1632-1704)", text);
-    }
-
-    [Fact]
-    public void PageCitationToggleKeepsLifetimes()
-    {
-        string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, Off("page-citations"));
-        Assert.Contains("(1632-1704)", text);
-        Assert.DoesNotContain("(Smith, 2004)", text);
-    }
-
-    [Fact]
-    public void AhitToggleKeepsBlanksAndStarText()
-    {
-        string text = Sample;
-        Filters.ApplyClipboardFilters(ref text, Off("ahit"));
-        Assert.Contains("Unset starred question", text);
-        Assert.Contains("_____", text);
+        Filters.ApplyClipboardFilters(ref text, Off(offId));
+        Assert.Contains(stillThere, text);
+        Assert.DoesNotContain(stillRemoved, text);
     }
 
     [Fact]

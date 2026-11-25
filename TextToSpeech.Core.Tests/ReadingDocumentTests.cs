@@ -174,6 +174,104 @@ namespace TextToSpeech.Core.Tests
         }
     }
 
+    public class ReadingDocumentClipboardTests
+    {
+        [Fact]
+        public void ContainsUnread_IgnoresSentencesAlreadyRead()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two three. Four five. Six.");
+
+            Assert.True(doc.ContainsUnread("One two"));   // nothing read yet
+            doc.CompleteSentence();
+            Assert.False(doc.ContainsUnread("One two"));  // already read: can be pasted again
+            Assert.True(doc.Contains("One two"));         // still there for rewind
+            Assert.True(doc.ContainsUnread("Four five"));
+        }
+
+        [Fact]
+        public void ContainsUnread_IsFalseOnceEverythingIsRead_AndForBlankText()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One. Two.");
+            doc.CompleteSentence();
+            doc.CompleteSentence();
+            Assert.False(doc.ContainsUnread("Two"));
+            Assert.False(doc.ContainsUnread("  "));
+            Assert.False(doc.ContainsUnread(null));
+        }
+    }
+
+    public class ReadingDocumentTakeBackTests
+    {
+        [Fact]
+        public void TakeUnread_ReturnsCurrentAndLaterSentences_AndKeepsTheReadOnes()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six.");
+            doc.CompleteSentence(); // "One two." is read
+
+            Assert.Equal("Three four. Five six.", doc.TakeUnread());
+
+            Assert.Equal(1, doc.Count);
+            Assert.Equal("One two.", doc.Sentences[0].Text);
+            Assert.True(doc.IsAtEnd);
+            Assert.Equal("", doc.TakeUnread()); // nothing left
+        }
+
+        [Fact]
+        public void TakeAll_ReturnsEverythingAndEmptiesTheDocument()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four.");
+            doc.CompleteSentence();
+
+            Assert.Equal("One two. Three four.", doc.TakeAll());
+            Assert.Equal(0, doc.Count);
+            Assert.True(doc.IsAtEnd);
+        }
+
+        [Fact]
+        public void TakenText_CanBeAppendedAgainAsTheSameSentences()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six.");
+            string back = doc.TakeAll();
+
+            doc.Append(back);
+            Assert.Equal(new[] { "One two.", "Three four.", "Five six." }, doc.Sentences.Select(s => s.Text));
+        }
+    }
+
+    public class ReadingDocumentLookAheadTests
+    {
+        [Fact]
+        public void PeekUpcomingTexts_ReturnsTheNextFullSentences_AndMovesWithTheReader()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six. Seven eight.");
+
+            Assert.Equal(new[] { "Three four.", "Five six." }, doc.PeekUpcomingTexts(2));
+            doc.CompleteSentence();
+            Assert.Equal(new[] { "Five six.", "Seven eight." }, doc.PeekUpcomingTexts(2));
+            doc.CompleteSentence();
+            doc.CompleteSentence();
+            Assert.Empty(doc.PeekUpcomingTexts(2));   // nothing after the last sentence
+        }
+
+        [Fact]
+        public void PeekUpcomingTexts_MatchesWhatWillBeSpoken()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four.");
+            var peeked = doc.PeekUpcomingTexts(1)[0];
+
+            doc.CompleteSentence();
+            Assert.Equal(peeked, doc.GetTextToSpeak(out int offset));   // same text, so a prepared clip is found
+            Assert.Equal(0, offset);
+        }
+    }
+
     public class SentenceTests
     {
         [Fact]

@@ -11,6 +11,7 @@ namespace TextToSpeech.Speech
         private const string IdPrefix = "sapi:";
         private readonly object gate = new();
         private SpeechSynthesizer? current;
+        private int volumePercent = 100;
 
         public string Name => "Windows";
 
@@ -34,6 +35,7 @@ namespace TextToSpeech.Speech
                 catch (ArgumentException) { /* voice was uninstalled; keep the default */ }
             }
             synth.Rate = Math.Clamp(rate, -10, 10);
+            synth.Volume = Math.Clamp(volumePercent, 0, 100); // SAPI tops out at 100
             synth.SetOutputToDefaultAudioDevice();
 
             var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -92,6 +94,20 @@ namespace TextToSpeech.Speech
                 if (current != null) current.Rate = Math.Clamp(rate, -10, 10);
             }
         }
+
+        /// <summary>SAPI's volume is 0 to 100, so a setting above 100 plays at 100 for Windows voices. A change reaches the next sentence, not the one being spoken.</summary>
+        public void SetVolume(int percent)
+        {
+            lock (gate)
+            {
+                volumePercent = percent;
+                if (current != null) current.Volume = Math.Clamp(percent, 0, 100);
+            }
+        }
+
+        public void Prewarm(VoiceInfo? voice) { }
+        public void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate) { }
+        public void ClearUpcoming() { }
 
         public void Dispose() { }
     }

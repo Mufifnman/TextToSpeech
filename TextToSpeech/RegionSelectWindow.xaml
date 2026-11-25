@@ -8,6 +8,9 @@
         MouseLeftButtonDown="OnMouseDown" MouseMove="OnMouseMove" MouseLeftButtonUp="OnMouseUp"
         MouseRightButtonUp="OnCancel" KeyDown="OnKeyDown">
     <Canvas x:Name="Root">
+        <!-- The screenshot taken before the overlay opened, so nothing can move under the selection. -->
+        <Image x:Name="Backdrop" Stretch="Fill" IsHitTestVisible="False"/>
+
         <!-- Dim everything except the selected rectangle (even-odd fill punches the hole). -->
         <Path Fill="#80000000" IsHitTestVisible="False">
             <Path.Data>

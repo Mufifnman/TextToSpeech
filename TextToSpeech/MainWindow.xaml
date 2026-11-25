@@ -3,71 +3,275 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Title="Text to Speech" Height="400" Width="940" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" Foreground="{DynamicResource ThemeText}"
+        Title="Text to Speech" Height="466" Width="423" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown" SizeChanged="Window_SizeChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
-        <local:EnumToEnumerableConverter x:Key="EnumToEnumerableConverter" />
+        <!-- Title bar buttons (minimize, maximize, close) -->
+        <Style x:Key="TitleButton" TargetType="Button">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatPressed}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CloseTitleButton" TargetType="Button" BasedOn="{StaticResource TitleButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#C42B1C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#A32316"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Bottom option row: flat (same color as the window), small, with a subtle hover and pressed highlight. -->
+        <Style x:Key="BarButton" TargetType="Button">
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="MinWidth" Value="32"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="Margin" Value="0,0,2,0"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" CornerRadius="6" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatPressed}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
-    <Grid Margin="0,0,0,-5">
+    <Border x:Name="windowBorder" Background="{DynamicResource ThemeBackground}" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" CornerRadius="8">
+    <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="32"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="80"/>
         </Grid.RowDefinitions>
-        <Grid>
+        <!-- Title bar: title (also shows hotkey conflicts) and the window buttons -->
+        <Grid Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="textbox" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="Test"/>
-            <local:ReadingDisplay x:Name="__ReadListDisplay__" Grid.Column="1"/>
+            <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" Margin="12,0" VerticalAlignment="Center"
+                       FontSize="12" Foreground="{DynamicResource ThemeSubtle}" TextTrimming="CharacterEllipsis"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource TitleButton}" Click="TitleMinimize_Click" ToolTip="Minimize">
+                    <TextBlock Text="&#xE921;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+                <Button Style="{StaticResource TitleButton}" Click="TitleMaximize_Click" ToolTip="Maximize or restore">
+                    <TextBlock x:Name="maximizeGlyph" Text="&#xE922;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+                <Button Style="{StaticResource CloseTitleButton}" Click="TitleClose_Click" ToolTip="Close">
+                    <TextBlock Text="&#xE8BB;" FontFamily="{StaticResource IconFont}" FontSize="10"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+    <Grid Grid.Row="1">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="readingRow" Height="*" MinHeight="30"/>
+                <RowDefinition x:Name="inputRow" Height="Auto"/>
+            </Grid.RowDefinitions>
+            <local:ReadingDisplay x:Name="__ReadListDisplay__" MinHeight="30"/>
+            <!-- Top middle: send text from the reading pane back to the editable box -->
+            <StackPanel x:Name="bringBackPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" Panel.ZIndex="2" Visibility="Collapsed">
+                <Button x:Name="bringBackLeft" Click="BringBackLeft_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
+                        Background="{DynamicResource ThemeOverlay}" ToolTip="Bring back what is left to read (from the current sentence on) into the edit box">
+                    <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
+                </Button>
+                <Button x:Name="bringBackAll" Click="BringBackAll_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
+                        Background="{DynamicResource ThemeOverlay}" ToolTip="Bring back all the text (read and unread) into the edit box">
+                    <StackPanel>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-1,0,-5"/>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-5,0,-1"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <!-- One line while idle; grows to fill the window while you edit (see SetInputExpanded). -->
+            <TextBox x:Name="textbox" Grid.Row="1" Margin="0,2,0,0" MinHeight="30" MaxHeight="34"
+                     TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Text="Test"
+                     GotKeyboardFocus="Textbox_GotKeyboardFocus" PreviewMouseDown="Textbox_PreviewMouseDown"
+                     TextChanged="Textbox_TextChanged" LostKeyboardFocus="Textbox_LostKeyboardFocus"/>
+            <!-- Bottom right of the edit box, only while it is expanded: shrink it back to one line -->
+            <Button x:Name="shrinkInput" Grid.Row="1" Click="ShrinkInput_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="26"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,4" Panel.ZIndex="2" Visibility="Collapsed"
+                    Background="{DynamicResource ThemeOverlay}" ToolTip="Shrink the edit box back to one line">
+                <TextBlock Text="&#xE73F;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
+            </Button>
         </Grid>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <Grid>
+            <Grid Margin="4,4,4,0" Height="34">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" Focusable="False"/>
-                <Button x:Name="___RewindButton_" Content="&#9198; Back" Grid.Column="1" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)"/>
-                <Button x:Name="___PauseButton_" Content="&#9199; Pause" Grid.Column="2" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)"/>
-                <Button x:Name="___SkipButton_" Content="Skip &#9197;" Grid.Column="3" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)"/>
-                <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="4" Click="StopRead" Focusable="False"/>
-                <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="5" Click="ClearList" Focusable="False"/>
-                <Button x:Name="__ImageRead" Content="Read Region" Grid.Column="6" Click="ImageRead" Focusable="False" ToolTip="Drag a box around text on screen to read it aloud"/>
-                <Button x:Name="__ReadAgain" Content="Again" Grid.Column="7" Padding="8,0" IsEnabled="False" Click="ReadSameRegion" Focusable="False" ToolTip="Read the same screen region again (for example after scrolling)"/>
+                <Button x:Name="___RewindButton_" Margin="2,0" Grid.Column="0" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Back" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___PauseButton_" Margin="2,0" Grid.Column="1" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="pauseGlyph" Text="&#xE768;" FontFamily="{StaticResource IconFont}" Foreground="#2E9E4F" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="pauseLabel" Text="Play" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___SkipButton_" Margin="2,0" Grid.Column="2" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Skip" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___StopButton_" Margin="2,0" Grid.Column="3" Click="StopRead" Focusable="False" ToolTip="Stop reading (keeps your place)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE71A;" FontFamily="{StaticResource IconFont}" Foreground="#D9453D" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___ClearButton" Margin="2,0" Grid.Column="4" Click="ClearList" Focusable="False" ToolTip="Clear everything that is queued to read">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" Foreground="#7A7A7A" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Clear" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 </Grid>
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" Margin="4,6,4,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal"  HorizontalAlignment="Right" >
-                    <Menu Background="Transparent" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <MenuItem x:Name="filtersMenu" Header="Filters" ToolTip="Choose which clean-up filters run on copied or scanned text"><!-- items are built from FilterRegistry in code --></MenuItem>
-                    </Menu>
-                    <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
-                    <TextBlock Text="Voice: " Margin="0,3,0,4" />
-                    <ComboBox x:Name="voiceComboBox" MinWidth="220" SelectionChanged="VoiceComboBox_SelectionChanged" />
-                    <Button Content="More voices..." Margin="4,0,12,0" Padding="6,0" Click="MoreVoices_Click" />
-                    <TextBlock Text="OCR: " Margin="0,3,0,4" />
-                    <ComboBox x:Name="ocrOptionsComboBox" SelectionChanged="OcrOptionsComboBox_SelectionChanged" 
-                        ItemsSource="{Binding Source={x:Type local:OcrOptions}, Converter={StaticResource EnumToEnumerableConverter}}"
-                        SelectedIndex="0">
-                    </ComboBox>
+                <StackPanel x:Name="optionsLeft" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Speed: [-] (only when the window is narrow)  gauge + number (click for a slider)  [+] -->
+                    <Button x:Name="speedMinus" Content="&#x2212;" Click="SpeedMinus_Click" Style="{StaticResource BarButton}" MinWidth="26"
+                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Slower" Visibility="Collapsed"/>
+                    <Button x:Name="speedButton" Click="SpeedButton_Click" Style="{StaticResource BarButton}" ToolTip="Speed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="speedText" Text="4" FontWeight="SemiBold" MinWidth="18" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Popup x:Name="speedPopup" PlacementTarget="{Binding ElementName=speedButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
+                        <Border Style="{StaticResource PopupPanel}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="speedPopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <Slider x:Name="speedSlider" Orientation="Vertical" Minimum="-2" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
+                                        SmallChange="1" LargeChange="1" Height="120" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                    <Button x:Name="speedPlus" Content="+" Click="SpeedPlus_Click" Style="{StaticResource BarButton}" MinWidth="26" Margin="0,0,10,0"
+                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Faster" Visibility="Collapsed"/>
+                    <!-- Reading volume (0 to 120%), reading only -->
+                    <Button x:Name="volumeButton" Click="VolumeButton_Click" Style="{StaticResource BarButton}" Margin="10,0,2,0" ToolTip="Reading volume">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE767;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="volumeText" Text="100%" FontWeight="SemiBold" MinWidth="34" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Popup x:Name="volumePopup" PlacementTarget="{Binding ElementName=volumeButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
+                        <Border Style="{StaticResource PopupPanel}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="volumePopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <Slider x:Name="volumeSlider" Orientation="Vertical" Minimum="0" Maximum="120" TickFrequency="1" IsSnapToTickEnabled="True"
+                                        SmallChange="1" LargeChange="1" Height="120" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                    <Button x:Name="voiceButton" Content="&#x1F5E3;" Click="VoiceButton_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Choose the voice">
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="voiceMenu" />
+                        </Button.ContextMenu>
+                    </Button>
+                    <Button x:Name="filtersButton" Click="FiltersButton_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Filters: choose which clean-up filters run on copied or scanned text">
+                        <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="14" VerticalAlignment="Center"/>
+                        <Button.ContextMenu>
+                            <!-- items are built from FilterRegistry in code -->
+                            <ContextMenu x:Name="filtersMenu" />
+                        </Button.ContextMenu>
+                    </Button>
+                    <Button x:Name="settingsButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="Settings_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Settings: OCR engine, window opacity, bring up while playing"/>
                 </StackPanel>
+                <Button x:Name="__ImageRead" Grid.Column="1" Content="Read Region" Click="ImageRead" Focusable="False" Height="28" Padding="12,0" Margin="8,0,0,0" VerticalAlignment="Center"
+                        ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
             </Grid>
-            <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0,4,2" TextTrimming="CharacterEllipsis">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </Grid>
     </Grid>
+    </Grid>
+    </Border>
 </Window>

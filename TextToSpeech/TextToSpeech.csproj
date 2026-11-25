@@ -44,6 +44,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="TextToSpeech.Windows.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="MainWindow.xaml.cs">
       <SubType>Code</SubType>
       <DependentUpon>MainWindow.xaml</DependentUpon>

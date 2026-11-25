@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace TextToSpeech.Speech
 {
@@ -15,21 +16,19 @@ namespace TextToSpeech.Speech
 
         public bool IsPaused { get { lock (gate) { return paused; } } }
 
+        private volatile float gain = 1f;
+
+        /// <summary>Volume multiplier, applied live while a clip plays (1.0 = as generated; above 1.0 is soft-limited).</summary>
+        public float Gain { get => gain; set => gain = value; }
+
         public async Task PlayAsync(float[] samples, int sampleRate, IReadOnlyList<TimedWord> words,
             Action<WordBoundary>? onWord, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var pcm = new byte[samples.Length * 2];
-            for (int i = 0; i < samples.Length; i++)
-            {
-                short s = (short)Math.Round(Math.Clamp(samples[i], -1f, 1f) * short.MaxValue);
-                pcm[2 * i] = (byte)s;
-                pcm[2 * i + 1] = (byte)(s >> 8);
-            }
-
+            // Gain is read as the clip plays, so the volume slider works live (with a short ramp, no pops).
             var format = new WaveFormat(sampleRate, 16, 1);
-            using var stream = new RawSourceWaveStream(new MemoryStream(pcm), format);
+            var provider = new GainSampleProvider(samples, sampleRate, () => gain);
             using var wave = new WaveOutEvent { DesiredLatency = 120 };
             var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             wave.PlaybackStopped += (_, e) =>
@@ -37,7 +36,7 @@ namespace TextToSpeech.Speech
                 if (e.Exception != null) stopped.TrySetException(e.Exception);
                 else stopped.TrySetResult();
             };
-            wave.Init(stream);
+            wave.Init(new SampleToWaveProvider16(provider));
 
             lock (gate) { output = wave; paused = false; }
             try

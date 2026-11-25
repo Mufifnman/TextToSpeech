@@ -90,6 +90,67 @@ namespace TextToSpeech.Core.Reading
         }
 
         /// <summary>
+        /// Removes every sentence from the current one onward (what is left to read) and returns its text,
+        /// so it can be handed back to the editable box. Sentences already read stay. The whole current
+        /// sentence comes back, even if it was started.
+        /// </summary>
+        public string TakeUnread()
+        {
+            int from = Math.Min(Position.Sentence, sentences.Count);
+            string text = string.Join(" ", sentences.Skip(from).Select(s => s.Text));
+            if (from < sentences.Count)
+            {
+                sentences.RemoveRange(from, sentences.Count - from);
+                SpokenWord = -1;
+                Position = new ReadingPosition(sentences.Count, 0);
+                ContentChanged?.Invoke(this, EventArgs.Empty);
+                PositionChanged?.Invoke(this, EventArgs.Empty);
+            }
+            return text;
+        }
+
+        /// <summary>The full text of up to <paramref name="count"/> sentences after the current one, in reading order.</summary>
+        public IReadOnlyList<string> PeekUpcomingTexts(int count)
+        {
+            var result = new List<string>();
+            for (int i = Position.Sentence + 1; i < sentences.Count && result.Count < count; i++)
+            {
+                result.Add(sentences[i].Text);
+            }
+            return result;
+        }
+
+        /// <summary>Returns all the text (read and unread) and empties the document.</summary>
+        public string TakeAll()
+        {
+            string text = string.Join(" ", sentences.Select(s => s.Text));
+            Clear();
+            return text;
+        }
+
+        /// <summary>
+        /// Like <see cref="Contains"/> but only looks at sentences not yet finished (the current one onward).
+        /// The old queue dropped sentences as they were read, so text that was already read could be
+        /// copied and picked up again; this keeps that behavior now that read sentences stay for rewind.
+        /// </summary>
+        public bool ContainsUnread(string? fragment)
+        {
+            if (string.IsNullOrWhiteSpace(fragment))
+            {
+                return false;
+            }
+            string f = fragment.Trim();
+            for (int i = Position.Sentence; i < sentences.Count; i++)
+            {
+                if (sentences[i].Text.Contains(f, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// The text to hand to the speech engine for the current sentence, starting at
         /// <see cref="Position"/>.Word. <paramref name="offset"/> is where that text starts
         /// inside the sentence; add it to engine character positions before calling

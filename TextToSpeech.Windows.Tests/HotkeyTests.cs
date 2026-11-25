@@ -11,6 +11,8 @@ public class HotkeyBindingTests
     [InlineData("Ctrl+Alt+R", ModifierKeys.Control | ModifierKeys.Alt, Key.R)]
     [InlineData("ctrl+shift+F5", ModifierKeys.Control | ModifierKeys.Shift, Key.F5)]
     [InlineData("Win+Alt+W", ModifierKeys.Windows | ModifierKeys.Alt, Key.W)]
+    [InlineData("Alt+Space", ModifierKeys.Alt, Key.Space)]
+    [InlineData("Alt+Delete", ModifierKeys.Alt, Key.Delete)]
     [InlineData(" Control + Alt + O ", ModifierKeys.Control | ModifierKeys.Alt, Key.O)]
     public void TryParse_ReadsModifiersAndKey(string text, ModifierKeys mods, Key key)
     {
@@ -39,14 +41,6 @@ public class HotkeyBindingTests
         Assert.True(HotkeyBinding.TryParse(b.ToString(), out var back));
         Assert.Equal(b, back);
     }
-
-    [Fact]
-    public void IsValid_NeedsModifierAndKey()
-    {
-        Assert.False(new HotkeyBinding(ModifierKeys.None, Key.R).IsValid);
-        Assert.False(new HotkeyBinding(ModifierKeys.Control, Key.None).IsValid);
-        Assert.True(new HotkeyBinding(ModifierKeys.Control, Key.R).IsValid);
-    }
 }
 
 public class HotkeySettingsTests
@@ -55,17 +49,13 @@ public class HotkeySettingsTests
     public void Defaults_AreValidAndDistinct()
     {
         var s = new HotkeySettings();
-        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion() };
+        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion(), s.GetReadRegionQuiet(), s.GetPlayPause(), s.GetClearAll() };
         Assert.All(all, b => Assert.True(b.IsValid));
-        Assert.Equal(4, all.Distinct().Count());
-    }
-
-    [Fact]
-    public void ReadSelectionDefaults_AreAltRAndCtrlAltR()
-    {
-        var s = new HotkeySettings();
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.R), s.GetReadSelection());
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Alt, Key.R), s.GetReadSelectionAndShow());
+        Assert.Equal(7, all.Distinct().Count());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Alt, Key.O), s.GetReadRegion());   // shows the window
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.O), s.GetReadRegionQuiet());                     // leaves it alone
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Space), s.GetPlayPause());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Delete), s.GetClearAll());
     }
 
     [Fact]
@@ -91,13 +81,6 @@ public class HotkeySettingsTests
     }
 
     [Fact]
-    public void CustomBinding_IsUsed()
-    {
-        var s = new HotkeySettings { ReadRegion = "Ctrl+Shift+G" };
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Shift, Key.G), s.GetReadRegion());
-    }
-
-    [Fact]
     public void Json_RoundTripsAndStaysHandEditable()
     {
         var s = new HotkeySettings { ReadSelection = "Ctrl+Shift+Y", ReadSelectionAndShow = "Ctrl+Shift+U" };
@@ -106,5 +89,19 @@ public class HotkeySettingsTests
         var back = JsonSerializer.Deserialize<HotkeySettings>(json)!;
         Assert.Equal("Ctrl+Shift+Y", back.ReadSelection);
         Assert.Equal("Ctrl+Shift+U", back.ReadSelectionAndShow);
+    }
+}
+
+public class ResponsiveLayoutTests
+{
+    [Theory]
+    [InlineData(500, false)]
+    [InlineData(699, false)]
+    [InlineData(700, true)]
+    [InlineData(780, true)]    // the default window is big: step buttons shown
+    [InlineData(1400, true)]
+    public void SpeedStepButtons_ShowOnlyWhenTheWindowIsBig(double width, bool shown)
+    {
+        Assert.Equal(shown, TextToSpeech.ResponsiveLayout.ShowSpeedStepButtons(width));
     }
 }

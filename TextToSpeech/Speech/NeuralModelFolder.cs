@@ -115,7 +115,8 @@ namespace TextToSpeech.Speech
         }
 
         // The speaker order of the kokoro-en-v0_19 release, from the sherpa-onnx docs.
-        private static readonly string[] KokoroEnV019 =
+        /// <summary>The 11 voices of the kokoro-en-v0_19 release, in speaker id order.</summary>
+        public static readonly string[] KokoroEnV019 =
         {
             "af", "af_bella", "af_nicole", "af_sarah", "af_sky",
             "am_adam", "am_michael", "bf_emma", "bf_isabella", "bm_george", "bm_lewis",
