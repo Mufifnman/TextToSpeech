@@ -26,7 +26,8 @@ public static class RuleSerializer
         {
             var set = JsonSerializer.Deserialize<RuleSet>(json, Options)
                       ?? throw new RuleFormatException("The file is empty.");
-            set.Rules ??= new();
+            // A hand-edited file can hold "rules": null or a null entry; neither may crash the loader.
+            set.Rules = (set.Rules ?? new()).Where(r => r != null).ToList();
             foreach (var r in set.Rules) r.Value ??= "";
             return set;
         }

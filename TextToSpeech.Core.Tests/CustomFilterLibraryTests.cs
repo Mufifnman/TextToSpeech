@@ -101,6 +101,17 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void NullRulesAndNullEntries_DoNotThrow()
+        {
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, "nullrules.json"), "{ \"name\": \"A\", \"rules\": null }");
+            File.WriteAllText(Path.Combine(folder, "nullentry.json"), "{ \"name\": \"B\", \"rules\": [ null, { \"kind\": \"removeText\", \"value\": \"x\" } ] }");
+            var entries = new CustomFilterLibrary(folder).Load();
+            Assert.Equal(2, entries.Count);
+            Assert.Equal("a", new CustomFilterLibrary(folder).Load().Single(e => e.DisplayName == "B").Compiled!.Apply("axa"));
+        }
+
+        [Fact]
         public void HandWrittenFile_WithCommentsAndNoName_UsesFileName()
         {
             Directory.CreateDirectory(folder);

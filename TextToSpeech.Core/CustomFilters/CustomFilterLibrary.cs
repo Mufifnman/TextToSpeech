@@ -89,8 +89,9 @@ public sealed class CustomFilterLibrary
                 Id = id, FilePath = path, DisplayName = set.Name.Trim(), Set = set, Compiled = RuleEngine.Compile(set),
             };
         }
-        catch (Exception ex) when (ex is RuleFormatException or IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
+            // Loading must never throw (it runs in the main window's constructor): any problem with one file just skips that file.
             return Fail(ex.Message);
         }
     }

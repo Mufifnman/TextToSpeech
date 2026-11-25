@@ -9,6 +9,13 @@ public class LintAndSerializerTests
 
     private static bool Has(IEnumerable<LintIssue> issues, string code) => issues.Any(i => i.Code == code);
 
+    [Fact] public void NullRulesAndNullEntries_AreDropped()
+    {
+        Assert.Empty(RuleSerializer.FromJson("{ \"rules\": null }").Rules);
+        var set = RuleSerializer.FromJson("{ \"rules\": [ null, { \"kind\": \"removeText\", \"value\": \"x\" } ] }");
+        Assert.Single(set.Rules);
+    }
+
     [Fact] public void EmptyName_IsError() =>
         Assert.True(Has(RuleLinter.Check(new RuleSet { Rules = { new Rule { Kind = RuleKind.RemoveText, Value = "x" } } }), "EmptyName"));
 
