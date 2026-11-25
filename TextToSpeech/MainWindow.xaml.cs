@@ -553,13 +553,6 @@ namespace TextToSpeech
         private void SpeedMinus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate - RateStep);
 
         private void SpeedPlus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate + RateStep);
-            rate = (int)e.NewValue;
-
-            // GUESS: engines apply the new rate to the next sentence, not mid-sentence.
-            catalog.EngineFor(selectedVoice).SetRate(rate);
-            settings.Rate = rate;
-            settings.Save();
-        }
 
         private OcrOptions selectedOCROption = OcrOptions.Windows;
 
