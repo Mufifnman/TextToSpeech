@@ -94,7 +94,7 @@ public sealed class CompiledRuleSet
 public static class RuleEngine
 {
     /// <summary>Longest a single rule may run on one text before it is skipped.</summary>
-    public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(2);
+    public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromMilliseconds(300);
 
     public static CompiledRuleSet Compile(RuleSet set) => new(set, DefaultTimeout);
 

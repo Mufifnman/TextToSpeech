@@ -81,6 +81,13 @@ public class RuleEngineTests
     }
 
     [Fact]
+    public void DefaultTimeout_IsShort_SoARunawayRuleCannotFreezeAWindow()
+    {
+        // Rules run on the UI thread in the app; a bad pattern must give up in a fraction of a second.
+        Assert.True(RuleEngine.DefaultTimeout <= TimeSpan.FromMilliseconds(500), "default timeout is " + RuleEngine.DefaultTimeout);
+    }
+
+    [Fact]
     public void Timeout_SkipsRunawayRegex()
     {
         var old = RuleEngine.DefaultTimeout;
