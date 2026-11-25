@@ -34,6 +34,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" Focusable="False"/>
                 <Button x:Name="___RewindButton_" Content="&#9198; Back" Grid.Column="1" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)"/>
@@ -41,7 +42,8 @@
                 <Button x:Name="___SkipButton_" Content="Skip &#9197;" Grid.Column="3" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)"/>
                 <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="4" Click="StopRead" Focusable="False"/>
                 <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="5" Click="ClearList" Focusable="False"/>
-                <Button x:Name="__ImageRead" Content="Read Image" Grid.Column="6" Click="ImageRead" Focusable="False"/>
+                <Button x:Name="__ImageRead" Content="Read Region" Grid.Column="6" Click="ImageRead" Focusable="False" ToolTip="Drag a box around text on screen to read it aloud"/>
+                <Button x:Name="__ReadAgain" Content="Again" Grid.Column="7" Padding="8,0" IsEnabled="False" Click="ReadSameRegion" Focusable="False" ToolTip="Read the same screen region again (for example after scrolling)"/>
                 </Grid>
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>

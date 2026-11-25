@@ -1,4 +1,3 @@
-using Microsoft.Office.Core;
 using System.Drawing;
 
 namespace TextToSpeech
