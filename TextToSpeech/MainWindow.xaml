@@ -58,6 +58,7 @@
                             <MenuItem x:Name="ahitFilterItem" Header="AHIT starred questions / blanks" IsCheckable="True" Click="FilterMenuItem_Click" StaysOpenOnClick="True"/>
                         </MenuItem>
                     </Menu>
+                    <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
                     <TextBlock Text="OCR: " Margin="0,3,0,4" />
                     <ComboBox x:Name="ocrOptionsComboBox" SelectionChanged="OcrOptionsComboBox_SelectionChanged" 
                         ItemsSource="{Binding Source={x:Type local:OcrOptions}, Converter={StaticResource EnumToEnumerableConverter}}"
