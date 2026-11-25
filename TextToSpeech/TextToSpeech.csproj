@@ -13,6 +13,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The WPF SDK drops System.IO from the implicit usings -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="MonkeyReadingSmall.ico" />
   </ItemGroup>
 
