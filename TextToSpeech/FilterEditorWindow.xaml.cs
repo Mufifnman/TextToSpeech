@@ -44,8 +44,7 @@ namespace TextToSpeech
             if (existing?.Set is { } set)
             {
                 Title = "Edit filter";
-                nameBox.Text = set.Name;
-                groupBox.Text = set.Group ?? "";
+                nameBox.Text = string.IsNullOrWhiteSpace(set.Group) ? set.Name : set.Group.Trim() + "/" + set.Name;
                 foreach (var rule in set.Rules) AddRow(RuleRow.FromRule(rule));
                 deleteButton.Visibility = Visibility.Visible;
                 fileText.Text = existing.FilePath;
@@ -53,7 +52,7 @@ namespace TextToSpeech
             else
             {
                 Title = "New filter";
-                groupBox.Text = CustomFilterManager.DefaultGroup;
+                nameBox.Text = CustomFilterManager.DefaultGroup + "/";
                 AddRow(new RuleRow());
                 fileText.Text = "Saved in " + library.Folder;
             }
@@ -61,7 +60,7 @@ namespace TextToSpeech
             nameBox.TextChanged += (_, _) => ScheduleRefresh();
             sampleBox.TextChanged += (_, _) => ScheduleRefresh();
             refreshTimer.Tick += async (_, _) => { refreshTimer.Stop(); await RefreshAsync(); };
-            Loaded += (_, _) => { _ = RefreshAsync(); nameBox.Focus(); };
+            Loaded += (_, _) => { _ = RefreshAsync(); nameBox.Focus(); nameBox.CaretIndex = nameBox.Text.Length; };
             Closed += (_, _) => refreshTimer.Stop();
         }
 
@@ -151,7 +150,13 @@ namespace TextToSpeech
             {
                 var item = new MenuItem { Header = group };
                 var chosen = group;
-                item.Click += (_, _) => groupBox.Text = chosen;
+                item.Click += (_, _) =>
+                {
+                    string current = FilterPath.Split(nameBox.Text).Name;
+                    nameBox.Text = chosen + "/" + current;
+                    nameBox.Focus();
+                    nameBox.CaretIndex = nameBox.Text.Length;
+                };
                 menu.Items.Add(item);
             }
             PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
@@ -159,13 +164,17 @@ namespace TextToSpeech
 
         // ---- lint and preview ----
 
-        private RuleSet BuildSet() => new()
+        private RuleSet BuildSet()
         {
-            Name = nameBox.Text.Trim(),
-            Group = string.IsNullOrWhiteSpace(groupBox.Text) ? null : groupBox.Text.Trim(),
-            Description = existing?.Set?.Description,
-            Rules = rows.Select(r => r.ToRule()).ToList(),
-        };
+            var (group, name) = FilterPath.Split(nameBox.Text);
+            return new RuleSet
+            {
+                Name = name,
+                Group = group,
+                Description = existing?.Set?.Description,
+                Rules = rows.Select(r => r.ToRule()).ToList(),
+            };
+        }
 
         private void ScheduleRefresh()
         {

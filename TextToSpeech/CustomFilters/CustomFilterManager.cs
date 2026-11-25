@@ -35,4 +35,16 @@ namespace TextToSpeech
                 (ref string text) => { text = compiled.Apply(text); });
         }
     }
+
+    /// <summary>Turns "Web/Clean links" into a menu path ("Web") and a name ("Clean links"). / and \ both separate.</summary>
+    internal static class FilterPath
+    {
+        internal static (string? Group, string Name) Split(string text)
+        {
+            var parts = text.Split(new[] { '/', '\\' }).Select(p => p.Trim()).ToList();
+            string name = parts[^1];
+            var group = parts.Take(parts.Count - 1).Where(p => p.Length > 0).ToList();
+            return (group.Count == 0 ? null : string.Join("/", group), name);
+        }
+    }
 }

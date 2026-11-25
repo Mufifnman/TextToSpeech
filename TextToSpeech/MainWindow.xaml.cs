@@ -285,6 +285,7 @@ namespace TextToSpeech
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
                 TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); }));
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
+            p.SetTextSize(settings.PopupTextSize);
             return p;
         }
 
@@ -358,23 +359,30 @@ namespace TextToSpeech
         {
             filtersMenu.Items.Clear();
             PopupMenus.AddHeading(filtersMenu, "Filters");
-            foreach (string group in FilterRegistry.Groups)
+            // A group like "Web/Links" nests: submenu Web, then submenu Links.
+            foreach (var filter in FilterRegistry.All)
             {
-                var groupItem = new MenuItem { Header = group };
-                foreach (var filter in FilterRegistry.All.Where(f => f.Group == group))
+                ItemsControl parent = filtersMenu;
+                foreach (string part in filter.Group.Split('/', '\\').Select(g => g.Trim()).Where(g => g.Length > 0))
                 {
-                    var item = new MenuItem
+                    var next = parent.Items.OfType<MenuItem>().FirstOrDefault(m => m.Tag == null && m.Items.Count > 0 && (m.Header as string) == part);
+                    if (next == null)
                     {
-                        Header = filter.Label,
-                        IsCheckable = true,
-                        StaysOpenOnClick = true,
-                        IsChecked = filterSettings.IsEnabled(filter.Id),
-                        Tag = filter.Id,
-                    };
-                    item.Click += FilterMenuItem_Click;
-                    groupItem.Items.Add(item);
+                        next = new MenuItem { Header = part };
+                        parent.Items.Add(next);
+                    }
+                    parent = next;
                 }
-                filtersMenu.Items.Add(groupItem);
+                var item = new MenuItem
+                {
+                    Header = filter.Label,
+                    IsCheckable = true,
+                    StaysOpenOnClick = true,
+                    IsChecked = filterSettings.IsEnabled(filter.Id),
+                    Tag = filter.Id,
+                };
+                item.Click += FilterMenuItem_Click;
+                parent.Items.Add(item);
             }
             AddCustomFilterCommands();
         }
@@ -425,7 +433,6 @@ namespace TextToSpeech
             }
         }
 
-        private void AddFilter_Click(object sender, RoutedEventArgs e) => OpenFilterEditor(null);
 
         private void OpenFilterEditor(Core.CustomFilters.CustomFilterEntry? entry)
         {
@@ -846,6 +853,7 @@ namespace TextToSpeech
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
             if (volumePopup.Child is UIElement volumePanel) volumePanel.Opacity = popup;
             this.popup?.SetPanelOpacity(popup);
+            this.popup?.SetTextSize(settings.PopupTextSize);
             ApplyShellSettings();
         }
 

@@ -44,6 +44,9 @@ namespace TextToSpeech
         /// <summary>Keep the popup open while reading is paused or stopped (off: it hides until reading resumes).</summary>
         public bool PopupKeepOpenWhenPaused { get; set; } = true;
 
+        /// <summary>Font size of the text in the reading popup, 10 to 32.</summary>
+        public double PopupTextSize { get; set; } = 14;
+
         /// <summary>The window's close button hides it to the tray instead of exiting (Exit is in the tray menu).</summary>
         public bool CloseToTray { get; set; } = true;
 

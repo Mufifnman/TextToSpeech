@@ -246,15 +246,13 @@
                         </Button.ContextMenu>
                     </Button>
                     <Button x:Name="filtersButton" Click="FiltersButton_Click" Style="{StaticResource BarButton}"
-                            ToolTip="Filters: choose which clean-up filters run on copied or scanned text">
+                            ToolTip="Filters: choose which clean-up filters run on copied or scanned text, or make your own">
                         <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="14" VerticalAlignment="Center"/>
                         <Button.ContextMenu>
                             <!-- items are built from FilterRegistry in code -->
                             <ContextMenu x:Name="filtersMenu" />
                         </Button.ContextMenu>
                     </Button>
-                    <Button x:Name="addFilterButton" Content="+" FontSize="16" Click="AddFilter_Click" Style="{StaticResource BarButton}"
-                            ToolTip="New filter: make your own clean-up filter and add it to the Filters menu"/>
                     <Button x:Name="settingsButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="Settings_Click" Style="{StaticResource BarButton}"
                             ToolTip="Settings: OCR engine, window opacity, bring up while playing"/>
                 </StackPanel>

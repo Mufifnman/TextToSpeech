@@ -56,6 +56,10 @@ namespace TextToSpeech
             popupOpacitySlider.Value = Math.Round(settings.PopupOpacity * 100);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             popupOpacitySlider.ValueChanged += (_, _) => Changed();
+            popupTextSizeSlider.Value = Math.Clamp(settings.PopupTextSize, 10, 32);
+            popupPreviewText.FontSize = popupTextSizeSlider.Value;
+            popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            popupTextSizeSlider.ValueChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -67,7 +71,7 @@ namespace TextToSpeech
             ShowConflicts();
 
             // Sections that take more than a line are collapsible; the open ones are remembered.
-            foreach (Expander section in new[] { shellExpander, opacityExpander, hotkeyExpander })
+            foreach (Expander section in new[] { shellExpander, popupExpander, opacityExpander, hotkeyExpander })
             {
                 section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
                 section.Expanded += (_, _) => RememberSection(section, true);
@@ -93,6 +97,9 @@ namespace TextToSpeech
             settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             opacityText.Text = (int)opacitySlider.Value + "%";
+            settings.PopupTextSize = popupTextSizeSlider.Value;
+            popupPreviewText.FontSize = popupTextSizeSlider.Value;
+            popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
             settings.Save();
             onChanged();
             ShowApiInfo();

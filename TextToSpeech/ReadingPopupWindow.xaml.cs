@@ -68,6 +68,8 @@ namespace TextToSpeech
             takeBackButton.Visibility = canTakeBack ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        public void SetTextSize(double size) => display.TextSize = Math.Clamp(size, 10, 32);
+
         public void RefreshTheme() => display.RefreshTheme();
 
         public void SetPanelOpacity(double opacity) => panel.Opacity = opacity;

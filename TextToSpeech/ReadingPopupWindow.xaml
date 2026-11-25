@@ -28,11 +28,11 @@
 
             <Grid Grid.Row="2" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button x:Name="backButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Back" Click="Back_Click">
                         <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
@@ -43,7 +43,7 @@
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="openButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Open the full window" Click="Open_Click">
                         <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
