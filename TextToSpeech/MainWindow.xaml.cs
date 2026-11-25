@@ -294,31 +294,78 @@ namespace TextToSpeech
             }
         }
 
-        private void ImageRead(object sender, RoutedEventArgs e)
+        /// <summary>Screen region last picked by the user, so "Again" can re-read it (e.g. after scrolling).</summary>
+        private System.Drawing.Rectangle? lastRegion;
+
+        private bool isCapturing;
+
+        /// <summary>"Read Region": let the user drag a box around text, then OCR and read it.</summary>
+        private async void ImageRead(object sender, RoutedEventArgs e)
         {
-            Bitmap bitmap = CaptureScreenBehindWinodw();
-
-            string readText, errorMessage;
-
-            bool ocrTextReadSucceded = false;
-            switch (selectedOCROption)
+            if (isCapturing)
             {
-                case OcrOptions.OneNote:
-                    ocrTextReadSucceded = OneNoteOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
-                    break;
-                case OcrOptions.Tesseract:
-                    ocrTextReadSucceded = TesseractOCRManager.Instance.GetTextFromImage(bitmap, out readText, out errorMessage);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
+                return;
             }
-
-            if (!ocrTextReadSucceded)
+            isCapturing = true;
+            try
             {
-                textbox.Text = errorMessage;
+                // Get our own window out of the way while the user picks a region.
+                var previousState = WindowState;
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200); // let the minimize animation finish
+
+                var region = RegionSelectWindow.Pick();
+                if (region == null)
+                {
+                    WindowState = previousState == WindowState.Minimized ? WindowState.Normal : previousState;
+                    return;
+                }
+
+                lastRegion = region;
+                __ReadAgain.IsEnabled = true;
+                await CaptureAndReadAsync(region.Value);
+            }
+            finally
+            {
+                isCapturing = false;
+            }
+        }
+
+        /// <summary>"Again": re-capture the last region without picking it again.</summary>
+        private async void ReadSameRegion(object sender, RoutedEventArgs e)
+        {
+            if (isCapturing || lastRegion == null)
+            {
+                return;
+            }
+            isCapturing = true;
+            try
+            {
+                WindowState = WindowState.Minimized;
+                await Task.Delay(200);
+                await CaptureAndReadAsync(lastRegion.Value);
+            }
+            finally
+            {
+                isCapturing = false;
+            }
+        }
+
+        private async Task CaptureAndReadAsync(System.Drawing.Rectangle region)
+        {
+            // Give the desktop a moment to repaint after the overlay closes, so it isn't captured.
+            await Task.Delay(150);
+            using Bitmap bitmap = Utilities.CaptureScreenInArea(region.Location, region.Size);
+
+            var outcome = await Ocr.OcrEngines.For(selectedOCROption).RecognizeAsync(bitmap);
+            if (!outcome.Succeeded || string.IsNullOrWhiteSpace(outcome.Text))
+            {
+                WindowState = WindowState.Normal;
+                textbox.Text = outcome.ErrorMessage ?? "No text found in that region. Try a bigger box, or switch the OCR engine.";
                 return;
             }
 
+            string readText = outcome.Text;
             if (savedEnd != null)
             {
                 readText = savedEnd + " " + readText;
@@ -332,24 +379,8 @@ namespace TextToSpeech
 
             textbox.Text = readText;
 
-            //Minimize then read
-            this.WindowState = System.Windows.WindowState.Minimized;
-            this.ReadText(sender, e);
-        }
-
-        private Bitmap CaptureScreenBehindWinodw()
-        {
-            System.Drawing.Size size = new System.Drawing.Size((int)this.ActualWidth, (int)this.ActualHeight);
-            System.Drawing.Point origin = new System.Drawing.Point((int)this.Left, (int)this.Top);
-
-            // move window up for capture
-            this.Top = this.Top + size.Height;
-
-            var bitmap = Utilities.CaptureScreenInArea(origin, size);
-
-            // move window back down
-            this.Top = this.Top - size.Height;
-            return bitmap;
+            // Stay minimized while reading; ReadList restores the window when it finishes.
+            this.ReadText(this, new RoutedEventArgs());
         }
 
         private void Window_KeyDown_1(object sender, KeyEventArgs e)
