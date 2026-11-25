@@ -684,13 +684,13 @@ namespace TextToSpeech
         {
             if (raise.TakeMinimize())
             {
+                reading.Clear();   // done reading and putting the window away: the text goes away too, like the Clear button
                 if (hiddenBeforeRaise)
                 {
                     Hide();   // it was in the tray before the app raised it: back to the tray
                 }
                 else
                 {
-                    minimizedByApp = true;
                     WindowState = System.Windows.WindowState.Minimized;
                 }
                 hiddenBeforeRaise = false;
@@ -828,13 +828,8 @@ namespace TextToSpeech
 
         private void TitleClose_Click(object sender, RoutedEventArgs e) => Close();
 
-        private bool minimizedByApp;
-
         private void Window_StateChanged(object? sender, EventArgs e)
         {
-            // Minimizing by hand does the same as the Clear button (text goes away); the app's own tidy-up minimize does not.
-            if (WindowState == System.Windows.WindowState.Minimized && !minimizedByApp) reading.Clear();
-            if (WindowState != System.Windows.WindowState.Minimized) minimizedByApp = false;
             bool maximized = WindowState == System.Windows.WindowState.Maximized;
             maximizeGlyph.Text = maximized ? "\uE923" : "\uE922";          // restore / maximize
             windowBorder.CornerRadius = new CornerRadius(maximized ? 0 : 8);
