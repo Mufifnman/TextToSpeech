@@ -22,7 +22,6 @@ namespace TextToSpeech
         readonly VoiceCatalog catalog = new VoiceCatalog();
         readonly AppSettings settings = AppSettings.Load();
         VoiceInfo? selectedVoice = null;
-        bool loadingVoices = false;
 
         // Cancels the sentence being spoken; null when nothing is speaking.
         CancellationTokenSource? speechCts = null;
@@ -58,35 +57,60 @@ namespace TextToSpeech
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
 
-        /// <summary>Rebuilds the voice picker from what is installed, keeping the current choice if it still exists.</summary>
+        /// <summary>Rebuilds the voice menu from what is installed, keeping the current choice if it still exists.</summary>
         private void RefreshVoices()
         {
-            loadingVoices = true;
-            try
+            catalog.Refresh();
+            string? wanted = selectedVoice?.Id ?? settings.VoiceId;
+            selectedVoice = catalog.PickInitial(wanted);
+            BuildVoiceMenu();
+            if (catalog.LastError != null) statusText.Text = catalog.LastError;
+        }
+
+        /// <summary>One checkable item per voice (neural first, then Windows), then "More voices...".</summary>
+        private void BuildVoiceMenu()
+        {
+            voiceMenu.Items.Clear();
+            foreach (VoiceInfo voice in catalog.Voices)
             {
-                catalog.Refresh();
-                string? wanted = selectedVoice?.Id ?? settings.VoiceId;
-                voiceComboBox.ItemsSource = catalog.Voices;
-                selectedVoice = catalog.PickInitial(wanted);
-                voiceComboBox.SelectedItem = selectedVoice;
-                if (catalog.LastError != null) voiceComboBox.ToolTip = catalog.LastError;
+                var item = new MenuItem
+                {
+                    Header = voice.DisplayName,
+                    IsCheckable = true,
+                    IsChecked = selectedVoice?.Id == voice.Id,
+                    Tag = voice,
+                };
+                item.Click += VoiceMenuItem_Click;
+                voiceMenu.Items.Add(item);
             }
-            finally
+            if (voiceMenu.Items.Count > 0) voiceMenu.Items.Add(new Separator());
+            var more = new MenuItem { Header = "More voices..." };
+            more.Click += MoreVoices_Click;
+            voiceMenu.Items.Add(more);
+            voiceButton.ToolTip = selectedVoice != null ? "Voice: " + selectedVoice.DisplayName : "Choose the voice";
+        }
+
+        private void VoiceButton_Click(object sender, RoutedEventArgs e)
+        {
+            voiceMenu.PlacementTarget = voiceButton;
+            voiceMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            voiceMenu.IsOpen = true;
+        }
+
+        private void VoiceMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (((MenuItem)sender).Tag is VoiceInfo v)
             {
-                loadingVoices = false;
+                SelectVoice(v);
             }
         }
 
-        private void VoiceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void SelectVoice(VoiceInfo v)
         {
-            if (loadingVoices) return;
-            if (voiceComboBox.SelectedItem is VoiceInfo v)
-            {
-                selectedVoice = v;
-                settings.VoiceId = v.Id;
-                settings.Save();
-                // takes effect from the next sentence
-            }
+            selectedVoice = v;
+            settings.VoiceId = v.Id;
+            settings.Save();
+            BuildVoiceMenu(); // refresh the check mark; takes effect from the next sentence
         }
 
         private void MoreVoices_Click(object sender, RoutedEventArgs e)
@@ -284,9 +308,7 @@ namespace TextToSpeech
                     VoiceInfo fallback = catalog.DefaultFallbackVoice!;
                     statusText.Text = "Neural voice failed (" + ex.Message + "); using " + fallback.DisplayName;
                     selectedVoice = fallback;
-                    loadingVoices = true;
-                    voiceComboBox.SelectedItem = fallback;
-                    loadingVoices = false;
+                    BuildVoiceMenu();
                     await SpeakWith(fallback, text, offset, generation, cts.Token);
                 }
             }
