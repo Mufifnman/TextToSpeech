@@ -60,6 +60,12 @@ namespace TextToSpeech
             popupPreviewText.FontSize = popupTextSizeSlider.Value;
             popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
             popupTextSizeSlider.ValueChanged += (_, _) => Changed();
+            autoClearBox.IsChecked = settings.AutoClearAfterReading;
+            autoClearSlider.Value = Math.Clamp(settings.AutoClearDelaySeconds, 1, 30);
+            autoClearText.Text = (int)autoClearSlider.Value + " s";
+            autoClearSlider.IsEnabled = autoClearBox.IsChecked == true;
+            autoClearBox.Click += (_, _) => Changed();
+            autoClearSlider.ValueChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -100,6 +106,10 @@ namespace TextToSpeech
             settings.PopupTextSize = popupTextSizeSlider.Value;
             popupPreviewText.FontSize = popupTextSizeSlider.Value;
             popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            settings.AutoClearAfterReading = autoClearBox.IsChecked == true;
+            settings.AutoClearDelaySeconds = (int)autoClearSlider.Value;
+            autoClearText.Text = settings.AutoClearDelaySeconds + " s";
+            autoClearSlider.IsEnabled = settings.AutoClearAfterReading;
             settings.Save();
             onChanged();
             ShowApiInfo();

@@ -66,6 +66,14 @@
                     SmallChange="50" LargeChange="200" VerticalAlignment="Center"/>
         </DockPanel>
 
+        <CheckBox x:Name="autoClearBox" Content="Clear the text a few seconds after reading finishes" Margin="0,0,0,6"
+                  ToolTip="Same as the Clear button. A new read or new text in the meantime cancels it."/>
+        <DockPanel Margin="22,0,0,14">
+            <TextBlock x:Name="autoClearText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="autoClearSlider" Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"
+                    SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+        </DockPanel>
+
         <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends" Margin="0,0,0,14"
                   ToolTip="Pausing keeps the window up so you can resume. It only minimizes again if the app brought it up and you did not click or switch to it meanwhile."/>
 

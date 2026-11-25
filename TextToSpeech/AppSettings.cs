@@ -44,6 +44,12 @@ namespace TextToSpeech
         /// <summary>Keep the popup open while reading is paused or stopped (off: it hides until reading resumes).</summary>
         public bool PopupKeepOpenWhenPaused { get; set; } = true;
 
+        /// <summary>Clear the text a few seconds after reading finishes (like the Clear button).</summary>
+        public bool AutoClearAfterReading { get; set; } = true;
+
+        /// <summary>Seconds to wait after reading finishes before clearing, 1 to 60.</summary>
+        public int AutoClearDelaySeconds { get; set; } = 3;
+
         /// <summary>Font size of the text in the reading popup, 10 to 32.</summary>
         public double PopupTextSize { get; set; } = 14;
 

@@ -58,7 +58,9 @@ namespace TextToSpeech
             };
             reading.StateChanged += UpdatePauseButton;
             reading.SentenceStarting += OnSentenceStarting;
+            autoClearTimer.Tick += AutoClearTick;
             reading.Finished += OnReadingFinished;
+            reading.StateChanged += () => { if (reading.IsPlaying) autoClearTimer.Stop(); };
             reading.Notice += message => statusText.Text = message;
             reading.VoiceFellBack += _ => BuildVoiceMenu();
 
@@ -680,11 +682,29 @@ namespace TextToSpeech
         }
 
         /// <summary>Reading reached the end: put the window away only if the app raised it and nobody touched it.</summary>
+        private readonly System.Windows.Threading.DispatcherTimer autoClearTimer = new();
+
+        /// <summary>A few seconds after reading finishes the text clears, like the Clear button (if still finished by then).</summary>
+        private void ScheduleAutoClear()
+        {
+            autoClearTimer.Stop();
+            if (!settings.AutoClearAfterReading) return;
+            autoClearTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(settings.AutoClearDelaySeconds, 1, 60));
+            autoClearTimer.Start();
+        }
+
+        private void AutoClearTick(object? sender, EventArgs e)
+        {
+            autoClearTimer.Stop();
+            // New text or a new read in the meantime cancels the clear.
+            if (settings.AutoClearAfterReading && !reading.IsPlaying && document.IsAtEnd) reading.Clear();
+        }
+
         private void OnReadingFinished()
         {
+            ScheduleAutoClear();
             if (raise.TakeMinimize())
             {
-                reading.Clear();   // done reading and putting the window away: the text goes away too, like the Clear button
                 if (hiddenBeforeRaise)
                 {
                     Hide();   // it was in the tray before the app raised it: back to the tray
