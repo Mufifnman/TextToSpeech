@@ -44,6 +44,24 @@ namespace TextToSpeech
         /// <summary>Keep the popup open while reading is paused or stopped (off: it hides until reading resumes).</summary>
         public bool PopupKeepOpenWhenPaused { get; set; } = true;
 
+        /// <summary>Clear the text a few seconds after reading finishes (like the Clear button).</summary>
+        public bool AutoClearAfterReading { get; set; } = true;
+
+        /// <summary>Seconds to wait after reading finishes before clearing, 1 to 60.</summary>
+        public int AutoClearDelaySeconds { get; set; } = 3;
+
+        /// <summary>Also show the popup while the full window is open but not the window being used.</summary>
+        public bool ShowPopupWhenWindowUnfocused { get; set; } = false;
+
+        /// <summary>Popup width in pixels, 280 to 900.</summary>
+        public double PopupMaxWidth { get; set; } = 420;
+
+        /// <summary>Largest popup height in pixels, 90 to 700 (it is shorter when the text is short).</summary>
+        public double PopupMaxHeight { get; set; } = 260;
+
+        /// <summary>Font size of the text in the reading popup, 10 to 32.</summary>
+        public double PopupTextSize { get; set; } = 14;
+
         /// <summary>The window's close button hides it to the tray instead of exiting (Exit is in the tray menu).</summary>
         public bool CloseToTray { get; set; } = true;
 

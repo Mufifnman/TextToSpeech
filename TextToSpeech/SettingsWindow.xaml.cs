@@ -48,7 +48,7 @@ namespace TextToSpeech
             {
                 box.Click += (_, _) => Changed();
             }
-            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = showPopupBox.IsChecked == true;
+            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             ContentRendered += (_, _) => ShowApiInfo();
             gapSlider.Value = Math.Clamp(settings.SentenceGapMs, SentencePacing.MinGapMs, SentencePacing.MaxGapMs);
             gapText.Text = (int)gapSlider.Value + " ms";
@@ -56,6 +56,24 @@ namespace TextToSpeech
             popupOpacitySlider.Value = Math.Round(settings.PopupOpacity * 100);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             popupOpacitySlider.ValueChanged += (_, _) => Changed();
+            popupUnfocusedBox.IsChecked = settings.ShowPopupWhenWindowUnfocused;
+            popupUnfocusedBox.Click += (_, _) => Changed();
+            popupWidthSlider.Value = Math.Clamp(settings.PopupMaxWidth, 280, 900);
+            popupHeightSlider.Value = Math.Clamp(settings.PopupMaxHeight, 90, 700);
+            popupWidthText.Text = (int)popupWidthSlider.Value + " px";
+            popupHeightText.Text = (int)popupHeightSlider.Value + " px";
+            popupWidthSlider.ValueChanged += (_, _) => Changed();
+            popupHeightSlider.ValueChanged += (_, _) => Changed();
+            popupTextSizeSlider.Value = Math.Clamp(settings.PopupTextSize, 10, 32);
+            popupPreviewText.FontSize = popupTextSizeSlider.Value;
+            popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            popupTextSizeSlider.ValueChanged += (_, _) => Changed();
+            autoClearBox.IsChecked = settings.AutoClearAfterReading;
+            autoClearSlider.Value = Math.Clamp(settings.AutoClearDelaySeconds, 1, 30);
+            autoClearText.Text = (int)autoClearSlider.Value + " s";
+            autoClearSlider.IsEnabled = autoClearBox.IsChecked == true;
+            autoClearBox.Click += (_, _) => Changed();
+            autoClearSlider.ValueChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -67,7 +85,7 @@ namespace TextToSpeech
             ShowConflicts();
 
             // Sections that take more than a line are collapsible; the open ones are remembered.
-            foreach (Expander section in new[] { shellExpander, opacityExpander, hotkeyExpander })
+            foreach (Expander section in new[] { shellExpander, popupExpander, opacityExpander, hotkeyExpander })
             {
                 section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
                 section.Expanded += (_, _) => RememberSection(section, true);
@@ -87,12 +105,24 @@ namespace TextToSpeech
             settings.PopupAutoHide = popupAutoHideBox.IsChecked == true;
             settings.PopupKeepOpenWhenPaused = popupKeepBox.IsChecked == true;
             settings.ApiEnabled = apiBox.IsChecked == true;
-            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = showPopupBox.IsChecked == true;
+            popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
             gapText.Text = settings.SentenceGapMs + " ms";
             settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             opacityText.Text = (int)opacitySlider.Value + "%";
+            settings.ShowPopupWhenWindowUnfocused = popupUnfocusedBox.IsChecked == true;
+            settings.PopupMaxWidth = popupWidthSlider.Value;
+            settings.PopupMaxHeight = popupHeightSlider.Value;
+            popupWidthText.Text = (int)popupWidthSlider.Value + " px";
+            popupHeightText.Text = (int)popupHeightSlider.Value + " px";
+            settings.PopupTextSize = popupTextSizeSlider.Value;
+            popupPreviewText.FontSize = popupTextSizeSlider.Value;
+            popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            settings.AutoClearAfterReading = autoClearBox.IsChecked == true;
+            settings.AutoClearDelaySeconds = (int)autoClearSlider.Value;
+            autoClearText.Text = settings.AutoClearDelaySeconds + " s";
+            autoClearSlider.IsEnabled = settings.AutoClearAfterReading;
             settings.Save();
             onChanged();
             ShowApiInfo();

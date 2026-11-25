@@ -33,6 +33,18 @@ namespace TextToSpeech.Core.Shell
         /// <summary>The full window is on screen (not hidden to the tray, not minimized).</summary>
         public bool FullWindowShown { get; set; }
 
+        /// <summary>The "Show popup while the window is open but not in focus" setting.</summary>
+        public bool ShowWhenWindowUnfocused { get; set; }
+
+        /// <summary>The full window has the focus (only matters with <see cref="ShowWhenWindowUnfocused"/>).</summary>
+        public bool FullWindowFocused { get; set; }
+
+        /// <summary>The Settings window is open: keep the popup up so changes can be seen as they are made.</summary>
+        public bool KeepForSettings { get; set; }
+
+        /// <summary>The popup is being resized (or just was): keep it up until the wait after the resize is over.</summary>
+        public bool KeepForResize { get; set; }
+
         /// <summary>An API client has taken the remainder and not returned it yet.</summary>
         public bool HandoffOpen { get; set; }
 
@@ -73,7 +85,12 @@ namespace TextToSpeech.Core.Shell
 
         public bool IsVisible(bool isPlaying, bool hasUnread)
         {
-            if (!Enabled || FullWindowShown || dismissed || !started)
+            if (KeepForSettings || KeepForResize)
+            {
+                return Enabled;
+            }
+            bool windowCovers = FullWindowShown && (!ShowWhenWindowUnfocused || FullWindowFocused);
+            if (!Enabled || windowCovers || dismissed || !started)
             {
                 return false;
             }

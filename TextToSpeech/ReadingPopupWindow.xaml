@@ -5,7 +5,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" ShowActivated="False" Topmost="True" ResizeMode="NoResize"
         Foreground="{DynamicResource ThemeText}"
-        Width="420" MinHeight="90" MaxHeight="260" SizeToContent="Height" Title="Text to Speech">
+        Width="420" MinHeight="90" SizeToContent="Height" Title="Text to Speech">
     <!-- The compact reading view above the tray. It never takes focus (see OnSourceInitialized), so reading and
          typing elsewhere carry on undisturbed; clicks still work. -->
     <Border x:Name="panel" Style="{StaticResource PopupPanel}" Padding="6">
@@ -25,25 +25,38 @@
             </DockPanel>
 
             <local:ReadingDisplay x:Name="display" Grid.Row="1"/>
+            <TextBlock x:Name="sampleText" Grid.Row="1" Visibility="Collapsed" TextWrapping="Wrap" Padding="6"
+                       Foreground="{DynamicResource ThemeSubtle}"
+                       Text="Preview. This is sample text so you can try the text size and the height of the popup. The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump. Sphinx of black quartz, judge my vow. The five boxing wizards jump quickly. Waltz, bad nymph, for quick jigs vex. Drag the corner at the top left to resize the popup."/>
+
+            <!-- drag to resize: grows up and to the left because the popup is anchored bottom right -->
+            <Border x:Name="resizeGrip" Grid.RowSpan="3" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Background="Transparent" Cursor="SizeNWSE" ToolTip="Drag to resize"
+                    MouseLeftButtonDown="Grip_MouseDown" MouseMove="Grip_MouseMove" MouseLeftButtonUp="Grip_MouseUp">
+                <Path Data="M2,12 L12,2 M2,7 L7,2" Stroke="{DynamicResource ThemeSubtle}" StrokeThickness="1.5"/>
+            </Border>
 
             <Grid Grid.Row="2" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button x:Name="backButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Back" Click="Back_Click">
                         <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
                     <Button x:Name="playButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Play / pause" Click="PlayPause_Click">
                         <TextBlock x:Name="playGlyph" Text="&#xE769;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
-                    <Button x:Name="skipButton" Width="34" Height="26" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
+                    <Button x:Name="skipButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
+                    <Button x:Name="clearButton" Width="34" Height="26" Focusable="False" ToolTip="Clear the text" Click="Clear_Click">
+                        <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="openButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Open the full window" Click="Open_Click">
                         <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>

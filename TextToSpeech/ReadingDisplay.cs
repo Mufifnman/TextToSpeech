@@ -33,6 +33,13 @@ namespace TextToSpeech
             SetResourceReference(BackgroundProperty, "ThemeSurface");
         }
 
+        /// <summary>Font size of the reading text.</summary>
+        public double TextSize
+        {
+            get => textBlock.FontSize;
+            set => textBlock.FontSize = value;
+        }
+
         /// <summary>Raised when the user clicks a word. Arguments are the sentence and word index.</summary>
         public event Action<int, int>? WordClicked;
 

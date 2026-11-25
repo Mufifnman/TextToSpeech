@@ -11,11 +11,6 @@
                           ToolTip="Starts hidden in the tray when you sign in to Windows."/>
                 <CheckBox x:Name="closeToTrayBox" Content="Close button hides to tray" Margin="0,0,0,6"
                           ToolTip="The app keeps running in the tray. Exit is in the tray icon's menu."/>
-                <CheckBox x:Name="showPopupBox" Content="Show reading popup when reading starts" Margin="0,0,0,6"
-                          ToolTip="A small window above the tray with the text being read, shown only while the full window is hidden."/>
-                <CheckBox x:Name="popupAutoHideBox" Content="Hide popup when reading finishes" Margin="22,0,0,6"/>
-                <CheckBox x:Name="popupKeepBox" Content="Keep popup open when paused" Margin="22,0,0,6"
-                          ToolTip="Off: pausing or stopping hides the popup until reading resumes."/>
                 <CheckBox x:Name="apiBox" Content="Enable local API (127.0.0.1, for other programs)" Margin="0,6,0,4"
                           ToolTip="Lets programs on this computer send text to read and control reading. They need the token below."/>
                 <DockPanel Margin="22,0,0,0">
@@ -23,6 +18,46 @@
                             ToolTip="Opens the folder with api.json (port and token). The token is never put on the clipboard."/>
                     <TextBlock x:Name="apiInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12" VerticalAlignment="Center"/>
                 </DockPanel>
+            </StackPanel>
+        </Expander>
+
+        <Expander x:Name="popupExpander" Header="Reading popup" Tag="popup">
+            <StackPanel Margin="0,4,0,10">
+                <CheckBox x:Name="showPopupBox" Content="Show reading popup when reading starts" Margin="0,0,0,6"
+                          ToolTip="A small window above the tray with the text being read, shown only while the full window is hidden."/>
+                <CheckBox x:Name="popupUnfocusedBox" Content="Also show it while the window is open but not in focus" Margin="22,0,0,6"
+                          ToolTip="Off: the popup hides whenever the full window is open. On: it hides only while you are using the window."/>
+                <CheckBox x:Name="popupAutoHideBox" Content="Hide popup when reading finishes" Margin="22,0,0,6"/>
+                <CheckBox x:Name="popupKeepBox" Content="Keep popup open when paused" Margin="22,0,0,6"
+                          ToolTip="Off: pausing or stopping hides the popup until reading resumes."/>
+                <TextBlock Text="Opacity" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                <DockPanel Margin="0,6,0,8">
+                    <TextBlock x:Name="popupOpacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="popupOpacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                            SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="Width" FontWeight="SemiBold"/>
+                <DockPanel Margin="0,6,0,8">
+                    <TextBlock x:Name="popupWidthText" DockPanel.Dock="Right" Width="54" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="popupWidthSlider" Minimum="280" Maximum="900" TickFrequency="10" IsSnapToTickEnabled="True"
+                            SmallChange="10" LargeChange="50" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="Maximum height" FontWeight="SemiBold"/>
+                <DockPanel Margin="0,6,0,8">
+                    <TextBlock x:Name="popupHeightText" DockPanel.Dock="Right" Width="54" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="popupHeightSlider" Minimum="90" Maximum="700" TickFrequency="10" IsSnapToTickEnabled="True"
+                            SmallChange="10" LargeChange="50" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock Text="Text size" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                <DockPanel Margin="0,6,0,8">
+                    <TextBlock x:Name="popupTextSizeText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="popupTextSizeSlider" Minimum="10" Maximum="32" TickFrequency="1" IsSnapToTickEnabled="True"
+                            SmallChange="1" LargeChange="2" VerticalAlignment="Center"/>
+                </DockPanel>
+                <Border BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1" Padding="8" Height="86">
+                    <TextBlock x:Name="popupPreviewText" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                               Text="This is how the text in the reading popup will look. The quick brown fox jumps over the lazy dog."/>
+                </Border>
             </StackPanel>
         </Expander>
 
@@ -35,13 +70,7 @@
                             SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
                 </DockPanel>
 
-                <TextBlock Text="Pop-up opacity" FontWeight="SemiBold"/>
-                <DockPanel Margin="0,6,0,14">
-                    <TextBlock x:Name="popupOpacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
-                    <Slider x:Name="popupOpacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                            SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
-                </DockPanel>
-            </StackPanel>
+</StackPanel>
         </Expander>
 
         <TextBlock Text="Pause between sentences" FontWeight="SemiBold"/>
@@ -49,6 +78,14 @@
             <TextBlock x:Name="gapText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
             <Slider x:Name="gapSlider" Minimum="0" Maximum="2000" TickFrequency="50" IsSnapToTickEnabled="True"
                     SmallChange="50" LargeChange="200" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <CheckBox x:Name="autoClearBox" Content="Auto clear" Margin="0,0,0,6"
+                  ToolTip="Clears the text a few seconds after reading finishes, like the Clear button. A new read or new text in the meantime cancels it. Off: use the Clear button."/>
+        <DockPanel Margin="22,0,0,14">
+            <TextBlock x:Name="autoClearText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="autoClearSlider" Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"
+                    SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
         </DockPanel>
 
         <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends" Margin="0,0,0,14"

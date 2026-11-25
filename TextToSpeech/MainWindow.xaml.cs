@@ -58,7 +58,9 @@ namespace TextToSpeech
             };
             reading.StateChanged += UpdatePauseButton;
             reading.SentenceStarting += OnSentenceStarting;
+            autoClearTimer.Tick += AutoClearTick;
             reading.Finished += OnReadingFinished;
+            reading.StateChanged += () => { if (reading.IsPlaying) autoClearTimer.Stop(); };
             reading.Notice += message => statusText.Text = message;
             reading.VoiceFellBack += _ => BuildVoiceMenu();
 
@@ -79,6 +81,8 @@ namespace TextToSpeech
             SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); SetupShell(); };
             StateChanged += Window_StateChanged;
             StateChanged += (_, _) => UpdateFullWindowShown();
+            Activated += (_, _) => UpdateFullWindowShown();
+            Deactivated += (_, _) => UpdateFullWindowShown();
             IsVisibleChanged += (_, _) => UpdateFullWindowShown();
             Closing += MainWindow_Closing;
             reading.StateChanged += OnReadingStateForShell;
@@ -154,6 +158,7 @@ namespace TextToSpeech
             popupPolicy.Enabled = settings.ShowReadingPopup;
             popupPolicy.AutoHide = settings.PopupAutoHide;
             popupPolicy.KeepOpenWhenPaused = settings.PopupKeepOpenWhenPaused;
+            popupPolicy.ShowWhenWindowUnfocused = settings.ShowPopupWhenWindowUnfocused;
             StartupRegistration.Apply(settings.StartWithWindows);
             tray?.SetChecks(settings.ShowReadingPopup, settings.StartWithWindows);
             ApplyApiSetting();
@@ -228,6 +233,7 @@ namespace TextToSpeech
 
         private void UpdateFullWindowShown()
         {
+            popupPolicy.FullWindowFocused = IsActive;
             popupPolicy.FullWindowShown = IsVisible && WindowState != System.Windows.WindowState.Minimized;
             RefreshPopup();
         }
@@ -260,6 +266,7 @@ namespace TextToSpeech
                     p.SetInfo(active != null && active.Id != "ui" ? "From " + active.Source : null, canTakeBack: false);
                 }
                 p.SetPlaying(playing);
+                p.SetPreview(previewingPopup);
                 p.ShowPopup();
             }
             else
@@ -274,17 +281,34 @@ namespace TextToSpeech
             }
         }
 
+        private readonly System.Windows.Threading.DispatcherTimer resizeHoldTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+        private bool previewingPopup;
+
         private ReadingPopupWindow CreatePopup()
         {
+            resizeHoldTimer.Tick -= ResizeHoldElapsed;
+            resizeHoldTimer.Tick += ResizeHoldElapsed;
             var p = new ReadingPopupWindow(document, new PopupActions(
                 Back: () => reading.Rewind(),
                 PlayPause: PlayOrPause,
                 Skip: () => reading.Skip(),
+                Clear: () => reading.Clear(),
+                ResizeStarted: () => { resizeHoldTimer.Stop(); popupPolicy.KeepForResize = true; },
+                ResizeCompleted: (w, h) =>
+                {
+                    settings.PopupMaxWidth = w;
+                    settings.PopupMaxHeight = h;
+                    settings.Save();
+                    resizeHoldTimer.Stop();
+                    resizeHoldTimer.Start();   // the popup may hide again after a short wait, like after reading
+                },
                 JumpTo: (sentence, word) => reading.JumpTo(sentence, word),
                 OpenFullWindow: ShowFullWindow,
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
                 TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); }));
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
+            p.SetTextSize(settings.PopupTextSize);
+            p.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
             return p;
         }
 
@@ -358,23 +382,30 @@ namespace TextToSpeech
         {
             filtersMenu.Items.Clear();
             PopupMenus.AddHeading(filtersMenu, "Filters");
-            foreach (string group in FilterRegistry.Groups)
+            // A group like "Web/Links" nests: submenu Web, then submenu Links.
+            foreach (var filter in FilterRegistry.All)
             {
-                var groupItem = new MenuItem { Header = group };
-                foreach (var filter in FilterRegistry.All.Where(f => f.Group == group))
+                ItemsControl parent = filtersMenu;
+                foreach (string part in filter.Group.Split('/', '\\').Select(g => g.Trim()).Where(g => g.Length > 0))
                 {
-                    var item = new MenuItem
+                    var next = parent.Items.OfType<MenuItem>().FirstOrDefault(m => m.Tag == null && m.Items.Count > 0 && (m.Header as string) == part);
+                    if (next == null)
                     {
-                        Header = filter.Label,
-                        IsCheckable = true,
-                        StaysOpenOnClick = true,
-                        IsChecked = filterSettings.IsEnabled(filter.Id),
-                        Tag = filter.Id,
-                    };
-                    item.Click += FilterMenuItem_Click;
-                    groupItem.Items.Add(item);
+                        next = new MenuItem { Header = part };
+                        parent.Items.Add(next);
+                    }
+                    parent = next;
                 }
-                filtersMenu.Items.Add(groupItem);
+                var item = new MenuItem
+                {
+                    Header = filter.Label,
+                    IsCheckable = true,
+                    StaysOpenOnClick = true,
+                    IsChecked = filterSettings.IsEnabled(filter.Id),
+                    Tag = filter.Id,
+                };
+                item.Click += FilterMenuItem_Click;
+                parent.Items.Add(item);
             }
             AddCustomFilterCommands();
         }
@@ -425,7 +456,6 @@ namespace TextToSpeech
             }
         }
 
-        private void AddFilter_Click(object sender, RoutedEventArgs e) => OpenFilterEditor(null);
 
         private void OpenFilterEditor(Core.CustomFilters.CustomFilterEntry? entry)
         {
@@ -673,8 +703,27 @@ namespace TextToSpeech
         }
 
         /// <summary>Reading reached the end: put the window away only if the app raised it and nobody touched it.</summary>
+        private readonly System.Windows.Threading.DispatcherTimer autoClearTimer = new();
+
+        /// <summary>A few seconds after reading finishes the text clears, like the Clear button (if still finished by then).</summary>
+        private void ScheduleAutoClear()
+        {
+            autoClearTimer.Stop();
+            if (!settings.AutoClearAfterReading) return;
+            autoClearTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(settings.AutoClearDelaySeconds, 1, 60));
+            autoClearTimer.Start();
+        }
+
+        private void AutoClearTick(object? sender, EventArgs e)
+        {
+            autoClearTimer.Stop();
+            // New text or a new read in the meantime cancels the clear.
+            if (settings.AutoClearAfterReading && !reading.IsPlaying && document.IsAtEnd) reading.Clear();
+        }
+
         private void OnReadingFinished()
         {
+            ScheduleAutoClear();
             if (raise.TakeMinimize())
             {
                 if (hiddenBeforeRaise)
@@ -835,7 +884,24 @@ namespace TextToSpeech
         {
             var dialog = new SettingsWindow(settings, hotkeySettings, ApplyWindowSettings, SetupHotkeys, HotkeyConflicts) { Owner = this };
             dialog.ApiInfo = () => (api?.IsRunning == true, api?.Port ?? 0, api?.Token);
-            dialog.ShowDialog();
+            popupPolicy.KeepForSettings = true;
+            previewingPopup = true;
+            RefreshPopup();
+            try { dialog.ShowDialog(); }
+            finally
+            {
+                popupPolicy.KeepForSettings = false;
+                previewingPopup = false;
+                popup?.SetPreview(false);
+                RefreshPopup();
+            }
+        }
+
+        private void ResizeHoldElapsed(object? sender, EventArgs e)
+        {
+            resizeHoldTimer.Stop();
+            popupPolicy.KeepForResize = false;
+            RefreshPopup();
         }
 
         private void ApplyWindowSettings()
@@ -846,6 +912,8 @@ namespace TextToSpeech
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
             if (volumePopup.Child is UIElement volumePanel) volumePanel.Opacity = popup;
             this.popup?.SetPanelOpacity(popup);
+            this.popup?.SetTextSize(settings.PopupTextSize);
+            this.popup?.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
             ApplyShellSettings();
         }
 

@@ -10,6 +10,9 @@ namespace TextToSpeech
         Action Back,
         Action PlayPause,
         Action Skip,
+        Action Clear,
+        Action ResizeStarted,
+        Action<double, double> ResizeCompleted,
         Action<int, int> JumpTo,
         Action OpenFullWindow,
         Action Dismiss,
@@ -68,6 +71,77 @@ namespace TextToSpeech
             takeBackButton.Visibility = canTakeBack ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        public void SetMaxSize(double width, double height)
+        {
+            Width = Math.Clamp(width, 280, 900);
+            MaxHeight = Math.Clamp(height, 90, 700);
+            if (previewing) MinHeight = MaxHeight;
+            Anchor();
+        }
+
+        private bool previewing;
+
+        /// <summary>Preview while Settings is open: sample text and the full maximum height, so size and text size can be judged.</summary>
+        public void SetPreview(bool on)
+        {
+            previewing = on;
+            sampleText.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            display.Visibility = on ? Visibility.Hidden : Visibility.Visible;
+            MinHeight = on ? MaxHeight : 90;
+            Anchor();
+        }
+
+        // ---- drag to resize (cursor position from Windows, because the window moves under the mouse while it grows) ----
+        [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT point);
+        [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
+
+        private bool resizing;
+        private Point startCursor;
+        private double startWidth, startHeight;
+
+        private Point CursorInDips()
+        {
+            GetCursorPos(out var p);
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+            return new Point(p.X / dpi.DpiScaleX, p.Y / dpi.DpiScaleY);
+        }
+
+        private void Grip_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            resizing = true;
+            startCursor = CursorInDips();
+            startWidth = ActualWidth;
+            startHeight = ActualHeight;
+            resizeGrip.CaptureMouse();
+            actions.ResizeStarted();
+            e.Handled = true;
+        }
+
+        private void Grip_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            if (!resizing) return;
+            var now = CursorInDips();
+            double width = Math.Clamp(startWidth + (startCursor.X - now.X), 280, 900);
+            double height = Math.Clamp(startHeight + (startCursor.Y - now.Y), 90, 700);
+            Width = width;
+            MaxHeight = height;
+            MinHeight = height;   // follow the mouse, even when the text is short
+            Anchor();
+        }
+
+        private void Grip_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (!resizing) return;
+            resizing = false;
+            resizeGrip.ReleaseMouseCapture();
+            double width = Width, height = MaxHeight;
+            if (!previewing) MinHeight = 90;
+            actions.ResizeCompleted(width, height);
+            e.Handled = true;
+        }
+
+        public void SetTextSize(double size) { display.TextSize = Math.Clamp(size, 10, 32); sampleText.FontSize = display.TextSize; }
+
         public void RefreshTheme() => display.RefreshTheme();
 
         public void SetPanelOpacity(double opacity) => panel.Opacity = opacity;
@@ -91,6 +165,7 @@ namespace TextToSpeech
 
         private void Back_Click(object sender, RoutedEventArgs e) => actions.Back();
         private void PlayPause_Click(object sender, RoutedEventArgs e) => actions.PlayPause();
+        private void Clear_Click(object sender, RoutedEventArgs e) => actions.Clear();
         private void Skip_Click(object sender, RoutedEventArgs e) => actions.Skip();
         private void Open_Click(object sender, RoutedEventArgs e) => actions.OpenFullWindow();
         private void Close_Click(object sender, RoutedEventArgs e) => actions.Dismiss();
