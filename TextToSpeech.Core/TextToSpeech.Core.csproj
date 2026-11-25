@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- UI-free reading logic (document model, sentence splitting).
+       No Windows or WPF dependencies so it can be unit tested anywhere
+       and reused if the app moves beyond Windows. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TextToSpeech.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

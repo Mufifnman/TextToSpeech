@@ -37,6 +37,10 @@ jobs:
     - name: Build the application
       run: msbuild $env:Solution_Name /p:Configuration=Release
 
+    # Run the UI-free unit tests
+    - name: Test
+      run: dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
+
     # Upload build artifacts (the built executable files)
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3

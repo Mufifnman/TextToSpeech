@@ -1,10 +1,8 @@
-﻿
-
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
 using System.Speech.Synthesis;
-using System.Text;
+using TextToSpeech.Core.Reading;
 
 using System.Windows.Controls;
 
@@ -13,152 +11,196 @@ namespace TextToSpeech
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
-    /// </summary>
     /// 
+    /// The text being read lives in <see cref="ReadingDocument"/> (TextToSpeech.Core); this
+    /// class only turns document positions into speech and user input into document moves.
+    /// </summary>
     public partial class MainWindow : System.Windows.Window
     {
         // objects
-        SpeechSynthesizer reader = null;
-        Queue<string> readList = new Queue<string>();
-        Object readLock = new Object();
+        SpeechSynthesizer? reader = null;
+        readonly ReadingDocument document = new ReadingDocument();
         int rate = 4;
-        string savedEnd = null;
-        StringBuilder sb = new StringBuilder();
 
-        ReadingTextViewModel readingTextView = new ReadingTextViewModel();
+        // Characters at the start of the current sentence that were not sent to the engine
+        // (when starting from the middle of a sentence). Engine positions are relative to what we sent.
+        int spokenOffset = 0;
+
+        // Incremented for every utterance; events from cancelled utterances are ignored.
+        int speakGeneration = 0;
+
+        // True after the user paused or stopped; nothing speaks until they resume or click a word.
+        bool paused = false;
 
         public MainWindow()
         {
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
-            DataContext = readingTextView;
             InitializeComponent();
+            __ReadListDisplay__.Document = document;
+            __ReadListDisplay__.WordClicked += JumpTo;
         }
 
         private void ReadText(object sender, RoutedEventArgs e)
         {
-            lock (readLock)
+            if (this.textbox.Text != "")
             {
-                if (this.textbox.Text != "")
-                {
-                    string temp = textbox.Text;
-                    Filters.CombineLines(ref temp);
-                    foreach (string item in temp.Split('\n','.')) // TODO: think about what to do about '?','!'
-                    {
-                        if (!item.ToLower().Contains("read more at")) // cut out read more at
-                        {
-                            readList.Enqueue(item);
-                        }
-                    }
-                    textbox.Text = "";
-                }
-                if (reader == null) // if we aren't already reading
-                {
-                    ReadList();
-                }
+                string temp = textbox.Text;
+                Filters.CombineLines(ref temp);
+                // cut out "read more at"
+                document.Append(temp, s => !s.ToLower().Contains("read more at"));
+                textbox.Text = "";
             }
-            UpdateTextBlock();
+            paused = false;
+            if (reader == null) // if we aren't already reading
+            {
+                SpeakCurrent();
+            }
         }
 
         /// <summary>
-        /// This is a recursive call
+        /// Speaks the document from its current position (sentence and word), cancelling
+        /// anything already being spoken. Calls itself when a sentence completes. UI thread only.
         /// </summary>
-        /// <param name="sender">
-        /// Must be null on first call for it to function properly
-        /// todo: /\ chnge that and arguments /\
-        /// currently garenteed to be called on main thread
-        /// </param>
-        /// <param name="e"></param>
-        private void ReadList(object sender = null, SpeakCompletedEventArgs e = null)
+        private void SpeakCurrent()
         {
-            lock (readLock)
-            {
-                if (sender != null) // first call
-                {
-                    if (0 < readList.Count)
-                    {
-                        readList.Dequeue();
-                    }
-                }
-                else
-                {
-                    CreateReader();
-                }
-                if (0 < readList.Count && reader != null) // one because not dequeued until after this
-                {
-                    wordCount = 0;
-                    if (shouldUnderlineWord)
-                    {
-                        StringToXamlConverter.currentWordIndex = wordCount;
-                    }
-                    else
-                    {
-                        StringToXamlConverter.currentWordIndex = -1;
-                    }
-                    reader.SpeakAsync(readList.Peek());
-                    UpdateTextBlock();
-                    if (1 == readList.Count)
-                    {
-                        savedEnd = readList.Peek();
-                    }
-                }
-                else
-                {
-                    if (reader != null)
-                    {
-                        reader.Dispose();
-                        reader = null; // to keep track of the fact that we aren't currently readings
-                    }
+            CancelSpeech();
 
-                    // Maximize on done so next image can be scanned or line can be coppied
-                    if (this.WindowState == System.Windows.WindowState.Minimized)
-                    {
-                        this.WindowState = System.Windows.WindowState.Normal;
-                    }
+            string? text = document.GetTextToSpeak(out spokenOffset);
+            if (text == null)
+            {
+                // Done: maximize so next image can be scanned or line can be copied
+                if (this.WindowState == System.Windows.WindowState.Minimized)
+                {
+                    this.WindowState = System.Windows.WindowState.Normal;
                 }
+                UpdatePauseButton();
+                return;
+            }
+
+            int generation = ++speakGeneration;
+            var synth = new SpeechSynthesizer { Rate = rate };
+            reader = synth;
+            synth.SpeakProgress += (s, e) =>
+            {
+                // SAPI raises this off the UI thread
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (generation == speakGeneration)
+                    {
+                        document.ReportSpokenCharacter(spokenOffset + e.CharacterPosition);
+                    }
+                });
+            };
+            synth.SpeakCompleted += (s, e) =>
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (generation != speakGeneration || e.Cancelled)
+                    {
+                        return;
+                    }
+                    document.CompleteSentence();
+                    SpeakCurrent();
+                });
+            };
+            synth.SpeakAsync(text);
+            UpdatePauseButton();
+        }
+
+        /// <summary>Stops speaking without moving the reading position.</summary>
+        private void CancelSpeech()
+        {
+            speakGeneration++; // ignore events from the utterance being cancelled
+            if (reader != null)
+            {
+                reader.Dispose();
+                reader = null;
             }
         }
 
-        int wordCount = 0;
-        private void reader_SpeakProgress(object sender, SpeakProgressEventArgs e)
+        /// <summary>After the position moved: keep reading from there, unless the user is paused.</summary>
+        private void AfterMove()
         {
-            wordCount++;
-            if (shouldUnderlineWord)
+            if (paused)
             {
-                StringToXamlConverter.currentWordIndex = wordCount;
-                readingTextView.Text = sb.ToString();
-                //readingTextView.NotifyPropertyChanged();
-                //UpdateTextBlock();
+                CancelSpeech();
+                UpdatePauseButton();
+            }
+            else
+            {
+                SpeakCurrent();
+            }
+        }
+
+        private void JumpTo(int sentence, int word)
+        {
+            document.JumpTo(sentence, word);
+            // Clicking a word means "read from here", even when paused or stopped.
+            paused = false;
+            SpeakCurrent();
+        }
+
+        private void Rewind_Click(object sender, RoutedEventArgs e) => Rewind();
+
+        private void Skip_Click(object sender, RoutedEventArgs e) => Skip();
+
+        private void PlayPause_Click(object sender, RoutedEventArgs e) => TogglePlayPause();
+
+        private void Rewind()
+        {
+            document.Rewind();
+            AfterMove();
+        }
+
+        private void Skip()
+        {
+            if (document.Skip())
+            {
+                AfterMove();
             }
         }
 
         /// <summary>
         ///  clears the list of items to be read
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void ClearList(object sender = null, RoutedEventArgs e = null)
+        private void ClearList(object? sender = null, RoutedEventArgs? e = null)
         {
-            StopRead();
-            lock (readLock)
-            {
-                readList = new Queue<string>();
-                UpdateTextBlock();
-            }
-            savedEnd = null;
+            CancelSpeech();
+            document.Clear();
+            paused = false;
+            UpdatePauseButton();
         }
 
-        private void StopRead(object sender = null, RoutedEventArgs e = null)
+        /// <summary>Stops speaking. The position is kept, so Pause/Play (or clicking a word) continues from here.</summary>
+        private void StopRead(object? sender = null, RoutedEventArgs? e = null)
         {
-            // Initialize new Reader
-            lock (readLock)
+            Pause();
+        }
+
+        private void Pause()
+        {
+            paused = true;
+            CancelSpeech();
+            document.MarkStoppedAtSpokenWord(); // resume from the word we were on
+            UpdatePauseButton();
+        }
+
+        private void TogglePlayPause()
+        {
+            if (reader != null && !paused)
             {
-                if (reader != null)
-                {
-                    reader.Pause();
-                    reader.Dispose();
-                    reader = null;
-                }
+                Pause();
             }
+            else if (!document.IsAtEnd)
+            {
+                paused = false;
+                SpeakCurrent();
+            }
+        }
+
+        private void UpdatePauseButton()
+        {
+            ___PauseButton_.Content = (reader != null && !paused) ? "\u23F8 Pause" : "\u25B6 Play";
         }
 
         private void Window_GotFocus_1(object sender, RoutedEventArgs e)
@@ -166,24 +208,21 @@ namespace TextToSpeech
             // Retrieves data
             IDataObject iData = Clipboard.GetDataObject();
             // Is Data Text?
-            lock (readLock)
+            if (iData.GetDataPresent(DataFormats.Text))
             {
-                if (iData.GetDataPresent(DataFormats.Text))
+                string[] textList = textbox.Text.Split('\n');
+                string copyData = GetLongest((String)iData.GetData(DataFormats.Text));
+
+                if (!(textList.Contains(copyData) || document.Contains(copyData)))
                 {
-                    string[] textList = textbox.Text.Split('\n');
-                    string copyData = GetLongest((String)iData.GetData(DataFormats.Text));
+                    string preFiltered = (String)iData.GetData(DataFormats.Text) + "\n";
 
-                    if (!(textList.Contains(copyData) || readList.Contains(copyData)))
-                    {
-                        string preFiltered = (String)iData.GetData(DataFormats.Text) + "\n";
+                    Filters.WikipediaCitation(ref preFiltered);
+                    Filters.GovernmentFilter(ref preFiltered);
+                    Filters.AHITStarredQuestion(ref preFiltered);
 
-                        Filters.WikipediaCitation(ref preFiltered);
-                        Filters.GovernmentFilter(ref preFiltered);
-                        Filters.AHITStarredQuestion(ref preFiltered);
-
-                        textbox.Text = textbox.Text + "\n" + preFiltered;
-                        Clipboard.Clear();
-                    }
+                    textbox.Text = textbox.Text + "\n" + preFiltered;
+                    Clipboard.Clear();
                 }
             }
         }
@@ -192,12 +231,10 @@ namespace TextToSpeech
         /// Current repeat prevention technique (not great).
         /// More complex logic needed i.e. for each split if not in list insert (but where? after one that was?)
         /// </summary>
-        /// <param name="p"></param>
-        /// <returns></returns>
         private string GetLongest(string p)
         {
             string longest = "";
-            foreach (string item in p.Split('\n','.'))
+            foreach (string item in SentenceSplitter.Split(p))
             {
                 if (item.Length > longest.Length)
                 {
@@ -207,78 +244,19 @@ namespace TextToSpeech
             return longest;
         }
 
-        bool shouldUnderlineWord = true;
-        // TODO: make program current position knowledgeable, 
-        //   so you can save position and move around in large text files
-        //   should be possible in the string to xaml converter (maybe make it a string array to xaml converter?
-        //   could then have 'buttons' for all the text with alternating gray/white backgrounds 
-        //   would need to figure out how to keep to what was being read in the scrolled view
-        //      but break this until we hit read again if scrolling happens in that area 
-        //
-        //   buttons would rewind to that section of the text we want to read
-        //   
-        //   All this would require a refactor of the reading methods to remove the queue crap
-        //   we'd need to like clear whenever we finished reading as well
-
-
-        /// <summary>
-        /// Updates the current textBlock list of things to say
-        /// </summary>
-        private void UpdateTextBlock()
-        {
-            lock (readLock)
-            {
-                if (readList.Count <= 0)
-                {
-                    // nothing to update
-                    readingTextView.Text = string.Empty;
-                    return;
-                }
-
-                sb.Clear();
-
-                // todo: move this to a faster redraw method (also a string to XAMLConverter todo)
-                sb.Append(StringToXamlConverter.BeginHighlightToken);
-                string line = readList.Peek();
-                sb.Append(line);
-                sb.Append(StringToXamlConverter.EndHighlightToken);
-
-                foreach (string item in readList.Skip(1))
-                {
-                    //sb.AppendLine();
-                    sb.Append(item);
-                }
-                readingTextView.Text = sb.ToString();
-            }
-        }
-
-        private void CreateReader()
-        {
-            reader = new SpeechSynthesizer();
-            reader.Rate = rate;
-            reader.SpeakCompleted += 
-                (sender, e) =>
-                {
-                    Dispatcher.Invoke(() => ReadList(sender, e));
-                };
-            reader.SpeakProgress += reader_SpeakProgress;
-        }
-
         private void SpeedChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (e.NewValue == e.OldValue)
             {
                 return;
             }
-//            lock (readLock)
-  //          {
-                rate = (int)e.NewValue;
+            rate = (int)e.NewValue;
 
-                if (reader != null)
-                {
-                    reader.Rate = (int)e.NewValue;
-                }
-    //        }
+            // GUESS: SAPI applies the new rate to the next sentence, not mid-sentence.
+            if (reader != null)
+            {
+                reader.Rate = rate;
+            }
         }
 
         private OcrOptions selectedOCROption = new OcrOptions();
@@ -319,14 +297,16 @@ namespace TextToSpeech
                 return;
             }
 
-            if (savedEnd != null)
+            // A sentence cut off at the bottom of the last capture continues at the top of this one.
+            // GUESS: only joins when we are on or past the last sentence, as the old savedEnd did.
+            string? tail = document.TakeIncompleteTail();
+            if (tail != null)
             {
-                readText = savedEnd + " " + readText;
-                savedEnd = null;
+                readText = tail + " " + readText;
             }
 
             Filters.CombineLines(ref readText);
-            readText = readText.Replace('¡', 'i');
+            readText = readText.Replace('\u00A1', 'i');
 
             Filters.PsychologyFilter(ref readText);
 
@@ -352,30 +332,37 @@ namespace TextToSpeech
             return bitmap;
         }
 
-        private void Window_KeyDown_1(object sender, KeyEventArgs e)
+        /// <summary>
+        /// Keyboard shortcuts. Handled in the preview (tunnelling) event so a focused button
+        /// never also "clicks" on Space, which is what stopped the old hotkey from working.
+        ///   Space                  play / pause (unless typing in the text box)
+        ///   Ctrl+Space             play / pause, even while typing
+        ///   Left / Right           rewind / skip (unless typing in the text box)
+        ///   Ctrl+Left / Ctrl+Right rewind / skip, even while typing
+        /// </summary>
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Space)
+            bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+            bool typing = Keyboard.FocusedElement is TextBox && !ctrl;
+            if (typing)
             {
-                TogglePlayPause();
+                return;
             }
-        }
 
-        // TODO: make this actually work whenever you press [space] or find another solution.
-        private void TogglePlayPause()
-        {
-            lock (readLock)
+            switch (e.Key)
             {
-                if (reader != null)
-                {
-                    if (reader.State == SynthesizerState.Speaking)
-                    {
-                        reader.Pause();
-                    }
-                    else if (reader.State == SynthesizerState.Paused)
-                    {
-                        reader.Resume();
-                    }
-                }
+                case Key.Space:
+                    TogglePlayPause();
+                    e.Handled = true;
+                    break;
+                case Key.Left:
+                    Rewind();
+                    e.Handled = true;
+                    break;
+                case Key.Right:
+                    Skip();
+                    e.Handled = true;
+                    break;
             }
         }
     }
