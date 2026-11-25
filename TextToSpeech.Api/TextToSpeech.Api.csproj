@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Local API contract, security checks, request routing and the remainder-handoff session store.
+       No WPF in here, so it builds and tests on any OS. It owns the loopback HTTP listener, the router and the
+       host that drives the reading controller; the app only supplies voices, settings and the popup. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TextToSpeech.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TextToSpeech.Core\TextToSpeech.Core.csproj" />
+  </ItemGroup>
+
+</Project>

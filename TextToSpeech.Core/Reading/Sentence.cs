@@ -18,13 +18,20 @@ namespace TextToSpeech.Core.Reading
     /// </summary>
     public sealed class Sentence
     {
-        public Sentence(string text)
+        public Sentence(string text, string? owner = null)
         {
             Text = text ?? throw new ArgumentNullException(nameof(text));
             Words = Tokenize(text);
+            Owner = owner;
         }
 
         public string Text { get; }
+
+        /// <summary>
+        /// Which API session added this sentence (null for text typed, pasted or captured in the window).
+        /// Lets the local API find and hand back the unread part of one client's text.
+        /// </summary>
+        public string? Owner { get; }
 
         public IReadOnlyList<WordSpan> Words { get; }
 
