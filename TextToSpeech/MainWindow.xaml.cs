@@ -7,6 +7,9 @@ using TextToSpeech.Core.Reading;
 
 using System.Windows.Controls;
 using TextToSpeech.Hotkeys;
+using TextToSpeech.Api;
+using TextToSpeech.Core.Shell;
+using TextToSpeech.Shell;
 
 
 namespace TextToSpeech
@@ -71,12 +74,216 @@ namespace TextToSpeech
 
             BuildFiltersMenu();
             RegionReader = this;
-            SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); };
+            SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); SetupShell(); };
             StateChanged += Window_StateChanged;
+            StateChanged += (_, _) => UpdateFullWindowShown();
+            IsVisibleChanged += (_, _) => UpdateFullWindowShown();
+            Closing += MainWindow_Closing;
+            reading.StateChanged += OnReadingStateForShell;
+            reading.Cleared += () => { popupPolicy.Cleared(); RefreshPopup(); };
+            popupTimer.Tick += (_, _) => { popupTimer.Stop(); RefreshPopup(); };
+            ThemeManager.Changed += () => popup?.RefreshTheme();
             Activated += (_, _) => raise.Activated();
             PreviewMouseDown += (_, _) => raise.UserInteracted();
             ThemeManager.Changed += () => __ReadListDisplay__.RefreshTheme();
-            Closed += (_, _) => { reading.Dispose(); hotkeys?.Dispose(); catalog.Dispose(); };
+            Closed += (_, _) =>
+            {
+                popupTimer.Stop();
+                popup?.Close();
+                tray?.Dispose();
+                api?.Dispose();
+                reading.Dispose();
+                hotkeys?.Dispose();
+                catalog.Dispose();
+                Application.Current.Shutdown();   // the app only exits explicitly (ShutdownMode.OnExplicitShutdown)
+            };
+        }
+
+        // ---- always-on mode: tray icon, reading popup, close-to-tray, local API ----
+        readonly PopupPolicy popupPolicy = new();
+        readonly System.Windows.Threading.DispatcherTimer popupTimer = new();
+        ReadingPopupWindow? popup;
+        TrayIcon? tray;
+        LocalApiService? api;
+
+        // The app brought a window up that was hidden in the tray (not just minimized): put it back there afterwards.
+        bool hiddenBeforeRaise;
+
+        private void MarkRaisedByApp()
+        {
+            hiddenBeforeRaise = !IsVisible;
+            raise.AppRaised();
+        }
+
+        /// <summary>
+        /// Opens the full window because the user asked for it (popup button, tray, a second launch). It is not
+        /// marked as raised by the app, so nothing minimizes or hides it afterwards except the user.
+        /// </summary>
+        public void ShowFullWindow()
+        {
+            BringToFront();
+            raise.UserInteracted();
+            UpdateFullWindowShown();
+        }
+
+        private void SetupShell()
+        {
+            api = new LocalApiService(reading, BuildAppControl(), Dispatcher);
+            api.Host.Event += e => { if (e.Type.StartsWith("handoff")) RefreshPopup(); };
+
+            tray = new TrayIcon(new TrayActions(
+                ShowWindow: ShowFullWindow,
+                PlayPause: PlayOrPause,
+                Skip: () => reading.Skip(),
+                Back: () => reading.Rewind(),
+                Stop: () => reading.Pause(),
+                SetShowPopup: on => { settings.ShowReadingPopup = on; settings.Save(); ApplyShellSettings(); },
+                SetStartWithWindows: on => { settings.StartWithWindows = on; settings.Save(); ApplyShellSettings(); },
+                Exit: App.ExitApp),
+                settings.ShowReadingPopup, settings.StartWithWindows);
+
+            ApplyShellSettings();
+            UpdateFullWindowShown();
+        }
+
+        /// <summary>Applies the tray, popup, start-with-Windows and local API settings (also called when Settings changes).</summary>
+        private void ApplyShellSettings()
+        {
+            popupPolicy.Enabled = settings.ShowReadingPopup;
+            popupPolicy.AutoHide = settings.PopupAutoHide;
+            popupPolicy.KeepOpenWhenPaused = settings.PopupKeepOpenWhenPaused;
+            StartupRegistration.Apply(settings.StartWithWindows);
+            tray?.SetChecks(settings.ShowReadingPopup, settings.StartWithWindows);
+            ApplyApiSetting();
+            RefreshPopup();
+        }
+
+        private void ApplyApiSetting()
+        {
+            if (api == null)
+            {
+                return;
+            }
+            try
+            {
+                if (settings.ApiEnabled && !api.IsRunning)
+                {
+                    api.Start(settings.ApiPort);
+                }
+                else if (!settings.ApiEnabled && api.IsRunning)
+                {
+                    api.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                statusText.Text = "Local API: " + ex.Message;
+            }
+        }
+
+        private IAppControl BuildAppControl() => new AppControlAdapter
+        {
+            Voices = () => catalog.Voices.Select(v => new VoiceDto(v.Id, v.DisplayName, v.EngineName, v.IsNeural)).ToList(),
+            SelectVoice = id =>
+            {
+                var voice = catalog.Voices.FirstOrDefault(v => v.Id == id);
+                if (voice == null) return false;
+                SelectVoice(voice);
+                return true;
+            },
+            GetRate = () => rate,
+            ApplyRate = r => SetSpeed(r),
+            GetVolume = () => volume,
+            ApplyVolume = v => SetVolume(v),
+            GetWindow = CurrentWindowDto,
+            Popup = _ => RefreshPopup(),
+            Filter = text => { Filters.ApplyClipboardFilters(ref text, filterSettings); return text; },
+        };
+
+        private WindowDto CurrentWindowDto()
+        {
+            bool full = IsVisible && WindowState != System.Windows.WindowState.Minimized;
+            string mode = full ? "full" : popup?.IsVisible == true ? "popup" : "hidden";
+            return new WindowDto(mode, full && !raise.RaisedByApp);
+        }
+
+        /// <summary>The close button hides to the tray (if that setting is on); only Exit or Windows shutdown really closes.</summary>
+        private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+        {
+            if (App.IsExiting || !settings.CloseToTray)
+            {
+                return;
+            }
+            e.Cancel = true;
+            Hide();
+            if (!settings.TrayHintShown)
+            {
+                settings.TrayHintShown = true;
+                settings.Save();
+                tray?.ShowHint("Text to Speech is still running", "It lives in the tray. Click the icon to open it, or choose Exit from its menu.");
+            }
+        }
+
+        private void UpdateFullWindowShown()
+        {
+            popupPolicy.FullWindowShown = IsVisible && WindowState != System.Windows.WindowState.Minimized;
+            RefreshPopup();
+        }
+
+        private void OnReadingStateForShell()
+        {
+            popupPolicy.ReadingChanged(reading.IsPlaying, !document.IsAtEnd);
+            RefreshPopup();
+        }
+
+        private void RefreshPopup()
+        {
+            bool playing = reading.IsPlaying;
+            bool unread = !document.IsAtEnd;
+            var handoffs = api?.Host.OpenHandoffSources ?? Array.Empty<string>();
+            popupPolicy.HandoffOpen = handoffs.Count > 0;
+
+            tray?.SetState(playing ? "Text to Speech: reading" : unread ? "Text to Speech: paused" : "Text to Speech", playing);
+
+            if (popupPolicy.IsVisible(playing, unread))
+            {
+                var p = popup ??= CreatePopup();
+                if (handoffs.Count > 0)
+                {
+                    p.SetInfo("Waiting for " + string.Join(", ", handoffs.Distinct()) + " to return the rest...", canTakeBack: true);
+                }
+                else
+                {
+                    var active = api?.Host.Snapshot().ActiveSession;
+                    p.SetInfo(active != null && active.Id != "ui" ? "From " + active.Source : null, canTakeBack: false);
+                }
+                p.SetPlaying(playing);
+                p.ShowPopup();
+            }
+            else
+            {
+                popup?.HidePopup();
+            }
+
+            if (popupPolicy.TimeUntilRecheck() is { } wait)
+            {
+                popupTimer.Interval = wait + TimeSpan.FromMilliseconds(50);
+                popupTimer.Start();
+            }
+        }
+
+        private ReadingPopupWindow CreatePopup()
+        {
+            var p = new ReadingPopupWindow(document, new PopupActions(
+                Back: () => reading.Rewind(),
+                PlayPause: PlayOrPause,
+                Skip: () => reading.Skip(),
+                JumpTo: (sentence, word) => reading.JumpTo(sentence, word),
+                OpenFullWindow: ShowFullWindow,
+                Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
+                TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); }));
+            p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
+            return p;
         }
 
         /// <summary>Rebuilds the voice menu from what is installed, keeping the current choice if it still exists.</summary>
@@ -241,7 +448,7 @@ namespace TextToSpeech
             if (showWindow)
             {
                 // Only re-minimize if the window wasn't already up (if the user had it open, leave it alone).
-                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) raise.AppRaised();
+                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) MarkRaisedByApp();
                 ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(2);
                 BringToFront();
             }
@@ -261,7 +468,7 @@ namespace TextToSpeech
             if (showWindow)
             {
                 // Same as the read-selection hotkey: only put the window away afterwards if the app brought it up.
-                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) raise.AppRaised();
+                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) MarkRaisedByApp();
                 ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(2);
                 BringToFront();
             }
@@ -385,7 +592,15 @@ namespace TextToSpeech
         {
             if (raise.TakeMinimize())
             {
-                WindowState = System.Windows.WindowState.Minimized;
+                if (hiddenBeforeRaise)
+                {
+                    Hide();   // it was in the tray before the app raised it: back to the tray
+                }
+                else
+                {
+                    WindowState = System.Windows.WindowState.Minimized;
+                }
+                hiddenBeforeRaise = false;
             }
         }
 
@@ -534,6 +749,7 @@ namespace TextToSpeech
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new SettingsWindow(settings, hotkeySettings, ApplyWindowSettings, SetupHotkeys, HotkeyConflicts) { Owner = this };
+            dialog.ApiInfo = () => (api?.IsRunning == true, api?.Port ?? 0, api?.Token);
             dialog.ShowDialog();
         }
 
@@ -544,6 +760,8 @@ namespace TextToSpeech
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
             if (volumePopup.Child is UIElement volumePanel) volumePanel.Opacity = popup;
+            this.popup?.SetPanelOpacity(popup);
+            ApplyShellSettings();
         }
 
         private OcrOptions selectedOCROption => settings.GetOcrOption();

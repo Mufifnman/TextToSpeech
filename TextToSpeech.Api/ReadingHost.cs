@@ -70,6 +70,19 @@ namespace TextToSpeech.Api
             store.Prune(id => doc.OwnerSentenceCount(id) > 0);
         }
 
+        /// <summary>Sources (client names) of sessions whose remainder is currently taken.</summary>
+        public IReadOnlyList<string> OpenHandoffSources =>
+            store.Sessions.Where(s => s.State == SessionState.HandedOff).Select(s => s.Source).ToList();
+
+        /// <summary>The "Take it back" button: restores every taken remainder as it was.</summary>
+        public void ReleaseAllHandoffs()
+        {
+            foreach (var s in store.Sessions.Where(x => x.State == SessionState.HandedOff).ToList())
+            {
+                ReleaseAsync(s.Id, new ReleaseRequest(null)).GetAwaiter().GetResult();
+            }
+        }
+
         // ---------- status ----------
 
         public StatusDto Snapshot()

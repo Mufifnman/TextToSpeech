@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node C:/Git/TextToSpeech/integrations/cli/tts.mjs say --mode if-idle --source claude-code --quiet \"Claude Code finished\"" }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node C:/Git/TextToSpeech/integrations/cli/tts.mjs say --mode if-idle --source claude-code \"Claude Code needs your attention\"" }
+        ]
+      }
+    ]
+  }
+}

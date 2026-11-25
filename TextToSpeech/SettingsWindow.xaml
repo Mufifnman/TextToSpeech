@@ -5,6 +5,26 @@
         Title="Settings" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <StackPanel Margin="16" MinWidth="380">
+        <Expander x:Name="shellExpander" Header="Tray and background" Tag="shell">
+            <StackPanel Margin="0,4,0,10">
+                <CheckBox x:Name="startWithWindowsBox" Content="Start with Windows" Margin="0,0,0,6"
+                          ToolTip="Starts hidden in the tray when you sign in to Windows."/>
+                <CheckBox x:Name="closeToTrayBox" Content="Close button hides to tray" Margin="0,0,0,6"
+                          ToolTip="The app keeps running in the tray. Exit is in the tray icon's menu."/>
+                <CheckBox x:Name="showPopupBox" Content="Show reading popup when reading starts" Margin="0,0,0,6"
+                          ToolTip="A small window above the tray with the text being read, shown only while the full window is hidden."/>
+                <CheckBox x:Name="popupAutoHideBox" Content="Hide popup when reading finishes" Margin="22,0,0,6"/>
+                <CheckBox x:Name="popupKeepBox" Content="Keep popup open when paused" Margin="22,0,0,6"
+                          ToolTip="Off: pausing or stopping hides the popup until reading resumes."/>
+                <CheckBox x:Name="apiBox" Content="Enable local API (127.0.0.1, for other programs)" Margin="0,6,0,4"
+                          ToolTip="Lets programs on this computer send text to read and control reading. They need the token below."/>
+                <DockPanel Margin="22,0,0,0">
+                    <Button x:Name="copyTokenButton" DockPanel.Dock="Right" Content="Copy token" Padding="10,0" Height="24" Click="CopyToken_Click"/>
+                    <TextBlock x:Name="apiInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12" VerticalAlignment="Center"/>
+                </DockPanel>
+            </StackPanel>
+        </Expander>
+
         <Expander x:Name="opacityExpander" Header="Opacity" Tag="opacity">
             <StackPanel>
                 <TextBlock Text="Window opacity" FontWeight="SemiBold"/>

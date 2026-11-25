@@ -33,6 +33,32 @@ namespace TextToSpeech
         /// <summary>Bring the window up when reading starts and minimize it when reading ends (only when the app raised the window itself).</summary>
         public bool AutoShowWhilePlaying { get; set; } = false;
 
+        // ---- always-on mode (tray, popup, local API) ----
+
+        /// <summary>Show the small reading popup above the tray when reading starts and the full window is hidden.</summary>
+        public bool ShowReadingPopup { get; set; } = true;
+
+        /// <summary>Hide the popup a moment after reading finishes (off: it stays until dismissed).</summary>
+        public bool PopupAutoHide { get; set; } = true;
+
+        /// <summary>Keep the popup open while reading is paused or stopped (off: it hides until reading resumes).</summary>
+        public bool PopupKeepOpenWhenPaused { get; set; } = true;
+
+        /// <summary>The window's close button hides it to the tray instead of exiting (Exit is in the tray menu).</summary>
+        public bool CloseToTray { get; set; } = true;
+
+        /// <summary>Start hidden in the tray when Windows starts (a value in the current user's Run key).</summary>
+        public bool StartWithWindows { get; set; } = false;
+
+        /// <summary>Local API on 127.0.0.1 for other programs. Off until switched on.</summary>
+        public bool ApiEnabled { get; set; } = false;
+
+        /// <summary>Preferred API port; a free one is used if it is taken (api.json always says which).</summary>
+        public int ApiPort { get; set; } = 47821;
+
+        /// <summary>The one-time "still running in the tray" hint has been shown.</summary>
+        public bool TrayHintShown { get; set; } = false;
+
         /// <summary>Save somewhere else (used by tests so they never touch the real settings file).</summary>
         [System.Text.Json.Serialization.JsonIgnore]
         public string? PathOverride { get; set; }

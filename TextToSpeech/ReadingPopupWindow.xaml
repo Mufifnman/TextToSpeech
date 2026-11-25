@@ -1,0 +1,57 @@
+<Window x:Class="TextToSpeech.ReadingPopupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:TextToSpeech"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" Topmost="True" ResizeMode="NoResize"
+        Foreground="{DynamicResource ThemeText}"
+        Width="420" MinHeight="90" MaxHeight="260" SizeToContent="Height" Title="Text to Speech">
+    <!-- The compact reading view above the tray. It never takes focus (see OnSourceInitialized), so reading and
+         typing elsewhere carry on undisturbed; clicks still work. -->
+    <Border x:Name="panel" Style="{StaticResource PopupPanel}" Padding="6">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*" MinHeight="40"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Where the text came from (API clients) or that a client holds the rest. -->
+            <DockPanel x:Name="infoRow" Visibility="Collapsed" Margin="4,0,4,4">
+                <Button x:Name="takeBackButton" DockPanel.Dock="Right" Content="Take it back" Padding="8,0" Height="22" Focusable="False"
+                        Click="TakeBack_Click" Visibility="Collapsed"/>
+                <TextBlock x:Name="infoText" FontSize="12" Foreground="{DynamicResource ThemeSubtle}" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"/>
+            </DockPanel>
+
+            <local:ReadingDisplay x:Name="display" Grid.Row="1"/>
+
+            <Grid Grid.Row="2" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="backButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Back" Click="Back_Click">
+                        <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
+                    <Button x:Name="playButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Play / pause" Click="PlayPause_Click">
+                        <TextBlock x:Name="playGlyph" Text="&#xE769;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
+                    <Button x:Name="skipButton" Width="34" Height="26" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
+                        <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="openButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Open the full window" Click="Open_Click">
+                        <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
+                    <Button x:Name="closeButton" Width="26" Height="26" Focusable="False" ToolTip="Close the popup" Click="Close_Click">
+                        <TextBlock Text="&#xE711;" FontFamily="{StaticResource IconFont}" FontSize="11"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

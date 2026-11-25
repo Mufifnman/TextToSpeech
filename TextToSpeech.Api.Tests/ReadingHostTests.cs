@@ -433,5 +433,15 @@ namespace TextToSpeech.Api.Tests
             var e = await Assert.ThrowsAsync<ApiException>(() => rig.Host.PeekAsync("s_whatever"));
             Assert.Equal(404, e.HttpStatus);
         }
+
+        [Fact]
+        public async Task Open_handoffs_are_listed_and_release_all_restores_them()
+        {
+            var (id, _) = await SpeakAndTakeAfterFirstSentence();
+            Assert.Equal(new[] { "claude-code" }, rig.Host.OpenHandoffSources);
+            rig.Host.ReleaseAllHandoffs();
+            Assert.Empty(rig.Host.OpenHandoffSources);
+            Assert.Equal(HostRig.Three, rig.Document.OwnerText(id));
+        }
     }
 }
