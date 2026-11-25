@@ -174,6 +174,34 @@ namespace TextToSpeech.Core.Tests
         }
     }
 
+    public class ReadingDocumentClipboardTests
+    {
+        [Fact]
+        public void ContainsUnread_IgnoresSentencesAlreadyRead()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two three. Four five. Six.");
+
+            Assert.True(doc.ContainsUnread("One two"));   // nothing read yet
+            doc.CompleteSentence();
+            Assert.False(doc.ContainsUnread("One two"));  // already read: can be pasted again
+            Assert.True(doc.Contains("One two"));         // still there for rewind
+            Assert.True(doc.ContainsUnread("Four five"));
+        }
+
+        [Fact]
+        public void ContainsUnread_IsFalseOnceEverythingIsRead_AndForBlankText()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One. Two.");
+            doc.CompleteSentence();
+            doc.CompleteSentence();
+            Assert.False(doc.ContainsUnread("Two"));
+            Assert.False(doc.ContainsUnread("  "));
+            Assert.False(doc.ContainsUnread(null));
+        }
+    }
+
     public class SentenceTests
     {
         [Fact]

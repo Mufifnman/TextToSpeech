@@ -90,6 +90,28 @@ namespace TextToSpeech.Core.Reading
         }
 
         /// <summary>
+        /// Like <see cref="Contains"/> but only looks at sentences not yet finished (the current one onward).
+        /// The old queue dropped sentences as they were read, so text that was already read could be
+        /// copied and picked up again; this keeps that behavior now that read sentences stay for rewind.
+        /// </summary>
+        public bool ContainsUnread(string? fragment)
+        {
+            if (string.IsNullOrWhiteSpace(fragment))
+            {
+                return false;
+            }
+            string f = fragment.Trim();
+            for (int i = Position.Sentence; i < sentences.Count; i++)
+            {
+                if (sentences[i].Text.Contains(f, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// The text to hand to the speech engine for the current sentence, starting at
         /// <see cref="Position"/>.Word. <paramref name="offset"/> is where that text starts
         /// inside the sentence; add it to engine character positions before calling

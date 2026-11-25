@@ -225,6 +225,7 @@ namespace TextToSpeech
             {
                 // Only re-minimize if the window wasn't already up (if the user had it open, leave it alone).
                 minimizeWhenDone = WindowState == System.Windows.WindowState.Minimized || !IsVisible;
+                ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(2);
                 BringToFront();
             }
             QueueTextAndRead(text);
@@ -489,8 +490,16 @@ namespace TextToSpeech
             pauseLabel.Text = playing ? "Pause" : "Play";
         }
 
+        // After a read-selection hotkey brings the window up, don't let the focus change grab (and clear)
+        // the clipboard the hotkey just restored.
+        DateTime ignoreClipboardGrabUntil = DateTime.MinValue;
+
         private void Window_GotFocus_1(object sender, RoutedEventArgs e)
         {
+            if (DateTime.UtcNow < ignoreClipboardGrabUntil)
+            {
+                return;
+            }
             // Retrieves data
             IDataObject iData = Clipboard.GetDataObject();
             // Is Data Text?
@@ -499,7 +508,7 @@ namespace TextToSpeech
                 string[] textList = textbox.Text.Split('\n');
                 string copyData = GetLongest((String)iData.GetData(DataFormats.Text));
 
-                if (!(textList.Contains(copyData) || document.Contains(copyData)))
+                if (!(textList.Contains(copyData) || document.ContainsUnread(copyData)))
                 {
                     string preFiltered = (String)iData.GetData(DataFormats.Text) + "\n";
 
