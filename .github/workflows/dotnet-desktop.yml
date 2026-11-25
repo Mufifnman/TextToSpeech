@@ -15,19 +15,19 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     # Install the .NET Core
     - name: Install .NET Core
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'  # Specify your .NET version
 
     # Add MSBuild to the PATH
     - name: Setup MSBuild.exe
-      uses: microsoft/setup-msbuild@v1.0.2
+      uses: microsoft/setup-msbuild@v2
           
     # Restore NuGet packages
     - name: Restore NuGet packages
@@ -37,9 +37,13 @@ jobs:
     - name: Build the application
       run: msbuild $env:Solution_Name /p:Configuration=Release
 
+    # Run the UI-free unit tests
+    - name: Test
+      run: dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
+
     # Upload build artifacts (the built executable files)
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Executable Files
         path: |

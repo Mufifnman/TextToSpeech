@@ -3,9 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Title="Text to Speech" Height="383" Width="525" GotFocus="Window_GotFocus_1" KeyUp="Window_KeyDown_1">
+        Title="Text to Speech" Height="383" Width="525" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
-        <l:StringToXamlConverter x:Key="CONVERTERS_StringToXaml" />
         <local:EnumToEnumerableConverter x:Key="EnumToEnumerableConverter" />
     </Window.Resources>
     <Grid Margin="0,0,0,-5">
@@ -18,10 +17,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="textbox" TextWrapping="Wrap" Text="Test" KeyUp="Window_KeyDown_1"/>
-            <ContentControl x:Name="__ReadListDisplay__" Grid.Column="1" VerticalAlignment="Top" Background="LightGray" KeyUp="Window_KeyDown_1"
-               Content="{Binding Path=Text, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource CONVERTERS_StringToXaml}, Mode=TwoWay}">
-            </ContentControl>  
+            <TextBox x:Name="textbox" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="Test"/>
+            <local:ReadingDisplay x:Name="__ReadListDisplay__" Grid.Column="1"/>
         </Grid>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
@@ -34,11 +31,17 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" KeyUp="Window_KeyDown_1"/>
-                <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="1" Click="ClearList" KeyUp="Window_KeyDown_1"/>
-                <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="2" Click="StopRead" KeyUp="Window_KeyDown_1"/>
-                <Button x:Name="__ImageRead" Content="Read Image" Grid.Column="3" Click="ImageRead" KeyUp="Window_KeyDown_1"/>
+                <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" Focusable="False"/>
+                <Button x:Name="___RewindButton_" Content="&#9198; Back" Grid.Column="1" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)"/>
+                <Button x:Name="___PauseButton_" Content="&#9199; Pause" Grid.Column="2" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)"/>
+                <Button x:Name="___SkipButton_" Content="Skip &#9197;" Grid.Column="3" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)"/>
+                <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="4" Click="StopRead" Focusable="False"/>
+                <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="5" Click="ClearList" Focusable="False"/>
+                <Button x:Name="__ImageRead" Content="Read Image" Grid.Column="6" Click="ImageRead" Focusable="False"/>
                 </Grid>
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
