@@ -139,7 +139,6 @@ namespace TextToSpeech
                 ShowWindow: ShowFullWindow,
                 PlayPause: PlayOrPause,
                 Skip: () => reading.Skip(),
-                Clear: () => reading.Clear(),
                 Back: () => reading.Rewind(),
                 Stop: () => reading.Pause(),
                 SetShowPopup: on => { settings.ShowReadingPopup = on; settings.Save(); ApplyShellSettings(); },
