@@ -1,0 +1,25 @@
+<Window x:Class="TextToSpeech.VoiceDownloadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource ThemeBackground}" Foreground="{DynamicResource ThemeText}"
+        Title="Get more voices" Height="300" Width="480" WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Natural voices run on this computer after a one-time download from the sherpa-onnx project. Pick one to download."/>
+        <ListBox x:Name="voiceList" Grid.Row="1"/>
+        <StackPanel Grid.Row="2" Margin="0,8,0,0">
+            <ProgressBar x:Name="progress" Height="14" Minimum="0" Maximum="1"/>
+            <TextBlock x:Name="statusText" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="downloadButton" Content="Download" Padding="14,3" Margin="0,0,8,0" Click="Download_Click"/>
+            <Button x:Name="closeButton" Content="Close" Padding="14,3" Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
