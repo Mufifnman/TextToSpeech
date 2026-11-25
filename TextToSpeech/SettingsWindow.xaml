@@ -12,42 +12,53 @@
                     SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
         </DockPanel>
 
+        <TextBlock Text="Pop-up opacity" FontWeight="SemiBold"/>
+        <DockPanel Margin="0,6,0,14">
+            <TextBlock x:Name="popupOpacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="popupOpacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                    SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+        </DockPanel>
+
         <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends" Margin="0,0,0,14"
                   ToolTip="Pausing keeps the window up so you can resume. It only minimizes again if the app brought it up and you did not click or switch to it meanwhile."/>
 
-        <TextBlock Text="OCR engine (for Read Region)" FontWeight="SemiBold"/>
-        <StackPanel Orientation="Horizontal" Margin="0,6,0,14">
-            <RadioButton x:Name="ocrWindowsRadio" Content="Windows" GroupName="ocr" Margin="0,0,16,0"
-                         ToolTip="Built-in Windows OCR: fast, uses the Windows language packs"/>
-            <RadioButton x:Name="ocrTesseractRadio" Content="Tesseract" GroupName="ocr"
-                         ToolTip="Tesseract 5 with image clean-up: works offline from the bundled data"/>
-        </StackPanel>
+        <Expander x:Name="ocrExpander" Header="OCR engine (for Read Region)" Tag="ocr">
+            <StackPanel Orientation="Horizontal">
+                <RadioButton x:Name="ocrWindowsRadio" Content="Windows" GroupName="ocr" Margin="0,0,16,0"
+                             ToolTip="Built-in Windows OCR: fast, uses the Windows language packs"/>
+                <RadioButton x:Name="ocrTesseractRadio" Content="Tesseract" GroupName="ocr"
+                             ToolTip="Tesseract 5 with image clean-up: works offline from the bundled data"/>
+            </StackPanel>
+        </Expander>
 
-        <TextBlock Text="Hotkeys" FontWeight="SemiBold"/>
-        <TextBlock Text="Click a box, then press the new shortcut. Backspace puts the default back." Margin="0,2,0,6"
-                   TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12"/>
-        <Grid x:Name="hotkeyGrid">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="160"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
-            </Grid.RowDefinitions>
-            <TextBlock Text="Read selected text" Margin="0,4,12,4" ToolTip="The window stays hidden"/>
-            <TextBox x:Name="readBox" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelection" PreviewKeyDown="Capture_PreviewKeyDown"/>
-            <TextBlock Text="Read selected text and show window" Grid.Row="1" Margin="0,4,12,4" ToolTip="The window is minimized again when reading ends, if it was hidden"/>
-            <TextBox x:Name="readShowBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelectionAndShow" PreviewKeyDown="Capture_PreviewKeyDown"/>
-            <TextBlock Text="Show window" Grid.Row="2" Margin="0,4,12,4"/>
-            <TextBox x:Name="summonBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="SummonWindow" PreviewKeyDown="Capture_PreviewKeyDown"/>
-            <TextBlock Text="Read screen region (OCR)" Grid.Row="3" Margin="0,4,12,4"/>
-            <TextBox x:Name="regionBox" Grid.Row="3" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadRegion" PreviewKeyDown="Capture_PreviewKeyDown"/>
-            <TextBlock Text="Play / pause" Grid.Row="4" Margin="0,4,12,4"/>
-            <TextBox x:Name="playPauseBox" Grid.Row="4" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="PlayPause" PreviewKeyDown="Capture_PreviewKeyDown"/>
-            <TextBlock Text="Clear everything" Grid.Row="5" Margin="0,4,12,4"/>
-            <TextBox x:Name="clearBox" Grid.Row="5" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ClearAll" PreviewKeyDown="Capture_PreviewKeyDown"/>
-        </Grid>
-        <TextBlock x:Name="hotkeyMessage" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#E5484D" FontSize="12" Visibility="Collapsed"/>
+        <Expander x:Name="hotkeyExpander" Header="Hotkeys" Tag="hotkeys">
+            <StackPanel>
+            <TextBlock Text="Click a box, then press the new shortcut. Backspace puts the default back." Margin="0,2,0,6"
+                       TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12"/>
+            <Grid x:Name="hotkeyGrid">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="160"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Read selected text" Margin="0,4,12,4" ToolTip="The window stays hidden"/>
+                <TextBox x:Name="readBox" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelection" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Read selected text and show window" Grid.Row="1" Margin="0,4,12,4" ToolTip="The window is minimized again when reading ends, if it was hidden"/>
+                <TextBox x:Name="readShowBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelectionAndShow" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Show window" Grid.Row="2" Margin="0,4,12,4"/>
+                <TextBox x:Name="summonBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="SummonWindow" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Read screen region (OCR)" Grid.Row="3" Margin="0,4,12,4"/>
+                <TextBox x:Name="regionBox" Grid.Row="3" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadRegion" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Play / pause" Grid.Row="4" Margin="0,4,12,4"/>
+                <TextBox x:Name="playPauseBox" Grid.Row="4" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="PlayPause" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Clear everything" Grid.Row="5" Margin="0,4,12,4"/>
+                <TextBox x:Name="clearBox" Grid.Row="5" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ClearAll" PreviewKeyDown="Capture_PreviewKeyDown"/>
+            </Grid>
+            <TextBlock x:Name="hotkeyMessage" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#E5484D" FontSize="12" Visibility="Collapsed"/>
+            </StackPanel>
+        </Expander>
 
         <Button Content="Close" IsDefault="True" IsCancel="True" HorizontalAlignment="Right" Width="80" Height="28" Margin="0,14,0,0" Click="Close_Click"/>
     </StackPanel>

@@ -69,11 +69,12 @@ public class ThemeTests
             var sliderV = new Slider { Orientation = Orientation.Vertical, Minimum = 0, Maximum = 10, Height = 100 };
             var tip = new ToolTip { Content = "tip" };
             var viewer = new ScrollViewer { Content = new TextBlock { Text = "x" } };
+            var section = new Expander { Header = "Section", Content = new TextBlock { Text = "inside" }, IsExpanded = true };
             var menu = new ContextMenu();
             menu.Items.Add(item);
             menu.Items.Add(new Separator());
 
-            foreach (FrameworkElement element in new FrameworkElement[] { button, textBox, item, menu, vertical, horizontal, sliderH, sliderV, tip, viewer })
+            foreach (FrameworkElement element in new FrameworkElement[] { button, textBox, item, menu, vertical, horizontal, sliderH, sliderV, tip, viewer, section })
             {
                 element.ApplyTemplate();
                 element.Measure(new Size(300, 100));
@@ -194,6 +195,65 @@ internal static class Sta
         thread.Start();
         thread.Join();
         if (failure != null) throw new Exception("STA test failed: " + failure, failure);
+    }
+}
+
+public class SettingsSectionTests
+{
+    [Fact]
+    public void SectionsRememberTheirOpenState_AndOpenAgainTheNextTime()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "tts-test-settings-" + Guid.NewGuid() + ".json");
+        try
+        {
+            Sta.Run(() =>
+            {
+                var settings = new TextToSpeech.AppSettings { PathOverride = file };
+                var first = new TextToSpeech.SettingsWindow(settings, () => { });
+                var hotkeys = (System.Windows.Controls.Expander)first.FindName("hotkeyExpander");
+                var ocr = (System.Windows.Controls.Expander)first.FindName("ocrExpander");
+                Assert.False(hotkeys.IsExpanded);   // sections start collapsed
+                Assert.False(ocr.IsExpanded);
+
+                hotkeys.IsExpanded = true;
+                Assert.Contains("hotkeys", settings.ExpandedSections);
+                Assert.DoesNotContain("ocr", settings.ExpandedSections);
+
+                var second = new TextToSpeech.SettingsWindow(settings, () => { });
+                Assert.True(((System.Windows.Controls.Expander)second.FindName("hotkeyExpander")).IsExpanded);
+                Assert.False(((System.Windows.Controls.Expander)second.FindName("ocrExpander")).IsExpanded);
+
+                hotkeys.IsExpanded = false;
+                Assert.DoesNotContain("hotkeys", settings.ExpandedSections);
+            });
+        }
+        finally
+        {
+            if (File.Exists(file)) File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void PopupOpacitySlider_IsSeparateFromTheWindowOpacitySlider()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "tts-test-settings-" + Guid.NewGuid() + ".json");
+        try
+        {
+            Sta.Run(() =>
+            {
+                var settings = new TextToSpeech.AppSettings { PathOverride = file };
+                var dialog = new TextToSpeech.SettingsWindow(settings, () => { });
+
+                ((System.Windows.Controls.Slider)dialog.FindName("popupOpacitySlider")).Value = 60;
+
+                Assert.Equal(0.6, settings.PopupOpacity, 3);
+                Assert.Equal(1.0, settings.WindowOpacity, 3);   // the window's own opacity is untouched
+            });
+        }
+        finally
+        {
+            if (File.Exists(file)) File.Delete(file);
+        }
     }
 }
 

@@ -338,4 +338,61 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- ===== Expander: a collapsible section with a chevron ===== -->
+    <Style x:Key="ExpanderHeaderToggle" TargetType="ToggleButton">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="6,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="chevron" Text="&#xE76C;" FontFamily="{StaticResource IconFont}" FontSize="10"
+                                       VerticalAlignment="Center" Width="14" RenderTransformOrigin="0.5,0.5" Foreground="{DynamicResource ThemeSubtle}">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <ContentPresenter VerticalAlignment="Center" TextElement.FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource ThemeFlatHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="chevron" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="90"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Expander">
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="0,0,0,1" Margin="0,0,0,4">
+                        <StackPanel>
+                            <ToggleButton Style="{StaticResource ExpanderHeaderToggle}" Content="{TemplateBinding Header}"
+                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+                            <ContentPresenter x:Name="content" Visibility="Collapsed" Margin="20,2,0,10"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="content" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>

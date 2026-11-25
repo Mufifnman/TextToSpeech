@@ -728,6 +728,9 @@ namespace TextToSpeech
         private void ApplyWindowSettings()
         {
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
+            double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
+            if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
+            if (volumePopup.Child is UIElement volumePanel) volumePanel.Opacity = popup;
         }
 
         private OcrOptions selectedOCROption => settings.GetOcrOption();

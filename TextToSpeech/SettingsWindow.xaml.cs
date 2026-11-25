@@ -35,6 +35,9 @@ namespace TextToSpeech
             opacitySlider.Value = Math.Round(settings.WindowOpacity * 100);
             opacityText.Text = (int)opacitySlider.Value + "%";
             autoShowBox.IsChecked = settings.AutoShowWhilePlaying;
+            popupOpacitySlider.Value = Math.Round(settings.PopupOpacity * 100);
+            popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
+            popupOpacitySlider.ValueChanged += (_, _) => Changed();
             ocrWindowsRadio.IsChecked = settings.GetOcrOption() == OcrOptions.Windows;
             ocrTesseractRadio.IsChecked = settings.GetOcrOption() == OcrOptions.Tesseract;
             opacitySlider.ValueChanged += (_, _) => Changed();
@@ -47,6 +50,14 @@ namespace TextToSpeech
                 box.Text = GetBinding((string)box.Tag).ToString();
             }
             ShowConflicts();
+
+            // Sections that take more than a line are collapsible; the open ones are remembered.
+            foreach (Expander section in new[] { ocrExpander, hotkeyExpander })
+            {
+                section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
+                section.Expanded += (_, _) => RememberSection(section, true);
+                section.Collapsed += (_, _) => RememberSection(section, false);
+            }
             loading = false;
         }
 
@@ -55,10 +66,21 @@ namespace TextToSpeech
             if (loading) return;
             settings.WindowOpacity = Math.Clamp(opacitySlider.Value / 100.0, 0.3, 1.0);
             settings.AutoShowWhilePlaying = autoShowBox.IsChecked == true;
+            settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
+            popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             settings.OcrEngine = ocrTesseractRadio.IsChecked == true ? nameof(OcrOptions.Tesseract) : nameof(OcrOptions.Windows);
             opacityText.Text = (int)opacitySlider.Value + "%";
             settings.Save();
             onChanged();
+        }
+
+        private void RememberSection(Expander section, bool open)
+        {
+            if (loading) return;
+            string name = (string)section.Tag;
+            settings.ExpandedSections.Remove(name);
+            if (open) settings.ExpandedSections.Add(name);
+            settings.Save();
         }
 
         // ---- hotkeys ----

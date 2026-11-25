@@ -15,6 +15,12 @@ namespace TextToSpeech
         /// <summary>Whole-window opacity, 0.3 to 1.0.</summary>
         public double WindowOpacity { get; set; } = 1.0;
 
+        /// <summary>Opacity of the pop-up panels (speed and volume sliders now; the reading pop-up when it exists), 0.3 to 1.0.</summary>
+        public double PopupOpacity { get; set; } = 1.0;
+
+        /// <summary>Which Settings sections are expanded, remembered between visits.</summary>
+        public List<string> ExpandedSections { get; set; } = new();
+
         /// <summary>OCR engine used by Read Region: "Windows" or "Tesseract".</summary>
         public string OcrEngine { get; set; } = "Windows";
 
