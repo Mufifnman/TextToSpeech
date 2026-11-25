@@ -3,14 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Title="Text to Speech" Height="383" Width="525" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
+        Title="Text to Speech" Height="400" Width="940" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <local:EnumToEnumerableConverter x:Key="EnumToEnumerableConverter" />
     </Window.Resources>
     <Grid Margin="0,0,0,-5">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="60"/>
+            <RowDefinition Height="80"/>
         </Grid.RowDefinitions>
         <Grid>
             <Grid.ColumnDefinitions>
@@ -24,6 +24,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -56,6 +57,9 @@
                         <MenuItem x:Name="filtersMenu" Header="Filters" ToolTip="Choose which clean-up filters run on copied or scanned text"><!-- items are built from FilterRegistry in code --></MenuItem>
                     </Menu>
                     <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
+                    <TextBlock Text="Voice: " Margin="0,3,0,4" />
+                    <ComboBox x:Name="voiceComboBox" MinWidth="220" SelectionChanged="VoiceComboBox_SelectionChanged" />
+                    <Button Content="More voices..." Margin="4,0,12,0" Padding="6,0" Click="MoreVoices_Click" />
                     <TextBlock Text="OCR: " Margin="0,3,0,4" />
                     <ComboBox x:Name="ocrOptionsComboBox" SelectionChanged="OcrOptionsComboBox_SelectionChanged" 
                         ItemsSource="{Binding Source={x:Type local:OcrOptions}, Converter={StaticResource EnumToEnumerableConverter}}"
@@ -63,6 +67,7 @@
                     </ComboBox>
                 </StackPanel>
             </Grid>
+            <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
         </Grid>
     </Grid>
 </Window>
