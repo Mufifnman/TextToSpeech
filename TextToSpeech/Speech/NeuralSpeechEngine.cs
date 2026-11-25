@@ -131,6 +131,9 @@ namespace TextToSpeech.Speech
         public bool IsPaused => player.IsPaused;
         public void Pause() => player.Pause();
         public void Resume() => player.Resume();
+        /// <summary>Gain with a soft limiter, so 100 to 120 percent is real extra loudness without harsh clipping.</summary>
+        public void SetVolume(int percent) => player.Gain = Math.Clamp(percent, 0, 120) / 100f;
+
         public void SetRate(int rate) { /* applies from the next sentence, since audio is generated per sentence */ }
 
         public void Dispose()

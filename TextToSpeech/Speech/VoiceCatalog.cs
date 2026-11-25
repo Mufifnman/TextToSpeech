@@ -22,6 +22,13 @@ namespace TextToSpeech.Speech
             Voices = voices;
         }
 
+        /// <summary>Applies the reading volume to every engine.</summary>
+        public void SetVolume(int percent)
+        {
+            Sapi.SetVolume(percent);
+            Neural.SetVolume(percent);
+        }
+
         public ISpeechEngine EngineFor(VoiceInfo? voice) =>
             voice != null && voice.EngineName == Neural.Name ? Neural : Sapi;
 

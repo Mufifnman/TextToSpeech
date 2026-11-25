@@ -1,0 +1,19 @@
+<Window x:Class="TextToSpeech.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="16" MinWidth="320">
+        <TextBlock Text="Window opacity" FontWeight="SemiBold"/>
+        <DockPanel Margin="0,6,0,14">
+            <TextBlock x:Name="opacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="opacitySlider" Minimum="30" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
+                    SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>
+        </DockPanel>
+        <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends"
+                  ToolTip="Pausing keeps the window up so you can resume. It minimizes when the reading finishes."/>
+        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                   Text="Changes apply right away and are saved."/>
+        <Button Content="Close" IsDefault="True" IsCancel="True" HorizontalAlignment="Right" Width="80" Height="28" Margin="0,14,0,0" Click="Close_Click"/>
+    </StackPanel>
+</Window>

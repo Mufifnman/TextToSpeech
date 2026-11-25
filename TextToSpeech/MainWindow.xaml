@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
-        Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
+        Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown" SizeChanged="Window_SizeChanged">
     <Window.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
@@ -156,16 +156,42 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Speed: [-]  gauge + number  [+] -->
+                    <!-- Speed: [-] (only when the window is narrow)  gauge + number (click for a slider)  [+] -->
                     <Button x:Name="speedMinus" Content="&#x2212;" Click="SpeedMinus_Click" Style="{StaticResource BarButton}" MinWidth="26"
-                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Slower"/>
-                    <StackPanel x:Name="speedDisplay" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0"
-                                ToolTip="Speaking speed">
-                        <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="speedText" Text="4" FontWeight="SemiBold" MinWidth="18" TextAlignment="Center" VerticalAlignment="Center"/>
-                    </StackPanel>
+                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Slower" Visibility="Collapsed"/>
+                    <Button x:Name="speedButton" Click="SpeedButton_Click" Style="{StaticResource BarButton}" ToolTip="Speed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="speedText" Text="4" FontWeight="SemiBold" MinWidth="18" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Popup x:Name="speedPopup" PlacementTarget="{Binding ElementName=speedButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="speedPopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <Slider x:Name="speedSlider" Orientation="Vertical" Minimum="-2" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
+                                        SmallChange="1" LargeChange="1" Height="120" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                     <Button x:Name="speedPlus" Content="+" Click="SpeedPlus_Click" Style="{StaticResource BarButton}" MinWidth="26" Margin="0,0,10,0"
-                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Faster"/>
+                            Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Faster" Visibility="Collapsed"/>
+                    <!-- Reading volume (0 to 120%), reading only -->
+                    <Button x:Name="volumeButton" Click="VolumeButton_Click" Style="{StaticResource BarButton}" Margin="10,0,2,0" ToolTip="Reading volume">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE767;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                            <TextBlock x:Name="volumeText" Text="100%" FontWeight="SemiBold" MinWidth="34" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Popup x:Name="volumePopup" PlacementTarget="{Binding ElementName=volumeButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="4">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock x:Name="volumePopupText" HorizontalAlignment="Center" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <Slider x:Name="volumeSlider" Orientation="Vertical" Minimum="0" Maximum="120" TickFrequency="5" IsSnapToTickEnabled="True"
+                                        SmallChange="5" LargeChange="10" Height="120" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
                     <Button x:Name="voiceButton" Content="&#x1F5E3;" Click="VoiceButton_Click" Style="{StaticResource BarButton}"
                             ToolTip="Choose the voice">
                         <Button.ContextMenu>
@@ -182,12 +208,14 @@
                     </Button>
                     <Button Content="&#xE765;" FontFamily="{StaticResource IconFont}" Click="HotkeySettings_Click" Style="{StaticResource BarButton}"
                             ToolTip="Hotkeys: choose the global shortcuts"/>
-                    <Button x:Name="ocrButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="OcrButton_Click" Style="{StaticResource BarButton}"
+                    <Button x:Name="ocrButton" Content="OCR" Click="OcrButton_Click" Style="{StaticResource BarButton}"
                             ToolTip="Choose the OCR engine used by Read Region">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="ocrMenu" />
                         </Button.ContextMenu>
                     </Button>
+                    <Button x:Name="settingsButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" Click="Settings_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Settings: window opacity, bring up while playing"/>
                 </StackPanel>
                 <Button x:Name="__ImageRead" Grid.Column="1" Content="Read Region" Click="ImageRead" Focusable="False" Height="28" Padding="12,0" Margin="8,0,0,0" VerticalAlignment="Center"
                         ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>

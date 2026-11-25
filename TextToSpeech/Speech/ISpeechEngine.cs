@@ -37,6 +37,12 @@ namespace TextToSpeech.Speech
         void Pause();
         void Resume();
 
+        /// <summary>
+        /// Reading volume, 0 to 120 percent. Engines apply it from the next sentence. Above 100 only works
+        /// where the engine produces its own audio (see each engine).
+        /// </summary>
+        void SetVolume(int percent);
+
         /// <summary>Changes the rate. Some engines can only apply it from the next utterance.</summary>
         void SetRate(int rate);
     }

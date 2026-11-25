@@ -46,6 +46,9 @@ namespace TextToSpeech
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
             InitializeComponent();
             SetSpeed(settings.Rate, save: false);
+            SetVolume(settings.Volume, save: false);
+            speedSlider.ValueChanged += (_, e) => { if (!updatingSpeedUi) SetSpeed((int)Math.Round(e.NewValue)); };
+            volumeSlider.ValueChanged += (_, e) => { if (!updatingVolumeUi) SetVolume((int)Math.Round(e.NewValue)); };
             RefreshVoices();
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
@@ -53,7 +56,7 @@ namespace TextToSpeech
             BuildFiltersMenu();
             BuildOcrMenu();
             RegionReader = this;
-            SourceInitialized += (_, _) => SetupHotkeys();
+            SourceInitialized += (_, _) => { SetupHotkeys(); ApplyWindowSettings(); };
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
         }
 
@@ -357,7 +360,7 @@ namespace TextToSpeech
             string? text = document.GetTextToSpeak(out spokenOffset);
             if (text == null)
             {
-                if (minimizeWhenDone)
+                if (minimizeWhenDone || settings.AutoShowWhilePlaying)
                 {
                     // The hotkey brought the window up for this read; put it away again.
                     minimizeWhenDone = false;
@@ -370,6 +373,11 @@ namespace TextToSpeech
                 }
                 UpdatePauseButton();
                 return;
+            }
+
+            if (settings.AutoShowWhilePlaying && WindowState == System.Windows.WindowState.Minimized)
+            {
+                WindowState = System.Windows.WindowState.Normal; // reading started: bring the window up
             }
 
             int generation = ++speakGeneration;
@@ -609,8 +617,9 @@ namespace TextToSpeech
             return longest;
         }
 
-        // ---- speaking speed: SAPI scale, -2 (slow) to 10 (fast); one step per +/- click ----
+        // ---- speaking speed: SAPI scale, -2 (slow) to 10 (fast) ----
         private const int MinRate = -2, MaxRate = 10, RateStep = 1;
+        private bool updatingSpeedUi = false;
 
         private void SetSpeed(int value, bool save = true)
         {
@@ -621,13 +630,64 @@ namespace TextToSpeech
                 settings.Rate = rate;
                 settings.Save();
             }
+            updatingSpeedUi = true;
             speedText.Text = rate.ToString();
-            speedDisplay.ToolTip = "Speaking speed: " + rate + " (use \u2212 and + to change)";
+            speedSlider.Value = rate;
+            updatingSpeedUi = false;
+            speedPopupText.Text = rate.ToString();
+            speedButton.ToolTip = $"Speed {rate} (range {MinRate} to {MaxRate})";
         }
+
+        private void SpeedButton_Click(object sender, RoutedEventArgs e) => speedPopup.IsOpen = true;
 
         private void SpeedMinus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate - RateStep);
 
         private void SpeedPlus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate + RateStep);
+
+        // ---- reading volume: 0 to 120 percent, reading only (not the system volume) ----
+        private const int MinVolume = 0, MaxVolume = 120;
+        private bool updatingVolumeUi = false;
+
+        private void SetVolume(int value, bool save = true)
+        {
+            int volume = Math.Clamp(value, MinVolume, MaxVolume);
+            catalog.SetVolume(volume);
+            if (save)
+            {
+                settings.Volume = volume;
+                settings.Save();
+            }
+            updatingVolumeUi = true;
+            volumeText.Text = volume + "%";
+            volumeSlider.Value = volume;
+            updatingVolumeUi = false;
+            volumePopupText.Text = volume + "%";
+            volumeButton.ToolTip = $"Reading volume {volume}% (0 to {MaxVolume}%). Above 100% only neural voices get louder; Windows voices stay at 100%.";
+        }
+
+        private void VolumeButton_Click(object sender, RoutedEventArgs e) => volumePopup.IsOpen = true;
+
+        // ---- narrow window: show the - and + beside the speed button (the slider popup always works) ----
+        private const double NarrowWidth = 700;
+
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var visibility = ActualWidth < NarrowWidth ? Visibility.Visible : Visibility.Collapsed;
+            speedMinus.Visibility = visibility;
+            speedPlus.Visibility = visibility;
+        }
+
+        // ---- settings: opacity and "bring up while playing" ----
+        private void Settings_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new SettingsWindow(settings, ApplyWindowSettings) { Owner = this };
+            dialog.ShowDialog();
+        }
+
+        private void ApplyWindowSettings()
+        {
+            WindowAppearance.SetOpacity(this, settings.WindowOpacity);
+        }
 
         private OcrOptions selectedOCROption = OcrOptions.Windows;
 

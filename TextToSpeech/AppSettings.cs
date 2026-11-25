@@ -9,6 +9,15 @@ namespace TextToSpeech
         public string? VoiceId { get; set; }
         public int Rate { get; set; } = 4;
 
+        /// <summary>Reading volume in percent, 0 to 120. Only affects the reading, not the system volume.</summary>
+        public int Volume { get; set; } = 100;
+
+        /// <summary>Whole-window opacity, 0.3 to 1.0.</summary>
+        public double WindowOpacity { get; set; } = 1.0;
+
+        /// <summary>Bring the window up when reading starts and minimize it when reading ends.</summary>
+        public bool AutoShowWhilePlaying { get; set; } = false;
+
         private static string FilePath =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TextToSpeech", "settings.json");
 

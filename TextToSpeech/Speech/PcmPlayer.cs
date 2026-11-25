@@ -15,15 +15,21 @@ namespace TextToSpeech.Speech
 
         public bool IsPaused { get { lock (gate) { return paused; } } }
 
+        private volatile float gain = 1f;
+
+        /// <summary>Volume multiplier for the next clip (1.0 = as generated; above 1.0 is soft-limited).</summary>
+        public float Gain { get => gain; set => gain = value; }
+
         public async Task PlayAsync(float[] samples, int sampleRate, IReadOnlyList<TimedWord> words,
             Action<WordBoundary>? onWord, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            float clipGain = gain;
             var pcm = new byte[samples.Length * 2];
             for (int i = 0; i < samples.Length; i++)
             {
-                short s = (short)Math.Round(Math.Clamp(samples[i], -1f, 1f) * short.MaxValue);
+                short s = (short)Math.Round(AudioGain.Apply(samples[i], clipGain) * short.MaxValue);
                 pcm[2 * i] = (byte)s;
                 pcm[2 * i + 1] = (byte)(s >> 8);
             }

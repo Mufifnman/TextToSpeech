@@ -42,3 +42,43 @@ public class WordTimingEstimatorTests
         Assert.Empty(WordTimingEstimator.Estimate(text, seconds));
     }
 }
+
+public class AudioGainTests
+{
+    [Theory]
+    [InlineData(0.5f, 1.0f, 0.5f)]
+    [InlineData(-0.5f, 1.0f, -0.5f)]
+    [InlineData(0.5f, 0.5f, 0.25f)]
+    [InlineData(0.5f, 0.0f, 0.0f)]
+    public void AtOrBelowFullGain_IsAPlainMultiply(float sample, float gain, float expected)
+    {
+        Assert.Equal(expected, AudioGain.Apply(sample, gain), 5);
+    }
+
+    [Fact]
+    public void FullGain_DoesNotAlterLoudOriginalAudio()
+    {
+        Assert.Equal(0.95f, AudioGain.Apply(0.95f, 1.0f), 5);
+    }
+
+    [Fact]
+    public void BoostedQuietAudio_IsAPlainMultiply()
+    {
+        Assert.Equal(0.6f, AudioGain.Apply(0.5f, 1.2f), 5); // 0.6 is under the soft knee
+    }
+
+    [Fact]
+    public void BoostedLoudAudio_NeverClips_AndKeepsOrder()
+    {
+        float previous = float.MinValue;
+        for (float sample = -1f; sample <= 1f; sample += 0.05f)
+        {
+            float result = AudioGain.Apply(sample, 1.2f);
+            Assert.InRange(result, -1f, 1f);
+            Assert.True(result >= previous);   // louder input is never quieter out
+            previous = result;
+        }
+        Assert.InRange(AudioGain.Apply(1f, 1.2f), 0.9f, 1f);
+        Assert.Equal(-AudioGain.Apply(0.9f, 1.2f), AudioGain.Apply(-0.9f, 1.2f), 6); // symmetric
+    }
+}
