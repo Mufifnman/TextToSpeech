@@ -50,7 +50,7 @@
             </Grid.RowDefinitions>
             <local:ReadingDisplay x:Name="__ReadListDisplay__" MinHeight="30"/>
             <!-- Top middle: send text from the reading pane back to the editable box -->
-            <StackPanel x:Name="bringBackPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" Panel.ZIndex="2" Visibility="Visible">
+            <StackPanel x:Name="bringBackPanel" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" Panel.ZIndex="2" Visibility="Collapsed">
                 <Button x:Name="bringBackLeft" Click="BringBackLeft_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
                         Background="{DynamicResource ThemeOverlay}" ToolTip="Bring back what is left to read (from the current sentence on) into the edit box">
                     <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"/>

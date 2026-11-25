@@ -15,18 +15,26 @@ namespace TextToSpeech.Hotkeys
         // GUESS: summon-window and region-select keep their original shortcuts.
         public string SummonWindow { get; set; } = "Ctrl+Alt+W";
         public string ReadRegion { get; set; } = "Ctrl+Alt+O";
+        /// <summary>Play / pause, from anywhere. Alt+Space normally opens a window's system menu; registered globally it takes that over while the app runs.</summary>
+        public string PlayPause { get; set; } = "Alt+Space";
+        /// <summary>Clears everything queued to read.</summary>
+        public string ClearAll { get; set; } = "Alt+Delete";
 
         public static HotkeyBinding Default(string name) => name switch
         {
             nameof(ReadSelection) => new(ModifierKeys.Alt, Key.R),
             nameof(ReadSelectionAndShow) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.R),
             nameof(SummonWindow) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.W),
+            nameof(PlayPause) => new(ModifierKeys.Alt, Key.Space),
+            nameof(ClearAll) => new(ModifierKeys.Alt, Key.Delete),
             _ => new(ModifierKeys.Control | ModifierKeys.Alt, Key.O),
         };
 
         public HotkeyBinding GetReadSelection() => Resolve(ReadSelection, nameof(ReadSelection));
         public HotkeyBinding GetReadSelectionAndShow() => Resolve(ReadSelectionAndShow, nameof(ReadSelectionAndShow));
         public HotkeyBinding GetSummonWindow() => Resolve(SummonWindow, nameof(SummonWindow));
+        public HotkeyBinding GetPlayPause() => Resolve(PlayPause, nameof(PlayPause));
+        public HotkeyBinding GetClearAll() => Resolve(ClearAll, nameof(ClearAll));
         public HotkeyBinding GetReadRegion() => Resolve(ReadRegion, nameof(ReadRegion));
 
         private static HotkeyBinding Resolve(string text, string name) =>

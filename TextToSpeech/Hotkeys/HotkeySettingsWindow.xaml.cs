@@ -16,6 +16,8 @@ namespace TextToSpeech.Hotkeys
             readShowBox.Text = settings.GetReadSelectionAndShow().ToString();
             summonBox.Text = settings.GetSummonWindow().ToString();
             regionBox.Text = settings.GetReadRegion().ToString();
+            playPauseBox.Text = settings.GetPlayPause().ToString();
+            clearBox.Text = settings.GetClearAll().ToString();
         }
 
         private void Capture_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -42,13 +44,15 @@ namespace TextToSpeech.Hotkeys
         {
             "Read" => nameof(HotkeySettings.ReadSelection),
             "ReadShow" => nameof(HotkeySettings.ReadSelectionAndShow),
+            "PlayPause" => nameof(HotkeySettings.PlayPause),
+            "Clear" => nameof(HotkeySettings.ClearAll),
             "Summon" => nameof(HotkeySettings.SummonWindow),
             _ => nameof(HotkeySettings.ReadRegion),
         };
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            var texts = new[] { readBox.Text, readShowBox.Text, summonBox.Text, regionBox.Text };
+            var texts = new[] { readBox.Text, readShowBox.Text, summonBox.Text, regionBox.Text, playPauseBox.Text, clearBox.Text };
             if (texts.Distinct().Count() != texts.Length)
             {
                 MessageBox.Show(this, "Each action needs a different shortcut.", "Hotkeys");
@@ -57,6 +61,8 @@ namespace TextToSpeech.Hotkeys
             _settings.ReadSelection = readBox.Text;
             _settings.ReadSelectionAndShow = readShowBox.Text;
             _settings.SummonWindow = summonBox.Text;
+            _settings.PlayPause = playPauseBox.Text;
+            _settings.ClearAll = clearBox.Text;
             _settings.ReadRegion = regionBox.Text;
             _settings.Save();
             DialogResult = true;

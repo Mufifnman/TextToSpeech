@@ -11,6 +11,8 @@ public class HotkeyBindingTests
     [InlineData("Ctrl+Alt+R", ModifierKeys.Control | ModifierKeys.Alt, Key.R)]
     [InlineData("ctrl+shift+F5", ModifierKeys.Control | ModifierKeys.Shift, Key.F5)]
     [InlineData("Win+Alt+W", ModifierKeys.Windows | ModifierKeys.Alt, Key.W)]
+    [InlineData("Alt+Space", ModifierKeys.Alt, Key.Space)]
+    [InlineData("Alt+Delete", ModifierKeys.Alt, Key.Delete)]
     [InlineData(" Control + Alt + O ", ModifierKeys.Control | ModifierKeys.Alt, Key.O)]
     public void TryParse_ReadsModifiersAndKey(string text, ModifierKeys mods, Key key)
     {
@@ -47,9 +49,11 @@ public class HotkeySettingsTests
     public void Defaults_AreValidAndDistinct()
     {
         var s = new HotkeySettings();
-        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion() };
+        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion(), s.GetPlayPause(), s.GetClearAll() };
         Assert.All(all, b => Assert.True(b.IsValid));
-        Assert.Equal(4, all.Distinct().Count());
+        Assert.Equal(6, all.Distinct().Count());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Space), s.GetPlayPause());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Delete), s.GetClearAll());
     }
 
     [Fact]

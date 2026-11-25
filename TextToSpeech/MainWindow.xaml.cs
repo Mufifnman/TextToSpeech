@@ -51,6 +51,8 @@ namespace TextToSpeech
             volumeSlider.ValueChanged += (_, e) => { if (!updatingVolumeUi) SetVolume((int)Math.Round(e.NewValue)); };
             RefreshVoices();
             __ReadListDisplay__.Document = document;
+            document.ContentChanged += (_, _) => UpdateBringBackVisibility();
+            UpdateBringBackVisibility();
             __ReadListDisplay__.WordClicked += JumpTo;
 
             BuildFiltersMenu();
@@ -196,6 +198,10 @@ namespace TextToSpeech
                 failed.Add(hotkeySettings.GetSummonWindow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey()))
                 failed.Add(hotkeySettings.GetReadRegion().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetPlayPause(), PlayOrPause))
+                failed.Add(hotkeySettings.GetPlayPause().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetClearAll(), () => ClearList()))
+                failed.Add(hotkeySettings.GetClearAll().ToString());
             if (failed.Count > 0)
             {
                 Title = "Text to Speech (hotkey in use by another app: " + string.Join(", ", failed) + ")";
@@ -271,10 +277,10 @@ namespace TextToSpeech
                 return;
             }
             inputExpanded = expanded;
+            UpdateBringBackVisibility();
             if (expanded)
             {
                 shrinkInput.Visibility = Visibility.Visible;
-                bringBackPanel.Visibility = Visibility.Collapsed; // editing: the shrink icon is shown instead
                 readingRow.Height = new GridLength(OneLineHeight); // reading pane keeps one line
                 inputRow.Height = new GridLength(1, GridUnitType.Star);
                 textbox.MaxHeight = double.PositiveInfinity;
@@ -282,11 +288,19 @@ namespace TextToSpeech
             else
             {
                 shrinkInput.Visibility = Visibility.Collapsed;
-                bringBackPanel.Visibility = Visibility.Visible;   // one-line box: offer to pull text back
                 readingRow.Height = new GridLength(1, GridUnitType.Star);
                 inputRow.Height = GridLength.Auto;
                 textbox.MaxHeight = 34;
             }
+        }
+
+        /// <summary>
+        /// The bring-back arrows sit on the reading pane. They show while the edit box is open (so the
+        /// reading pane is the small one) and only when the reading pane has text to bring back.
+        /// </summary>
+        private void UpdateBringBackVisibility()
+        {
+            bringBackPanel.Visibility = inputExpanded && document.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ShrinkInput_Click(object sender, RoutedEventArgs e) => SetInputExpanded(false);
