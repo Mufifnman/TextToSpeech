@@ -269,16 +269,47 @@ namespace TextToSpeech
             inputExpanded = expanded;
             if (expanded)
             {
+                shrinkInput.Visibility = Visibility.Visible;
                 readingRow.Height = new GridLength(OneLineHeight); // reading pane keeps one line
                 inputRow.Height = new GridLength(1, GridUnitType.Star);
                 textbox.MaxHeight = double.PositiveInfinity;
             }
             else
             {
+                shrinkInput.Visibility = Visibility.Collapsed;
                 readingRow.Height = new GridLength(1, GridUnitType.Star);
                 inputRow.Height = GridLength.Auto;
                 textbox.MaxHeight = 34;
             }
+        }
+
+        private void ShrinkInput_Click(object sender, RoutedEventArgs e) => SetInputExpanded(false);
+
+        private void BringBackLeft_Click(object sender, RoutedEventArgs e) => BringBackToEditBox(document.TakeUnread());
+
+        private void BringBackAll_Click(object sender, RoutedEventArgs e) => BringBackToEditBox(document.TakeAll());
+
+        /// <summary>
+        /// Puts text taken out of the reading pane at the top of the edit box, stops any speech (nothing
+        /// is left to say from what was taken), and opens the box up for editing.
+        /// </summary>
+        private void BringBackToEditBox(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+            CancelSpeech();
+            paused = true;
+            UpdatePauseButton();
+
+            textbox.Text = textbox.Text == "" ? text : text + "\n" + textbox.Text;
+            SetInputExpanded(true);
+
+            // Focusing the box must not trigger the clipboard grab.
+            ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(1);
+            textbox.Focus();
+            textbox.CaretIndex = 0;
         }
 
         private void Textbox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => SetInputExpanded(true);

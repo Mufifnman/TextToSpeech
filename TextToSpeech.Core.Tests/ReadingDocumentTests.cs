@@ -202,6 +202,47 @@ namespace TextToSpeech.Core.Tests
         }
     }
 
+    public class ReadingDocumentTakeBackTests
+    {
+        [Fact]
+        public void TakeUnread_ReturnsCurrentAndLaterSentences_AndKeepsTheReadOnes()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six.");
+            doc.CompleteSentence(); // "One two." is read
+
+            Assert.Equal("Three four. Five six.", doc.TakeUnread());
+
+            Assert.Equal(1, doc.Count);
+            Assert.Equal("One two.", doc.Sentences[0].Text);
+            Assert.True(doc.IsAtEnd);
+            Assert.Equal("", doc.TakeUnread()); // nothing left
+        }
+
+        [Fact]
+        public void TakeAll_ReturnsEverythingAndEmptiesTheDocument()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four.");
+            doc.CompleteSentence();
+
+            Assert.Equal("One two. Three four.", doc.TakeAll());
+            Assert.Equal(0, doc.Count);
+            Assert.True(doc.IsAtEnd);
+        }
+
+        [Fact]
+        public void TakenText_CanBeAppendedAgainAsTheSameSentences()
+        {
+            var doc = new ReadingDocument();
+            doc.Append("One two. Three four. Five six.");
+            string back = doc.TakeAll();
+
+            doc.Append(back);
+            Assert.Equal(new[] { "One two.", "Three four.", "Five six." }, doc.Sentences.Select(s => s.Text));
+        }
+    }
+
     public class SentenceTests
     {
         [Fact]

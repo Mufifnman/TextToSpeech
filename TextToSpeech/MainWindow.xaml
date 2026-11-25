@@ -79,11 +79,31 @@
                 <RowDefinition x:Name="inputRow" Height="Auto"/>
             </Grid.RowDefinitions>
             <local:ReadingDisplay x:Name="__ReadListDisplay__" MinHeight="30"/>
+            <!-- Top middle: send text from the reading pane back to the editable box -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" Panel.ZIndex="2">
+                <Button x:Name="bringBackLeft" Click="BringBackLeft_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
+                        Background="#D9FFFFFF" ToolTip="Bring back what is left to read (from the current sentence on) into the edit box">
+                    <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
+                </Button>
+                <Button x:Name="bringBackAll" Click="BringBackAll_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="30"
+                        Background="#D9FFFFFF" ToolTip="Bring back all the text (read and unread) into the edit box">
+                    <StackPanel>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-1,0,-5"/>
+                        <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="12" HorizontalAlignment="Center" Margin="0,-5,0,-1"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
             <!-- One line while idle; grows to fill the window while you edit (see SetInputExpanded). -->
             <TextBox x:Name="textbox" Grid.Row="1" Margin="0,2,0,0" MinHeight="30" MaxHeight="34"
                      TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Text="Test"
                      GotKeyboardFocus="Textbox_GotKeyboardFocus" PreviewMouseDown="Textbox_PreviewMouseDown"
                      TextChanged="Textbox_TextChanged" LostKeyboardFocus="Textbox_LostKeyboardFocus"/>
+            <!-- Bottom right of the edit box, only while it is expanded: shrink it back to one line -->
+            <Button x:Name="shrinkInput" Grid.Row="1" Click="ShrinkInput_Click" Style="{StaticResource BarButton}" Height="22" MinWidth="26"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,4" Panel.ZIndex="2" Visibility="Collapsed"
+                    Background="#D9FFFFFF" ToolTip="Shrink the edit box back to one line">
+                <TextBlock Text="&#xE73F;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
+            </Button>
         </Grid>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>

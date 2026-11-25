@@ -90,6 +90,34 @@ namespace TextToSpeech.Core.Reading
         }
 
         /// <summary>
+        /// Removes every sentence from the current one onward (what is left to read) and returns its text,
+        /// so it can be handed back to the editable box. Sentences already read stay. The whole current
+        /// sentence comes back, even if it was started.
+        /// </summary>
+        public string TakeUnread()
+        {
+            int from = Math.Min(Position.Sentence, sentences.Count);
+            string text = string.Join(" ", sentences.Skip(from).Select(s => s.Text));
+            if (from < sentences.Count)
+            {
+                sentences.RemoveRange(from, sentences.Count - from);
+                SpokenWord = -1;
+                Position = new ReadingPosition(sentences.Count, 0);
+                ContentChanged?.Invoke(this, EventArgs.Empty);
+                PositionChanged?.Invoke(this, EventArgs.Empty);
+            }
+            return text;
+        }
+
+        /// <summary>Returns all the text (read and unread) and empties the document.</summary>
+        public string TakeAll()
+        {
+            string text = string.Join(" ", sentences.Select(s => s.Text));
+            Clear();
+            return text;
+        }
+
+        /// <summary>
         /// Like <see cref="Contains"/> but only looks at sentences not yet finished (the current one onward).
         /// The old queue dropped sentences as they were read, so text that was already read could be
         /// copied and picked up again; this keeps that behavior now that read sentences stay for rewind.
