@@ -105,6 +105,13 @@ namespace TextToSpeech.Api
                     await StreamEventsAsync(context, request);
                     return;
                 }
+                // Reject unauthenticated requests here so they never queue work on the UI thread.
+                var denied = router!.Authorize(request);
+                if (denied != null)
+                {
+                    await WriteAsync(context.Response, denied);
+                    return;
+                }
                 var response = request.Body is { Length: > ApiRouter.MaxBodyChars }
                     ? ApiSecurity.Error(413, "too_large", "Request body is too large.")
                     : await runOnUi(() => router!.HandleAsync(request));
