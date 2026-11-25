@@ -10,4 +10,9 @@
     <RootNamespace>TextToSpeech.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Standalone plain-language rule engine, kept separate so it can be open-sourced on its own. -->
+    <ProjectReference Include="..\PlainRules\src\PlainRules\PlainRules.csproj" />
+  </ItemGroup>
+
 </Project>

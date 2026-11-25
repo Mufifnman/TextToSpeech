@@ -23,13 +23,20 @@ namespace TextToSpeech
     /// </summary>
     internal static class FilterRegistry
     {
-        public static readonly IReadOnlyList<FilterDefinition> All = new FilterDefinition[]
+        private static readonly FilterDefinition[] BuiltIn = new FilterDefinition[]
         {
             new("wikipedia", "Citations", "Wikipedia citations ([1], [edit])", FilterStage.Clipboard, Filters.WikipediaCitation),
             new("author-year", "Citations", "Author-year citations (Smith, 2004)", FilterStage.Clipboard | FilterStage.Ocr, Filters.PsychologyFilter),
             new("page-citations", "Citations", "Page citations, lifetimes (p. 12)", FilterStage.Clipboard, Filters.GovernmentFilter),
             new("ahit", "Quiz material", "AHIT starred questions / blanks", FilterStage.Clipboard, Filters.AHITStarredQuestion),
         };
+
+        /// <summary>Built-in filters followed by the user's custom filters (see <see cref="SetCustom"/>).</summary>
+        public static IReadOnlyList<FilterDefinition> All { get; private set; } = BuiltIn;
+
+        /// <summary>Replaces the custom filters that follow the built-in ones. Call on the UI thread.</summary>
+        internal static void SetCustom(IEnumerable<FilterDefinition> custom) =>
+            All = BuiltIn.Concat(custom).ToArray();
 
         /// <summary>Distinct group names in first-seen order (one submenu each).</summary>
         public static IEnumerable<string> Groups => All.Select(f => f.Group).Distinct();

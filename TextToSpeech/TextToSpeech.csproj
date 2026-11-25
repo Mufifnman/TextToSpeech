@@ -43,6 +43,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TextToSpeech.Core\TextToSpeech.Core.csproj" />
     <ProjectReference Include="..\TextToSpeech.Api\TextToSpeech.Api.csproj" />
+    <ProjectReference Include="..\PlainRules\src\PlainRules\PlainRules.csproj" />
   </ItemGroup>
 
   <ItemGroup>
