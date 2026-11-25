@@ -44,9 +44,9 @@ namespace TextToSpeech
         public MainWindow()
         {
             this.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
-            int savedRate = settings.Rate;
             InitializeComponent();
-            __Speed__.Value = savedRate; // the XAML default fires SpeedChanged first, so set it after
+            SetSpeed(settings.Rate, save: false);
+            speedSlider.ValueChanged += (_, e) => { if (!updatingSpeedUi) SetSpeed((int)Math.Round(e.NewValue)); };
             RefreshVoices();
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
@@ -56,6 +56,18 @@ namespace TextToSpeech
             RegionReader = this;
             SourceInitialized += (_, _) => SetupHotkeys();
             Closed += (_, _) => { CancelSpeech(); hotkeys?.Dispose(); catalog.Dispose(); };
+        }
+
+        /// <summary>A bold, unclickable title at the top of a popup menu so people know what they are choosing.</summary>
+        private static void AddMenuHeading(ContextMenu menu, string title)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = title,
+                IsEnabled = false,
+                FontWeight = FontWeights.SemiBold,
+            });
+            menu.Items.Add(new Separator());
         }
 
         /// <summary>Rebuilds the voice menu from what is installed, keeping the current choice if it still exists.</summary>
@@ -72,6 +84,7 @@ namespace TextToSpeech
         private void BuildVoiceMenu()
         {
             voiceMenu.Items.Clear();
+            AddMenuHeading(voiceMenu, "Voice");
             foreach (VoiceInfo voice in catalog.Voices)
             {
                 var item = new MenuItem
@@ -89,6 +102,13 @@ namespace TextToSpeech
             more.Click += MoreVoices_Click;
             voiceMenu.Items.Add(more);
             voiceButton.ToolTip = selectedVoice != null ? "Voice: " + selectedVoice.DisplayName : "Choose the voice";
+        }
+
+        private void FiltersButton_Click(object sender, RoutedEventArgs e)
+        {
+            filtersMenu.PlacementTarget = filtersButton;
+            filtersMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+            filtersMenu.IsOpen = true;
         }
 
         private void VoiceButton_Click(object sender, RoutedEventArgs e)
@@ -125,6 +145,7 @@ namespace TextToSpeech
         private void BuildFiltersMenu()
         {
             filtersMenu.Items.Clear();
+            AddMenuHeading(filtersMenu, "Filters");
             foreach (string group in FilterRegistry.Groups)
             {
                 var groupItem = new MenuItem { Header = group };
@@ -507,12 +528,31 @@ namespace TextToSpeech
             return longest;
         }
 
-        private void SpeedChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        // ---- speaking speed: SAPI scale, -2 (slow) to 10 (fast); one step per +/- click ----
+        private const int MinRate = -2, MaxRate = 10, RateStep = 1;
+        private bool updatingSpeedUi = false;
+
+        private void SetSpeed(int value, bool save = true)
         {
-            if (e.NewValue == e.OldValue)
+            rate = Math.Clamp(value, MinRate, MaxRate);
+            catalog.EngineFor(selectedVoice).SetRate(rate); // GUESS: engines apply it from the next sentence
+            if (save)
             {
-                return;
+                settings.Rate = rate;
+                settings.Save();
             }
+            updatingSpeedUi = true;
+            speedText.Text = rate.ToString();
+            speedSlider.Value = rate;
+            speedButton.ToolTip = "Speaking speed: " + rate + " (click to change)";
+            updatingSpeedUi = false;
+        }
+
+        private void SpeedButton_Click(object sender, RoutedEventArgs e) => speedPopup.IsOpen = true;
+
+        private void SpeedMinus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate - RateStep);
+
+        private void SpeedPlus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate + RateStep);
             rate = (int)e.NewValue;
 
             // GUESS: engines apply the new rate to the next sentence, not mid-sentence.
@@ -527,6 +567,7 @@ namespace TextToSpeech
         private void BuildOcrMenu()
         {
             ocrMenu.Items.Clear();
+            AddMenuHeading(ocrMenu, "OCR engine");
             foreach (OcrOptions option in Enum.GetValues<OcrOptions>())
             {
                 var item = new MenuItem

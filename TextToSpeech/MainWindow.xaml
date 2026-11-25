@@ -6,6 +6,15 @@
         Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+        <!-- One size and style for every button on the bottom row -->
+        <Style x:Key="BarButton" TargetType="Button">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="44"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
     </Window.Resources>
     <Grid Margin="0,0,0,-5">
         <Grid.RowDefinitions>
@@ -70,33 +79,49 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Slider x:Name="__Speed__" Grid.Row="1" Minimum="-2" SmallChange="1" Value="4" ValueChanged="SpeedChanged" />
-                <StackPanel Grid.Column="2" Orientation="Horizontal"  HorizontalAlignment="Right" >
-                    <Menu Background="Transparent" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <!-- Icon-only header (funnel glyph); swap it for plain text like "Filters" to get the label back. -->
-                        <MenuItem x:Name="filtersMenu" ToolTip="Filters: choose which clean-up filters run on copied or scanned text">
-                            <MenuItem.Header>
-                                <TextBlock Text="&#xE71C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
-                            </MenuItem.Header>
-                            <!-- items are built from FilterRegistry in code -->
-                        </MenuItem>
-                    </Menu>
-                    <Button Content="Hotkeys..." Click="HotkeySettings_Click" Margin="0,0,8,0" Padding="6,0"/>
-                    <Button x:Name="voiceButton" Content="&#x1F5E3;" Click="VoiceButton_Click" Margin="0,0,8,0" Padding="8,0"
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Speed: shows the current number; click for a popup with - / slider / + -->
+                    <Button x:Name="speedButton" Click="SpeedButton_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Speaking speed (click to change)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xEC4A;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="speedText" Text="4" FontWeight="SemiBold" MinWidth="16" TextAlignment="Center" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Popup x:Name="speedPopup" PlacementTarget="{Binding ElementName=speedButton}" Placement="Top" StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" BorderThickness="1" CornerRadius="4" Padding="8">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="speedMinus" Content="&#x2212;" Click="SpeedMinus_Click" Width="28" Height="28" Focusable="False" Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Slower"/>
+                                <Slider x:Name="speedSlider" Minimum="-2" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="1" Width="140" Margin="8,0" VerticalAlignment="Center"/>
+                                <Button x:Name="speedPlus" Content="+" Click="SpeedPlus_Click" Width="28" Height="28" Focusable="False" Foreground="#4A78B5" FontSize="18" FontWeight="Bold" ToolTip="Faster"/>
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                    <Button x:Name="voiceButton" Content="&#x1F5E3;" FontSize="15" Click="VoiceButton_Click" Style="{StaticResource BarButton}"
                             ToolTip="Choose the voice">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="voiceMenu" />
                         </Button.ContextMenu>
                     </Button>
-                    <Button x:Name="__ImageRead" Content="Read Region" Click="ImageRead" Focusable="False" Margin="0,0,4,0" Padding="8,0"
-                            ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
-                    <Button x:Name="ocrButton" Content="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Click="OcrButton_Click" Focusable="False" Padding="8,0"
+                    <Button x:Name="filtersButton" Click="FiltersButton_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Filters: choose which clean-up filters run on copied or scanned text">
+                        <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="15" VerticalAlignment="Center"/>
+                        <Button.ContextMenu>
+                            <!-- items are built from FilterRegistry in code -->
+                            <ContextMenu x:Name="filtersMenu" />
+                        </Button.ContextMenu>
+                    </Button>
+                    <Button Content="&#xE765;" FontFamily="{StaticResource IconFont}" FontSize="15" Click="HotkeySettings_Click" Style="{StaticResource BarButton}"
+                            ToolTip="Hotkeys: choose the global shortcuts"/>
+                    <Button x:Name="ocrButton" Content="&#xE713;" FontFamily="{StaticResource IconFont}" FontSize="15" Click="OcrButton_Click" Style="{StaticResource BarButton}"
                             ToolTip="Choose the OCR engine used by Read Region">
                         <Button.ContextMenu>
                             <ContextMenu x:Name="ocrMenu" />
                         </Button.ContextMenu>
                     </Button>
                 </StackPanel>
+                <Button x:Name="__ImageRead" Grid.Column="1" Content="Read Region" Click="ImageRead" Style="{StaticResource BarButton}" Margin="8,0,4,0"
+                        ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
             </Grid>
             <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
         </Grid>
