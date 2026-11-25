@@ -108,7 +108,6 @@ namespace TextToSpeech.Core.Tests
             File.WriteAllText(Path.Combine(folder, "nullentry.json"), "{ \"name\": \"B\", \"rules\": [ null, { \"kind\": \"removeText\", \"value\": \"x\" } ] }");
             var entries = new CustomFilterLibrary(folder).Load();
             Assert.Equal(2, entries.Count);
-            // removing "x" from "axa" leaves "aa"
             Assert.Equal("aa", new CustomFilterLibrary(folder).Load().Single(e => e.DisplayName == "B").Compiled!.Apply("axa"));
         }
 
