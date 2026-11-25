@@ -281,7 +281,7 @@ namespace TextToSpeech
             }
         }
 
-        private readonly System.Windows.Threading.DispatcherTimer resizeHoldTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+        private readonly System.Windows.Threading.DispatcherTimer resizeHoldTimer = new() { Interval = TimeSpan.FromSeconds(3) };
         private bool previewingPopup;
 
         private ReadingPopupWindow CreatePopup()
