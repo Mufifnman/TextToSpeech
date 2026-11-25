@@ -274,6 +274,7 @@ namespace TextToSpeech
             if (expanded)
             {
                 shrinkInput.Visibility = Visibility.Visible;
+                bringBackPanel.Visibility = Visibility.Collapsed; // editing: the shrink icon is shown instead
                 readingRow.Height = new GridLength(OneLineHeight); // reading pane keeps one line
                 inputRow.Height = new GridLength(1, GridUnitType.Star);
                 textbox.MaxHeight = double.PositiveInfinity;
@@ -281,6 +282,7 @@ namespace TextToSpeech
             else
             {
                 shrinkInput.Visibility = Visibility.Collapsed;
+                bringBackPanel.Visibility = Visibility.Visible;   // one-line box: offer to pull text back
                 readingRow.Height = new GridLength(1, GridUnitType.Star);
                 inputRow.Height = GridLength.Auto;
                 textbox.MaxHeight = 34;
@@ -669,11 +671,9 @@ namespace TextToSpeech
         private void VolumeButton_Click(object sender, RoutedEventArgs e) => volumePopup.IsOpen = true;
 
         // ---- narrow window: show the - and + beside the speed button (the slider popup always works) ----
-        private const double NarrowWidth = 700;
-
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            var visibility = ActualWidth < NarrowWidth ? Visibility.Visible : Visibility.Collapsed;
+            var visibility = ResponsiveLayout.ShowSpeedStepButtons(ActualWidth) ? Visibility.Visible : Visibility.Collapsed;
             speedMinus.Visibility = visibility;
             speedPlus.Visibility = visibility;
         }

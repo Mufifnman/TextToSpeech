@@ -85,3 +85,17 @@ public class HotkeySettingsTests
         Assert.Equal("Ctrl+Shift+U", back.ReadSelectionAndShow);
     }
 }
+
+public class ResponsiveLayoutTests
+{
+    [Theory]
+    [InlineData(500, true)]
+    [InlineData(699, true)]
+    [InlineData(700, false)]
+    [InlineData(780, false)]   // the default window is big: no step buttons
+    [InlineData(1400, false)]
+    public void SpeedStepButtons_ShowOnlyWhenTheWindowIsSmall(double width, bool shown)
+    {
+        Assert.Equal(shown, TextToSpeech.ResponsiveLayout.ShowSpeedStepButtons(width));
+    }
+}
