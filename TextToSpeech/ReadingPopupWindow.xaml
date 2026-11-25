@@ -39,8 +39,11 @@
                     <Button x:Name="playButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Play / pause" Click="PlayPause_Click">
                         <TextBlock x:Name="playGlyph" Text="&#xE769;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
-                    <Button x:Name="skipButton" Width="34" Height="26" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
+                    <Button x:Name="skipButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                    </Button>
+                    <Button x:Name="clearButton" Width="34" Height="26" Focusable="False" ToolTip="Clear the text" Click="Clear_Click">
+                        <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">

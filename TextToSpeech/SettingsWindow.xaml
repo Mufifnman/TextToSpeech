@@ -66,8 +66,8 @@
                     SmallChange="50" LargeChange="200" VerticalAlignment="Center"/>
         </DockPanel>
 
-        <CheckBox x:Name="autoClearBox" Content="Clear the text a few seconds after reading finishes" Margin="0,0,0,6"
-                  ToolTip="Same as the Clear button. A new read or new text in the meantime cancels it."/>
+        <CheckBox x:Name="autoClearBox" Content="Auto clear" Margin="0,0,0,6"
+                  ToolTip="Clears the text a few seconds after reading finishes, like the Clear button. A new read or new text in the meantime cancels it. Off: use the Clear button."/>
         <DockPanel Margin="22,0,0,14">
             <TextBlock x:Name="autoClearText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
             <Slider x:Name="autoClearSlider" Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"

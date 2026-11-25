@@ -10,6 +10,7 @@ namespace TextToSpeech
         Action Back,
         Action PlayPause,
         Action Skip,
+        Action Clear,
         Action<int, int> JumpTo,
         Action OpenFullWindow,
         Action Dismiss,
@@ -93,6 +94,7 @@ namespace TextToSpeech
 
         private void Back_Click(object sender, RoutedEventArgs e) => actions.Back();
         private void PlayPause_Click(object sender, RoutedEventArgs e) => actions.PlayPause();
+        private void Clear_Click(object sender, RoutedEventArgs e) => actions.Clear();
         private void Skip_Click(object sender, RoutedEventArgs e) => actions.Skip();
         private void Open_Click(object sender, RoutedEventArgs e) => actions.OpenFullWindow();
         private void Close_Click(object sender, RoutedEventArgs e) => actions.Dismiss();
