@@ -385,7 +385,27 @@ namespace TextToSpeech
 
         private void Skip_Click(object sender, RoutedEventArgs e) => Skip();
 
-        private void PlayPause_Click(object sender, RoutedEventArgs e) => TogglePlayPause();
+        private void PlayPause_Click(object sender, RoutedEventArgs e) => PlayOrPause();
+
+        /// <summary>
+        /// The one Play/Pause button (and Space): while reading it pauses; otherwise it starts reading,
+        /// first adding whatever is in the text box, or resumes from the saved position if the box is empty.
+        /// </summary>
+        private void PlayOrPause()
+        {
+            if (IsSpeaking && !paused)
+            {
+                Pause();
+            }
+            else if (textbox.Text != "")
+            {
+                ReadText(this, new RoutedEventArgs());
+            }
+            else
+            {
+                TogglePlayPause();
+            }
+        }
 
         private void Rewind()
         {
@@ -441,7 +461,11 @@ namespace TextToSpeech
 
         private void UpdatePauseButton()
         {
-            ___PauseButton_.Content = (IsSpeaking && !paused) ? "\u23F8 Pause" : "\u25B6 Play";
+            bool playing = IsSpeaking && !paused;
+            pauseGlyph.Text = playing ? "\uE769" : "\uE768";        // pause / play
+            pauseGlyph.Foreground = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(playing ? "#E0A010" : "#2E9E4F"));
+            pauseLabel.Text = playing ? "Pause" : "Play";
         }
 
         private void Window_GotFocus_1(object sender, RoutedEventArgs e)
@@ -650,7 +674,7 @@ namespace TextToSpeech
             switch (e.Key)
             {
                 case Key.Space:
-                    TogglePlayPause();
+                    PlayOrPause();
                     e.Handled = true;
                     break;
                 case Key.Left:

@@ -4,6 +4,9 @@
         xmlns:local="clr-namespace:TextToSpeech"
         xmlns:l="clr-namespace:TextToSpeech"
         Title="Text to Speech" Height="400" Width="780" GotFocus="Window_GotFocus_1" PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    </Window.Resources>
     <Grid Margin="0,0,0,-5">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -31,12 +34,36 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="___ReadButton_" Content="Go!" Grid.Column="0" Click="ReadText" Focusable="False"/>
-                <Button x:Name="___RewindButton_" Content="&#9198; Back" Grid.Column="1" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)"/>
-                <Button x:Name="___PauseButton_" Content="&#9199; Pause" Grid.Column="2" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)"/>
-                <Button x:Name="___SkipButton_" Content="Skip &#9197;" Grid.Column="3" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)"/>
-                <Button x:Name="___StopButton_" Content="Stop!" Grid.Column="4" Click="StopRead" Focusable="False"/>
-                <Button x:Name="___ClearButton" Content="Clear!" Grid.Column="5" Click="ClearList" Focusable="False"/>
+                <Button x:Name="___RewindButton_" Grid.Column="0" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Back" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___PauseButton_" Grid.Column="1" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="pauseGlyph" Text="&#xE768;" FontFamily="{StaticResource IconFont}" Foreground="#2E9E4F" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="pauseLabel" Text="Play" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___SkipButton_" Grid.Column="2" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Skip" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___StopButton_" Grid.Column="3" Click="StopRead" Focusable="False" ToolTip="Stop reading (keeps your place)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE71A;" FontFamily="{StaticResource IconFont}" Foreground="#D9453D" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Stop" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="___ClearButton" Grid.Column="4" Click="ClearList" Focusable="False" ToolTip="Clear everything that is queued to read">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" Foreground="#7A7A7A" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Clear" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 </Grid>
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
