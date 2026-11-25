@@ -115,13 +115,14 @@ namespace TextToSpeech
         }
 
         // ---- hotkeys ----
-        private IEnumerable<TextBox> HotkeyBoxes() => new[] { readBox, readShowBox, summonBox, regionBox, playPauseBox, clearBox };
+        private IEnumerable<TextBox> HotkeyBoxes() => new[] { readBox, readShowBox, summonBox, regionBox, regionQuietBox, playPauseBox, clearBox };
 
         private HotkeyBinding GetBinding(string name) => name switch
         {
             nameof(HotkeySettings.ReadSelection) => hotkeys.GetReadSelection(),
             nameof(HotkeySettings.ReadSelectionAndShow) => hotkeys.GetReadSelectionAndShow(),
             nameof(HotkeySettings.SummonWindow) => hotkeys.GetSummonWindow(),
+            nameof(HotkeySettings.ReadRegionQuiet) => hotkeys.GetReadRegionQuiet(),
             nameof(HotkeySettings.PlayPause) => hotkeys.GetPlayPause(),
             nameof(HotkeySettings.ClearAll) => hotkeys.GetClearAll(),
             _ => hotkeys.GetReadRegion(),
@@ -135,6 +136,7 @@ namespace TextToSpeech
                 case nameof(HotkeySettings.ReadSelection): hotkeys.ReadSelection = text; break;
                 case nameof(HotkeySettings.ReadSelectionAndShow): hotkeys.ReadSelectionAndShow = text; break;
                 case nameof(HotkeySettings.SummonWindow): hotkeys.SummonWindow = text; break;
+                case nameof(HotkeySettings.ReadRegionQuiet): hotkeys.ReadRegionQuiet = text; break;
                 case nameof(HotkeySettings.PlayPause): hotkeys.PlayPause = text; break;
                 case nameof(HotkeySettings.ClearAll): hotkeys.ClearAll = text; break;
                 default: hotkeys.ReadRegion = text; break;

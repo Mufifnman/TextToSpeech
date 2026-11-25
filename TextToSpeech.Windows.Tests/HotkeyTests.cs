@@ -49,9 +49,11 @@ public class HotkeySettingsTests
     public void Defaults_AreValidAndDistinct()
     {
         var s = new HotkeySettings();
-        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion(), s.GetPlayPause(), s.GetClearAll() };
+        var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion(), s.GetReadRegionQuiet(), s.GetPlayPause(), s.GetClearAll() };
         Assert.All(all, b => Assert.True(b.IsValid));
-        Assert.Equal(6, all.Distinct().Count());
+        Assert.Equal(7, all.Distinct().Count());
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Alt, Key.O), s.GetReadRegion());   // shows the window
+        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.O), s.GetReadRegionQuiet());                     // leaves it alone
         Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Space), s.GetPlayPause());
         Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.Delete), s.GetClearAll());
     }

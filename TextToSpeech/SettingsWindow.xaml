@@ -55,7 +55,7 @@
                     <ColumnDefinition Width="160"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                    <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                 </Grid.RowDefinitions>
                 <TextBlock Text="Read selected text" Margin="0,4,12,4" ToolTip="The window stays hidden"/>
                 <TextBox x:Name="readBox" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelection" PreviewKeyDown="Capture_PreviewKeyDown"/>
@@ -63,12 +63,14 @@
                 <TextBox x:Name="readShowBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadSelectionAndShow" PreviewKeyDown="Capture_PreviewKeyDown"/>
                 <TextBlock Text="Show window" Grid.Row="2" Margin="0,4,12,4"/>
                 <TextBox x:Name="summonBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="SummonWindow" PreviewKeyDown="Capture_PreviewKeyDown"/>
-                <TextBlock Text="Read screen region (OCR)" Grid.Row="3" Margin="0,4,12,4"/>
+                <TextBlock Text="Read screen region and show window" Grid.Row="3" Margin="0,4,12,4" ToolTip="The window comes up after you finish the selection, and goes back down after reading if the app raised it"/>
                 <TextBox x:Name="regionBox" Grid.Row="3" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadRegion" PreviewKeyDown="Capture_PreviewKeyDown"/>
-                <TextBlock Text="Play / pause" Grid.Row="4" Margin="0,4,12,4"/>
-                <TextBox x:Name="playPauseBox" Grid.Row="4" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="PlayPause" PreviewKeyDown="Capture_PreviewKeyDown"/>
-                <TextBlock Text="Clear everything" Grid.Row="5" Margin="0,4,12,4"/>
-                <TextBox x:Name="clearBox" Grid.Row="5" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ClearAll" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Read screen region, window stays as it is" Grid.Row="4" Margin="0,4,12,4"/>
+                <TextBox x:Name="regionQuietBox" Grid.Row="4" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ReadRegionQuiet" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Play / pause" Grid.Row="5" Margin="0,4,12,4"/>
+                <TextBox x:Name="playPauseBox" Grid.Row="5" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="PlayPause" PreviewKeyDown="Capture_PreviewKeyDown"/>
+                <TextBlock Text="Clear everything" Grid.Row="6" Margin="0,4,12,4"/>
+                <TextBox x:Name="clearBox" Grid.Row="6" Grid.Column="1" IsReadOnly="True" Margin="0,2" Tag="ClearAll" PreviewKeyDown="Capture_PreviewKeyDown"/>
             </Grid>
             <TextBlock x:Name="hotkeyMessage" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#E5484D" FontSize="12" Visibility="Collapsed"/>
             </StackPanel>

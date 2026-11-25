@@ -209,8 +209,10 @@ namespace TextToSpeech
                 failed.Add(hotkeySettings.GetReadSelectionAndShow().ToString());
             if (!hotkeys.Register(hotkeySettings.GetSummonWindow(), BringToFront))
                 failed.Add(hotkeySettings.GetSummonWindow().ToString());
-            if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey()))
+            if (!hotkeys.Register(hotkeySettings.GetReadRegion(), () => _ = ReadRegionHotkey(showWindow: true)))
                 failed.Add(hotkeySettings.GetReadRegion().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetReadRegionQuiet(), () => _ = ReadRegionHotkey(showWindow: false)))
+                failed.Add(hotkeySettings.GetReadRegionQuiet().ToString());
             if (!hotkeys.Register(hotkeySettings.GetPlayPause(), PlayOrPause))
                 failed.Add(hotkeySettings.GetPlayPause().ToString());
             if (!hotkeys.Register(hotkeySettings.GetClearAll(), () => ClearList()))
@@ -254,16 +256,23 @@ namespace TextToSpeech
             QueueTextAndRead(text);
         }
 
-        private async Task ReadRegionHotkey()
+        private async Task ReadRegionHotkey(bool showWindow)
         {
             if (RegionReader == null)
             {
-                BringToFront(); // fallback: the existing Read Image flow captures the screen behind the window
                 ImageRead(this, new RoutedEventArgs());
                 return;
             }
+            // The overlay shows alone during the drag; the window policy applies only once there is text to read.
             string text = await RegionReader.SelectRegionAndReadAsync();
             if (string.IsNullOrWhiteSpace(text)) return;
+            if (showWindow)
+            {
+                // Same as the read-selection hotkey: only put the window away afterwards if the app brought it up.
+                if (WindowState == System.Windows.WindowState.Minimized || !IsVisible) raise.AppRaised();
+                ignoreClipboardGrabUntil = DateTime.UtcNow.AddSeconds(2);
+                BringToFront();
+            }
             QueueTextAndRead(text);
         }
 
