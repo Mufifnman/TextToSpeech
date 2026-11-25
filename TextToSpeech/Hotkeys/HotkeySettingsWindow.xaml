@@ -1,0 +1,30 @@
+<Window x:Class="TextToSpeech.Hotkeys.HotkeySettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Hotkeys" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="12">
+        <TextBlock Text="Click a box, then press the new shortcut. Backspace clears back to the default." Margin="0,0,0,8" TextWrapping="Wrap" MaxWidth="360"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="180"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition/><RowDefinition/><RowDefinition/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Read selected text" Margin="0,4,12,4"/>
+            <TextBox x:Name="readBox" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Read"/>
+            <TextBlock Text="Show window" Grid.Row="1" Margin="0,4,12,4"/>
+            <TextBox x:Name="summonBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Summon"/>
+            <TextBlock Text="Read screen region (OCR)" Grid.Row="2" Margin="0,4,12,4"/>
+            <TextBox x:Name="regionBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2" PreviewKeyDown="Capture_PreviewKeyDown" Tag="Region"/>
+        </Grid>
+        <CheckBox x:Name="summonOnReadBox" Margin="0,10,0,0"
+                  Content="Reading from a hotkey also brings the window to the front"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Save" Width="70" IsDefault="True" Click="Save_Click" Margin="0,0,8,0"/>
+            <Button Content="Cancel" Width="70" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
