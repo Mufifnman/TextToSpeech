@@ -31,6 +31,7 @@ namespace TextToSpeech
 
         // True after the user paused or stopped; nothing speaks until they resume or click a word.
         bool paused = false;
+        FilterSettings filterSettings = FilterSettingsStore.Load();
 
         public MainWindow()
         {
@@ -38,6 +39,20 @@ namespace TextToSpeech
             InitializeComponent();
             __ReadListDisplay__.Document = document;
             __ReadListDisplay__.WordClicked += JumpTo;
+
+            wikipediaFilterItem.IsChecked = filterSettings.WikipediaCitations;
+            psychologyFilterItem.IsChecked = filterSettings.PsychologyCitations;
+            governmentFilterItem.IsChecked = filterSettings.GovernmentCitations;
+            ahitFilterItem.IsChecked = filterSettings.AhitStarredQuestions;
+        }
+
+        private void FilterMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            filterSettings.WikipediaCitations = wikipediaFilterItem.IsChecked;
+            filterSettings.PsychologyCitations = psychologyFilterItem.IsChecked;
+            filterSettings.GovernmentCitations = governmentFilterItem.IsChecked;
+            filterSettings.AhitStarredQuestions = ahitFilterItem.IsChecked;
+            FilterSettingsStore.Save(filterSettings);
         }
 
         private void ReadText(object sender, RoutedEventArgs e)
@@ -217,9 +232,7 @@ namespace TextToSpeech
                 {
                     string preFiltered = (String)iData.GetData(DataFormats.Text) + "\n";
 
-                    Filters.WikipediaCitation(ref preFiltered);
-                    Filters.GovernmentFilter(ref preFiltered);
-                    Filters.AHITStarredQuestion(ref preFiltered);
+                    Filters.ApplyClipboardFilters(ref preFiltered, filterSettings);
 
                     textbox.Text = textbox.Text + "\n" + preFiltered;
                     Clipboard.Clear();
@@ -308,7 +321,7 @@ namespace TextToSpeech
             Filters.CombineLines(ref readText);
             readText = readText.Replace('\u00A1', 'i');
 
-            Filters.PsychologyFilter(ref readText);
+            Filters.ApplyOcrFilters(ref readText, filterSettings);
 
             textbox.Text = readText;
 
