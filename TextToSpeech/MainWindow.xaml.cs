@@ -256,6 +256,47 @@ namespace TextToSpeech
             if (dlg.ShowDialog() == true) SetupHotkeys();
         }
 
+        // ---- the editable box: one line while idle, the whole window while you edit ----
+        private const double OneLineHeight = 30;
+        private bool inputExpanded = false;
+
+        private void SetInputExpanded(bool expanded)
+        {
+            if (inputExpanded == expanded)
+            {
+                return;
+            }
+            inputExpanded = expanded;
+            if (expanded)
+            {
+                readingRow.Height = new GridLength(OneLineHeight); // reading pane keeps one line
+                inputRow.Height = new GridLength(1, GridUnitType.Star);
+                textbox.MaxHeight = double.PositiveInfinity;
+            }
+            else
+            {
+                readingRow.Height = new GridLength(1, GridUnitType.Star);
+                inputRow.Height = GridLength.Auto;
+                textbox.MaxHeight = 34;
+            }
+        }
+
+        private void Textbox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => SetInputExpanded(true);
+
+        // Clicking in the box while it is small (keyboard focus may already be there) also opens it up.
+        private void Textbox_PreviewMouseDown(object sender, MouseButtonEventArgs e) => SetInputExpanded(true);
+
+        // Typing or pasting into a small box that still has focus opens it up again.
+        private void Textbox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (textbox.IsKeyboardFocused && textbox.Text != "")
+            {
+                SetInputExpanded(true);
+            }
+        }
+
+        private void Textbox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => SetInputExpanded(false);
+
         private void ReadText(object sender, RoutedEventArgs e)
         {
             if (this.textbox.Text != "")
@@ -265,6 +306,7 @@ namespace TextToSpeech
                 // cut out "read more at"
                 document.Append(temp, s => !s.ToLower().Contains("read more at"));
                 textbox.Text = "";
+                SetInputExpanded(false); // the text moved over: back to the small one-line box
             }
             paused = false;
             if (!IsSpeaking) // if we aren't already reading

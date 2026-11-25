@@ -74,12 +74,16 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBox x:Name="textbox" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="Test"/>
-            <local:ReadingDisplay x:Name="__ReadListDisplay__" Grid.Column="1"/>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="readingRow" Height="*" MinHeight="30"/>
+                <RowDefinition x:Name="inputRow" Height="Auto"/>
+            </Grid.RowDefinitions>
+            <local:ReadingDisplay x:Name="__ReadListDisplay__" MinHeight="30"/>
+            <!-- One line while idle; grows to fill the window while you edit (see SetInputExpanded). -->
+            <TextBox x:Name="textbox" Grid.Row="1" Margin="0,2,0,0" MinHeight="30" MaxHeight="34"
+                     TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Text="Test"
+                     GotKeyboardFocus="Textbox_GotKeyboardFocus" PreviewMouseDown="Textbox_PreviewMouseDown"
+                     TextChanged="Textbox_TextChanged" LostKeyboardFocus="Textbox_LostKeyboardFocus"/>
         </Grid>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
@@ -95,38 +99,38 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="___RewindButton_" Grid.Column="0" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)">
+                <Button x:Name="___RewindButton_" Margin="2,0" Grid.Column="0" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE892;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Back" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="___PauseButton_" Grid.Column="1" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)">
+                <Button x:Name="___PauseButton_" Margin="2,0" Grid.Column="1" Click="PlayPause_Click" Focusable="False" ToolTip="Play / pause (Space, or Ctrl+Space while typing)">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="pauseGlyph" Text="&#xE768;" FontFamily="{StaticResource IconFont}" Foreground="#2E9E4F" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="pauseLabel" Text="Play" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="___SkipButton_" Grid.Column="2" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)">
+                <Button x:Name="___SkipButton_" Margin="2,0" Grid.Column="2" Click="Skip_Click" Focusable="False" ToolTip="Next sentence (Ctrl+Right)">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" Foreground="#4A78B5" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Skip" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="___StopButton_" Grid.Column="3" Click="StopRead" Focusable="False" ToolTip="Stop reading (keeps your place)">
+                <Button x:Name="___StopButton_" Margin="2,0" Grid.Column="3" Click="StopRead" Focusable="False" ToolTip="Stop reading (keeps your place)">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE71A;" FontFamily="{StaticResource IconFont}" Foreground="#D9453D" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Stop" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="___ClearButton" Grid.Column="4" Click="ClearList" Focusable="False" ToolTip="Clear everything that is queued to read">
+                <Button x:Name="___ClearButton" Margin="2,0" Grid.Column="4" Click="ClearList" Focusable="False" ToolTip="Clear everything that is queued to read">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" Foreground="#7A7A7A" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Clear" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 </Grid>
-            <Grid Grid.Row="1" Margin="4,8,4,4">
+            <Grid Grid.Row="1" Margin="4,6,4,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -168,7 +172,17 @@
                 <Button x:Name="__ImageRead" Grid.Column="1" Content="Read Region" Click="ImageRead" Focusable="False" Height="28" Padding="12,0" Margin="8,0,0,0" VerticalAlignment="Center"
                         ToolTip="Drag a box around text on screen to read it aloud (Ctrl+Alt+O)"/>
             </Grid>
-            <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="statusText" Grid.Row="2" Text="" Foreground="DarkRed" Margin="4,0,4,2" TextTrimming="CharacterEllipsis">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </Grid>
     </Grid>
 </Window>
