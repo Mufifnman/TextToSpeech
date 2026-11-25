@@ -18,7 +18,7 @@ namespace TextToSpeech
         private readonly Func<string?> hotkeyConflicts;
         private bool loading = true;
 
-        /// <summary>Set by the main window: whether the local API is running, its port and token (for the Copy token button).</summary>
+        /// <summary>Set by the main window: whether the local API is running, its port and token (for the connection line).</summary>
         public Func<(bool Running, int Port, string? Token)>? ApiInfo { get; set; }
 
         public SettingsWindow(AppSettings settings, Action onChanged)
@@ -113,13 +113,21 @@ namespace TextToSpeech
             }
         }
 
-        private void CopyToken_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Opens the folder with api.json, selected. The token is deliberately not put on the clipboard: the main window
+        /// reads new clipboard text aloud, which would speak (and keep) the token.
+        /// </summary>
+        private void ShowConnectionFile_Click(object sender, RoutedEventArgs e)
         {
-            string? token = ApiInfo?.Invoke().Token;
-            if (!string.IsNullOrEmpty(token))
+            string path = TextToSpeech.Api.ConnectionInfo.DefaultPath;
+            try
             {
-                try { Clipboard.SetText(token); } catch (Exception) { /* clipboard busy */ }
+                if (System.IO.File.Exists(path))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+                }
             }
+            catch (Exception) { /* nothing useful to do if Explorer cannot start */ }
         }
 
         // ---- OCR engine: a small drop-down (a button that opens a themed menu) ----

@@ -19,7 +19,8 @@
                 <CheckBox x:Name="apiBox" Content="Enable local API (127.0.0.1, for other programs)" Margin="0,6,0,4"
                           ToolTip="Lets programs on this computer send text to read and control reading. They need the token below."/>
                 <DockPanel Margin="22,0,0,0">
-                    <Button x:Name="copyTokenButton" DockPanel.Dock="Right" Content="Copy token" Padding="10,0" Height="24" Click="CopyToken_Click"/>
+                    <Button x:Name="copyTokenButton" DockPanel.Dock="Right" Content="Show file" Padding="10,0" Height="24" Click="ShowConnectionFile_Click"
+                            ToolTip="Opens the folder with api.json (port and token). The token is never put on the clipboard."/>
                     <TextBlock x:Name="apiInfoText" TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12" VerticalAlignment="Center"/>
                 </DockPanel>
             </StackPanel>
