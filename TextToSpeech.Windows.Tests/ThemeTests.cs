@@ -211,17 +211,17 @@ public class SettingsSectionTests
                 var settings = new TextToSpeech.AppSettings { PathOverride = file };
                 var first = new TextToSpeech.SettingsWindow(settings, () => { });
                 var hotkeys = (System.Windows.Controls.Expander)first.FindName("hotkeyExpander");
-                var ocr = (System.Windows.Controls.Expander)first.FindName("ocrExpander");
+                var opacity = (System.Windows.Controls.Expander)first.FindName("opacityExpander");
                 Assert.False(hotkeys.IsExpanded);   // sections start collapsed
-                Assert.False(ocr.IsExpanded);
+                Assert.False(opacity.IsExpanded);
 
                 hotkeys.IsExpanded = true;
                 Assert.Contains("hotkeys", settings.ExpandedSections);
-                Assert.DoesNotContain("ocr", settings.ExpandedSections);
+                Assert.DoesNotContain("opacity", settings.ExpandedSections);
 
                 var second = new TextToSpeech.SettingsWindow(settings, () => { });
                 Assert.True(((System.Windows.Controls.Expander)second.FindName("hotkeyExpander")).IsExpanded);
-                Assert.False(((System.Windows.Controls.Expander)second.FindName("ocrExpander")).IsExpanded);
+                Assert.False(((System.Windows.Controls.Expander)second.FindName("opacityExpander")).IsExpanded);
 
                 hotkeys.IsExpanded = false;
                 Assert.DoesNotContain("hotkeys", settings.ExpandedSections);
@@ -281,13 +281,59 @@ public class OcrSettingTests
                 var settings = new TextToSpeech.AppSettings { PathOverride = file };
                 int applied = 0;
                 var dialog = new TextToSpeech.SettingsWindow(settings, () => applied++);
-                var tesseract = (System.Windows.Controls.RadioButton)dialog.FindName("ocrTesseractRadio");
-                tesseract.IsChecked = true;
-                tesseract.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                var button = (System.Windows.Controls.Button)dialog.FindName("ocrButton");
+                Assert.Equal("Windows", ((System.Windows.Controls.TextBlock)dialog.FindName("ocrButtonText")).Text);
+                var tesseract = button.ContextMenu.Items.OfType<System.Windows.Controls.MenuItem>().Single(i => (string)i.Header == "Tesseract");
+                tesseract.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+                Assert.Equal("Tesseract", ((System.Windows.Controls.TextBlock)dialog.FindName("ocrButtonText")).Text);
 
                 Assert.Equal(TextToSpeech.OcrOptions.Tesseract, settings.GetOcrOption());
                 Assert.True(applied >= 1);
                 Assert.Contains("Tesseract", File.ReadAllText(file));
+            });
+        }
+        finally
+        {
+            if (File.Exists(file)) File.Delete(file);
+        }
+    }
+}
+
+public class SentenceGapTests
+{
+    [Fact]
+    public void DefaultGapIsAbout300ms_AndIsAnAppSetting()
+    {
+        Assert.Equal(300, new TextToSpeech.AppSettings().SentenceGapMs);
+    }
+
+    [Theory]
+    [InlineData(false, 300, 300)]
+    [InlineData(false, 0, 0)]            // 0 turns the pause off
+    [InlineData(false, 5000, 2000)]      // capped
+    [InlineData(false, -10, 0)]
+    [InlineData(true, 800, 0)]           // nothing is added after the last sentence
+    public void GapAfter(bool last, int configured, int expectedMs)
+    {
+        Assert.Equal(TimeSpan.FromMilliseconds(expectedMs), TextToSpeech.SentencePacing.GapAfter(last, configured));
+    }
+
+    [Fact]
+    public void GapSlider_IsAppliedAndSavedWithoutTouchingTheOtherSettings()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "tts-test-settings-" + Guid.NewGuid() + ".json");
+        try
+        {
+            Sta.Run(() =>
+            {
+                var settings = new TextToSpeech.AppSettings { PathOverride = file };
+                var dialog = new TextToSpeech.SettingsWindow(settings, () => { });
+
+                ((System.Windows.Controls.Slider)dialog.FindName("gapSlider")).Value = 650;
+
+                Assert.Equal(650, settings.SentenceGapMs);
+                Assert.Equal(1.0, settings.WindowOpacity, 3);
+                Assert.Contains("650", File.ReadAllText(file));
             });
         }
         finally

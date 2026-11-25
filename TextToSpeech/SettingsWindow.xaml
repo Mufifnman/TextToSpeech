@@ -5,31 +5,45 @@
         Title="Settings" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <StackPanel Margin="16" MinWidth="380">
-        <TextBlock Text="Window opacity" FontWeight="SemiBold"/>
-        <DockPanel Margin="0,6,0,14">
-            <TextBlock x:Name="opacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
-            <Slider x:Name="opacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                    SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
-        </DockPanel>
+        <Expander x:Name="opacityExpander" Header="Opacity" Tag="opacity">
+            <StackPanel>
+                <TextBlock Text="Window opacity" FontWeight="SemiBold"/>
+                <DockPanel Margin="0,6,0,14">
+                    <TextBlock x:Name="opacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="opacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                            SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+                </DockPanel>
 
-        <TextBlock Text="Pop-up opacity" FontWeight="SemiBold"/>
+                <TextBlock Text="Pop-up opacity" FontWeight="SemiBold"/>
+                <DockPanel Margin="0,6,0,14">
+                    <TextBlock x:Name="popupOpacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <Slider x:Name="popupOpacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
+                            SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+                </DockPanel>
+            </StackPanel>
+        </Expander>
+
+        <TextBlock Text="Pause between sentences" FontWeight="SemiBold"/>
         <DockPanel Margin="0,6,0,14">
-            <TextBlock x:Name="popupOpacityText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
-            <Slider x:Name="popupOpacitySlider" Minimum="30" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True"
-                    SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+            <TextBlock x:Name="gapText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="gapSlider" Minimum="0" Maximum="2000" TickFrequency="50" IsSnapToTickEnabled="True"
+                    SmallChange="50" LargeChange="200" VerticalAlignment="Center"/>
         </DockPanel>
 
         <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends" Margin="0,0,0,14"
                   ToolTip="Pausing keeps the window up so you can resume. It only minimizes again if the app brought it up and you did not click or switch to it meanwhile."/>
 
-        <Expander x:Name="ocrExpander" Header="OCR engine (for Read Region)" Tag="ocr">
-            <StackPanel Orientation="Horizontal">
-                <RadioButton x:Name="ocrWindowsRadio" Content="Windows" GroupName="ocr" Margin="0,0,16,0"
-                             ToolTip="Built-in Windows OCR: fast, uses the Windows language packs"/>
-                <RadioButton x:Name="ocrTesseractRadio" Content="Tesseract" GroupName="ocr"
-                             ToolTip="Tesseract 5 with image clean-up: works offline from the bundled data"/>
-            </StackPanel>
-        </Expander>
+        <DockPanel Margin="0,14,0,14">
+            <Button x:Name="ocrButton" DockPanel.Dock="Right" MinWidth="110" Height="28" Padding="10,0" Click="OcrButton_Click"
+                    ToolTip="Windows: built-in OCR, fast, uses the Windows language packs. Tesseract: works offline from the bundled data.">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="ocrButtonText" Text="Windows" VerticalAlignment="Center"/>
+                    <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" Margin="10,1,0,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeSubtle}"/>
+                </StackPanel>
+            </Button>
+            <TextBlock Text="OCR engine (for Read Region)" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </DockPanel>
 
         <Expander x:Name="hotkeyExpander" Header="Hotkeys" Tag="hotkeys">
             <StackPanel>

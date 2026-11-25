@@ -35,15 +35,15 @@ namespace TextToSpeech
             opacitySlider.Value = Math.Round(settings.WindowOpacity * 100);
             opacityText.Text = (int)opacitySlider.Value + "%";
             autoShowBox.IsChecked = settings.AutoShowWhilePlaying;
+            gapSlider.Value = Math.Clamp(settings.SentenceGapMs, SentencePacing.MinGapMs, SentencePacing.MaxGapMs);
+            gapText.Text = (int)gapSlider.Value + " ms";
+            gapSlider.ValueChanged += (_, _) => Changed();
             popupOpacitySlider.Value = Math.Round(settings.PopupOpacity * 100);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             popupOpacitySlider.ValueChanged += (_, _) => Changed();
-            ocrWindowsRadio.IsChecked = settings.GetOcrOption() == OcrOptions.Windows;
-            ocrTesseractRadio.IsChecked = settings.GetOcrOption() == OcrOptions.Tesseract;
+            BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
-            ocrWindowsRadio.Click += (_, _) => Changed();
-            ocrTesseractRadio.Click += (_, _) => Changed();
 
             foreach (TextBox box in HotkeyBoxes())
             {
@@ -52,7 +52,7 @@ namespace TextToSpeech
             ShowConflicts();
 
             // Sections that take more than a line are collapsible; the open ones are remembered.
-            foreach (Expander section in new[] { ocrExpander, hotkeyExpander })
+            foreach (Expander section in new[] { opacityExpander, hotkeyExpander })
             {
                 section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
                 section.Expanded += (_, _) => RememberSection(section, true);
@@ -66,10 +66,41 @@ namespace TextToSpeech
             if (loading) return;
             settings.WindowOpacity = Math.Clamp(opacitySlider.Value / 100.0, 0.3, 1.0);
             settings.AutoShowWhilePlaying = autoShowBox.IsChecked == true;
+            settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
+            gapText.Text = settings.SentenceGapMs + " ms";
             settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
-            settings.OcrEngine = ocrTesseractRadio.IsChecked == true ? nameof(OcrOptions.Tesseract) : nameof(OcrOptions.Windows);
             opacityText.Text = (int)opacitySlider.Value + "%";
+            settings.Save();
+            onChanged();
+        }
+
+        // ---- OCR engine: a small drop-down (a button that opens a themed menu) ----
+        private void BuildOcrMenu()
+        {
+            var menu = new ContextMenu();
+            foreach (OcrOptions option in Enum.GetValues<OcrOptions>())
+            {
+                var item = new MenuItem { Header = option.ToString(), IsCheckable = true, IsChecked = option == settings.GetOcrOption(), Tag = option };
+                item.Click += (_, _) => ChooseOcr(option);
+                menu.Items.Add(item);
+            }
+            ocrButton.ContextMenu = menu;
+            ocrButtonText.Text = settings.GetOcrOption().ToString();
+        }
+
+        private void OcrButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ocrButton.ContextMenu == null) return;
+            ocrButton.ContextMenu.PlacementTarget = ocrButton;
+            ocrButton.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            ocrButton.ContextMenu.IsOpen = true;
+        }
+
+        private void ChooseOcr(OcrOptions option)
+        {
+            settings.OcrEngine = option.ToString();
+            BuildOcrMenu();   // refresh the check mark and the button text
             settings.Save();
             onChanged();
         }

@@ -464,7 +464,24 @@ namespace TextToSpeech
             {
                 return;
             }
+            // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
             document.CompleteSentence();
+            var gap = SentencePacing.GapAfter(document.IsAtEnd, settings.SentenceGapMs);
+            if (gap > TimeSpan.Zero)
+            {
+                try
+                {
+                    await Task.Delay(gap, cts.Token);   // jump, pause, stop and clear all cancel the wait
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                if (generation != speakGeneration)
+                {
+                    return;
+                }
+            }
             SpeakCurrent();
         }
 
