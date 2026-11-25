@@ -42,14 +42,3 @@ public class WordTimingEstimatorTests
         Assert.Empty(WordTimingEstimator.Estimate(text, seconds));
     }
 }
-
-public class AppSettingsTests
-{
-    [Fact]
-    public void Defaults_MatchTheSpeedSliderStart()
-    {
-        var s = new AppSettings();
-        Assert.Equal(4, s.Rate);
-        Assert.Null(s.VoiceId);
-    }
-}

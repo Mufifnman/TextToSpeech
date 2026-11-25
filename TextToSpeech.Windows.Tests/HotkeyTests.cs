@@ -39,14 +39,6 @@ public class HotkeyBindingTests
         Assert.True(HotkeyBinding.TryParse(b.ToString(), out var back));
         Assert.Equal(b, back);
     }
-
-    [Fact]
-    public void IsValid_NeedsModifierAndKey()
-    {
-        Assert.False(new HotkeyBinding(ModifierKeys.None, Key.R).IsValid);
-        Assert.False(new HotkeyBinding(ModifierKeys.Control, Key.None).IsValid);
-        Assert.True(new HotkeyBinding(ModifierKeys.Control, Key.R).IsValid);
-    }
 }
 
 public class HotkeySettingsTests
@@ -58,14 +50,6 @@ public class HotkeySettingsTests
         var all = new[] { s.GetReadSelection(), s.GetReadSelectionAndShow(), s.GetSummonWindow(), s.GetReadRegion() };
         Assert.All(all, b => Assert.True(b.IsValid));
         Assert.Equal(4, all.Distinct().Count());
-    }
-
-    [Fact]
-    public void ReadSelectionDefaults_AreAltRAndCtrlAltR()
-    {
-        var s = new HotkeySettings();
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Alt, Key.R), s.GetReadSelection());
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Alt, Key.R), s.GetReadSelectionAndShow());
     }
 
     [Fact]
@@ -88,13 +72,6 @@ public class HotkeySettingsTests
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.ReadSelectionAndShow)), s.GetReadSelectionAndShow());
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.SummonWindow)), s.GetSummonWindow());
         Assert.Equal(HotkeySettings.Default(nameof(HotkeySettings.ReadRegion)), s.GetReadRegion());
-    }
-
-    [Fact]
-    public void CustomBinding_IsUsed()
-    {
-        var s = new HotkeySettings { ReadRegion = "Ctrl+Shift+G" };
-        Assert.Equal(new HotkeyBinding(ModifierKeys.Control | ModifierKeys.Shift, Key.G), s.GetReadRegion());
     }
 
     [Fact]

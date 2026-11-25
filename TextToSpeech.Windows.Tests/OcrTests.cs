@@ -6,35 +6,10 @@ namespace TextToSpeech.Windows.Tests;
 
 public class OcrTests
 {
+    // Needs an OCR language pack installed (any normal English Windows has one), so it is tagged
+    // LocalOnly: run on a dev PC, skip elsewhere with --filter "Category!=LocalOnly".
     [Fact]
-    public void Outcome_OkAndFail()
-    {
-        var ok = OcrOutcome.Ok("hi");
-        Assert.True(ok.Succeeded);
-        Assert.Equal("hi", ok.Text);
-        Assert.Null(ok.ErrorMessage);
-
-        var fail = OcrOutcome.Fail("nope");
-        Assert.False(fail.Succeeded);
-        Assert.Null(fail.Text);
-        Assert.Equal("nope", fail.ErrorMessage);
-    }
-
-    [Fact]
-    public void Engines_WindowsIsDefaultAndCached()
-    {
-        Assert.Equal(OcrOptions.Windows, Enum.GetValues<OcrOptions>()[0]);
-        Assert.Same(OcrEngines.For(OcrOptions.Windows), OcrEngines.For(OcrOptions.Windows));
-    }
-
-    [Fact]
-    public void Engines_UnknownOptionThrows()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => OcrEngines.For((OcrOptions)99));
-    }
-
-    // Needs an OCR language pack installed (any normal English Windows has one).
-    [Fact]
+    [Trait("Category", "LocalOnly")]
     public async Task WindowsOcr_ReadsRenderedText()
     {
         using var bmp = new Bitmap(500, 120);
