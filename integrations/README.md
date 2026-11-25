@@ -42,4 +42,4 @@ Tools: `speak`, `pause`, `resume`, `skip`, `back`, `stop`, `clear`, `status`, `l
 
 ## Tests
 
-`node --test integrations/test` (uses a fake local server; the app does not need to run).
+`node --test "integrations/test/*.test.mjs"` (uses a fake local server; the app does not need to run).
