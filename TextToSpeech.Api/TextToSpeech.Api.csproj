@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Local API contract, security checks, request routing and the remainder-handoff session store.
+       No WPF and no HTTP server in here, so it builds and tests on any OS. The app wires it to a
+       real HTTP listener and to the reading controller. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TextToSpeech.Api</RootNamespace>
+  </PropertyGroup>
+
+</Project>
