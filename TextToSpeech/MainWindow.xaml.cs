@@ -48,6 +48,7 @@ namespace TextToSpeech
             SetSpeed(settings.Rate, save: false);
             SetVolume(settings.Volume, save: false);
             speedSlider.ValueChanged += (_, e) => { if (!updatingSpeedUi) SetSpeed((int)Math.Round(e.NewValue)); };
+            volumeSlider.PreviewMouseWheel += (_, e) => { SetVolume(volume + (e.Delta > 0 ? VolumeStep : -VolumeStep)); e.Handled = true; };
             volumeSlider.ValueChanged += (_, e) => { if (!updatingVolumeUi) SetVolume((int)Math.Round(e.NewValue)); };
             RefreshVoices();
             __ReadListDisplay__.Document = document;
@@ -662,12 +663,13 @@ namespace TextToSpeech
         private void SpeedPlus_Click(object sender, RoutedEventArgs e) => SetSpeed(rate + RateStep);
 
         // ---- reading volume: 0 to 120 percent, reading only (not the system volume) ----
-        private const int MinVolume = 0, MaxVolume = 120;
+        private const int MinVolume = 0, MaxVolume = 120, VolumeStep = 1;
+        private int volume = 100;
         private bool updatingVolumeUi = false;
 
         private void SetVolume(int value, bool save = true)
         {
-            int volume = Math.Clamp(value, MinVolume, MaxVolume);
+            volume = Math.Clamp(value, MinVolume, MaxVolume);
             catalog.SetVolume(volume);
             if (save)
             {
@@ -684,7 +686,7 @@ namespace TextToSpeech
 
         private void VolumeButton_Click(object sender, RoutedEventArgs e) => volumePopup.IsOpen = true;
 
-        // ---- narrow window: show the - and + beside the speed button (the slider popup always works) ----
+        // ---- big window: show the - and + beside the speed button; small window: hide them (the slider popup always works) ----
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             var visibility = ResponsiveLayout.ShowSpeedStepButtons(ActualWidth) ? Visibility.Visible : Visibility.Collapsed;

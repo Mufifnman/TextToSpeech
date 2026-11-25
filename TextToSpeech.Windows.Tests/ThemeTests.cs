@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using TextToSpeech;
 using Xunit;
@@ -61,11 +62,17 @@ public class ThemeTests
             var textBox = new TextBox { Text = "x" };
             var item = new MenuItem { Header = "item", IsCheckable = true, IsChecked = true };
             item.Items.Add(new MenuItem { Header = "sub" });   // submenu header with a popup
+            var vertical = new ScrollBar { Orientation = Orientation.Vertical };
+            var horizontal = new ScrollBar { Orientation = Orientation.Horizontal };
+            var sliderH = new Slider { Orientation = Orientation.Horizontal, Minimum = 0, Maximum = 10 };
+            var sliderV = new Slider { Orientation = Orientation.Vertical, Minimum = 0, Maximum = 10, Height = 100 };
+            var tip = new ToolTip { Content = "tip" };
+            var viewer = new ScrollViewer { Content = new TextBlock { Text = "x" } };
             var menu = new ContextMenu();
             menu.Items.Add(item);
             menu.Items.Add(new Separator());
 
-            foreach (FrameworkElement element in new FrameworkElement[] { button, textBox, item, menu })
+            foreach (FrameworkElement element in new FrameworkElement[] { button, textBox, item, menu, vertical, horizontal, sliderH, sliderV, tip, viewer })
             {
                 element.ApplyTemplate();
                 element.Measure(new Size(300, 100));

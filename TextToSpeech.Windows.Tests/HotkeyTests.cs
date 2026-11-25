@@ -93,12 +93,12 @@ public class HotkeySettingsTests
 public class ResponsiveLayoutTests
 {
     [Theory]
-    [InlineData(500, true)]
-    [InlineData(699, true)]
-    [InlineData(700, false)]
-    [InlineData(780, false)]   // the default window is big: no step buttons
-    [InlineData(1400, false)]
-    public void SpeedStepButtons_ShowOnlyWhenTheWindowIsSmall(double width, bool shown)
+    [InlineData(500, false)]
+    [InlineData(699, false)]
+    [InlineData(700, true)]
+    [InlineData(780, true)]    // the default window is big: step buttons shown
+    [InlineData(1400, true)]
+    public void SpeedStepButtons_ShowOnlyWhenTheWindowIsBig(double width, bool shown)
     {
         Assert.Equal(shown, TextToSpeech.ResponsiveLayout.ShowSpeedStepButtons(width));
     }
