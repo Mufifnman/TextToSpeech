@@ -29,9 +29,9 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
-            <TextBox x:Name="nameBox" Grid.Column="1" Height="28" VerticalContentAlignment="Center"
+            <TextBox x:Name="nameBox" Grid.Column="1" MinHeight="30" VerticalContentAlignment="Center"
                      ToolTip="The filter's name in the Filters menu. Put / or \ in it to place it in submenus."/>
-            <Button x:Name="groupPickButton" Grid.Column="2" Content="Pick folder" Height="28" Padding="10,0" Margin="6,0,0,0" Click="GroupPick_Click"
+            <Button x:Name="groupPickButton" Grid.Column="2" Content="Pick folder" MinHeight="30" Padding="10,0" Margin="6,0,0,0" Click="GroupPick_Click"
                     ToolTip="Start the name with an existing menu folder"/>
             <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,3,0,0" FontSize="12" Foreground="{DynamicResource ThemeSubtle}" TextWrapping="Wrap"
                        Text="Use / or \ for submenus, for example  Web/Clean links  puts “Clean links” in a Web submenu."/>
@@ -61,7 +61,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Height="26" Margin="0,0,6,0" HorizontalContentAlignment="Left" Padding="8,0"
+                                <Button Grid.Column="0" MinHeight="30" Margin="0,0,6,0" HorizontalContentAlignment="Left" Padding="8,0"
                                         Click="KindButton_Click" ToolTip="Kind of rule">
                                     <TextBlock Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis"/>
                                 </Button>
@@ -70,15 +70,15 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="26" VerticalContentAlignment="Center"
+                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" MinHeight="30" VerticalContentAlignment="Center"
                                              Visibility="{Binding ShowValueBox, Converter={StaticResource BoolToVis}}"
                                              ToolTip="{Binding ValueHint}"/>
-                                    <Button Height="26" HorizontalContentAlignment="Left" Padding="8,0" Click="PresetButton_Click"
+                                    <Button MinHeight="30" HorizontalContentAlignment="Left" Padding="8,0" Click="PresetButton_Click"
                                             Visibility="{Binding IsPreset, Converter={StaticResource BoolToVis}}">
                                         <TextBlock Text="{Binding PresetLabel}" TextTrimming="CharacterEllipsis"/>
                                     </Button>
                                     <TextBox Grid.Column="1" Width="170" Margin="6,0,0,0" Text="{Binding Extra, UpdateSourceTrigger=PropertyChanged}"
-                                             Height="26" VerticalContentAlignment="Center"
+                                             MinHeight="30" VerticalContentAlignment="Center"
                                              Visibility="{Binding ShowExtra, Converter={StaticResource BoolToVis}}"
                                              ToolTip="{Binding ExtraHint}"/>
                                 </Grid>
@@ -89,9 +89,9 @@
                                               Visibility="{Binding ShowWholeWords, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="MoveUp_Click" ToolTip="Move up"/>
-                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down"/>
-                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="RemoveRule_Click" ToolTip="Remove this rule"/>
+                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="MoveUp_Click" ToolTip="Move up"/>
+                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down"/>
+                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="RemoveRule_Click" ToolTip="Remove this rule"/>
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>
