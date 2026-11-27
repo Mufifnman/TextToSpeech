@@ -34,6 +34,13 @@ namespace TextToSpeech.Api.Arbitration
 
         private void SpeakFor(AgentRecord agent, string text, string mode)
         {
+            // Waiting text can come due long after it was accepted (headphones unplugged, quiet hours began, muted):
+            // the rules are checked again at the moment of speaking.
+            if (!PolicyEvaluator.Evaluate(policy(), Context()).MayRead)
+            {
+                lastSpoken = new SpeakResponse("", 0, "idle", 0, true);
+                return;
+            }
             lastSpoken = inner.SpeakAsync(new SpeakRequest(text, agent.Label, mode, null, null, null, null, null)).GetAwaiter().GetResult();
             if (frontedFor != agent.Id)
             {

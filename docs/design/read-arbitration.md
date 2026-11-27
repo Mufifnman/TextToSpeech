@@ -14,7 +14,7 @@ Builds on the local API and always-on design (`local-api-and-always-on.md` in th
 
 - Agent = `{ id, label, pid?, titleHint?, priority? }`. The plugin derives `id` from the project folder (stable across hooks and MCP), `pid` from its parent process, `titleHint` from the folder name. Agents are created on first contact (speak, register or focus) and forgotten after 6 h of silence with nothing waiting.
 - `POST /v1/speak` gains an optional `agent`. Without it, behavior is exactly as before (window, hotkeys, plain scripts are not arbitrated). With it: policy check, then turn taking. Response adds `decision`: `speaking`, `waiting` (with `queuePosition`, `heldBy`), `skipped` (`if-idle` while another agent reads) or `denied` (with `reason`).
-- Waiting text is kept per agent inside the app (default max 5 items per agent, oldest dropped), not in the reading list, so the user's own text and the holder's text are never interleaved with it.
+- Waiting text is kept per agent inside the app (default max 5 items per agent, oldest dropped), not in the reading list, so the user's own text and the holder's text are never interleaved with it. Waiting text expires after 30 minutes, is held in memory only (an app restart loses it), and the policy is checked again when it comes due, not only when it was submitted.
 - The turn ends when the reading list runs dry (`finished`). Next agent: window in focus first, then higher priority, then longest waiting. A holder whose reading ended without notice (queue cleared, app restarted) is replaced by the next speaker.
 - `focusMode`: `off`; `next` (focus only reorders the line, and starts reading at once if nothing is playing); `now` (the focused agent interrupts: its first text is spoken with `interrupt`, the interrupted remainder stays in the list and is read after, as with any interrupt).
 - Clearing the reading list also clears waiting text.
@@ -64,5 +64,6 @@ I recommend it as its own PR: it adds a microphone permission, new hotkeys and a
 - No .NET SDK in the cloud, so the C# (and its xunit tests) was written without compiling. Kevin builds and runs `dotnet test` locally; the Node side is tested in the cloud.
 - NAudio form-factor lookup and the Toolhelp/user32 P/Invokes are the least certain code; each fails safe (unknown headphones denies when the rule is on; focus unknown just means no promotion).
 - Windows with several agents in one terminal tab group depend on title hints (section 4).
-- Agents on the same project folder share an identity and take turns as one.
+- Agents on the same project folder share an identity and take turns as one. (Using the hook's session id would split them, but the MCP server has no session id, so one window would then compete with itself.)
+- `pid` and `titleHint` are client supplied and used by bring-to-front. Any local process with the token could ask the app to raise some window. Follow-up: derive the caller's pid from the loopback socket (GetExtendedTcpTable) and only raise windows of its ancestors. Open question: drop an agent's waiting text when its UserPromptSubmit fires (not done).
 - `now` focus mode interrupts speech the user may be listening to; default is `next`.

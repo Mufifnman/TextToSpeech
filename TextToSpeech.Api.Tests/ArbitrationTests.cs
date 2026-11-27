@@ -260,6 +260,16 @@ namespace TextToSpeech.Api.Tests
         }
 
         [Fact]
+        public void Waiting_text_expires()
+        {
+            arb.Submit(A("a"), "a1", "queue", 5);
+            arb.Submit(A("b"), "b1", "queue", 5);
+            now += ReadArbiter.PendingTtl + TimeSpan.FromMinutes(1);
+            Assert.Empty(arb.WaitingOrder());
+            Assert.Null(arb.OnReadingFinished());
+        }
+
+        [Fact]
         public void Agent_needs_an_id()
         {
             Assert.Throws<ApiException>(() => arb.Upsert(new AgentRef(" ", null, null, null, null)));
@@ -394,6 +404,17 @@ namespace TextToSpeech.Api.Tests
             Assert.False(p.MayRead);
             Assert.Equal(probe.Clock.AddMinutes(30).ToString("o"), p.MutedUntil);
             await Assert.ThrowsAsync<ApiException>(() => host.MuteAsync(0));
+        }
+
+        [Fact]
+        public async Task Waiting_text_is_dropped_if_the_rules_forbid_reading_when_its_turn_comes()
+        {
+            await host.SpeakAsync(Req("a", "one"));
+            busy = true;
+            await host.SpeakAsync(Req("b", "two"));
+            await host.MuteAsync(10);
+            host.OnReadingFinished();
+            Assert.Single(inner.Calls);
         }
 
         [Fact]

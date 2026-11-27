@@ -18,7 +18,7 @@ namespace TextToSpeech.Api.Arbitration
         internal List<PendingRead> Pending { get; } = new();
     }
 
-    public sealed record PendingRead(string Text, long Seq);
+    public sealed record PendingRead(string Text, long Seq, DateTimeOffset Added);
 
     public enum SubmitOutcome { Speaking, Waiting, Skipped, Dropped }
 
@@ -35,6 +35,9 @@ namespace TextToSpeech.Api.Arbitration
     public sealed class ReadArbiter
     {
         public static readonly TimeSpan AgentTtl = TimeSpan.FromHours(6);
+
+        /// <summary>Waiting text older than this is dropped: stale news is worse than none.</summary>
+        public static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(30);
 
         private readonly Func<DateTimeOffset> clock;
         private readonly Func<bool> isBusy;
@@ -108,7 +111,7 @@ namespace TextToSpeech.Api.Arbitration
             {
                 return new SubmitResult(SubmitOutcome.Skipped, heldBy + " is reading.", heldBy, 0);
             }
-            a.Pending.Add(new PendingRead(text, ++seq));
+            a.Pending.Add(new PendingRead(text, ++seq, clock()));
             while (a.Pending.Count > Math.Max(1, maxPending))
             {
                 a.Pending.RemoveAt(0);
@@ -172,12 +175,24 @@ namespace TextToSpeech.Api.Arbitration
         }
 
         /// <summary>Waiting agents in the order they will get their turn.</summary>
-        public IReadOnlyList<AgentRecord> WaitingOrder() =>
-            agents.Values.Where(a => a.Pending.Count > 0 && a.Id != HolderId)
+        public IReadOnlyList<AgentRecord> WaitingOrder()
+        {
+            DropExpired();
+            return agents.Values.Where(a => a.Pending.Count > 0 && a.Id != HolderId)
                 .OrderByDescending(a => a.Id == FocusedAgentId)
                 .ThenByDescending(a => a.Priority)
                 .ThenBy(a => a.Pending[0].Seq)
                 .ToList();
+        }
+
+        private void DropExpired()
+        {
+            var now = clock();
+            foreach (var a in agents.Values)
+            {
+                a.Pending.RemoveAll(p => now - p.Added > PendingTtl);
+            }
+        }
 
         private int QueuePosition(AgentRecord a) => WaitingOrder().ToList().FindIndex(x => x.Id == a.Id) + 1;
 
