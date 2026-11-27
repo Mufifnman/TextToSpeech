@@ -40,9 +40,9 @@
         <!-- rule list header -->
         <DockPanel Grid.Row="1" Margin="0,0,0,6">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="+ Rule" Padding="12,3" Margin="0,0,6,0" Click="AddRule_Click"
+                <Button Content="+ Rule" MinHeight="30" Padding="12,3" Margin="0,0,6,0" Click="AddRule_Click"
                         ToolTip="Add a rule: remove text, replace, remove lines, ..."/>
-                <Button Content="+ Common cleanup" Padding="12,3" Click="AddPreset_Click"
+                <Button Content="+ Common cleanup" MinHeight="30" Padding="12,3" Click="AddPreset_Click"
                         ToolTip="Add a ready-made cleanup such as web links, citation numbers or markdown symbols"/>
             </StackPanel>
             <TextBlock Text="Rules (run from top to bottom)" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -89,9 +89,9 @@
                                               Visibility="{Binding ShowWholeWords, Converter={StaticResource BoolToVis}}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="MoveUp_Click" ToolTip="Move up"/>
-                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down"/>
-                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="RemoveRule_Click" ToolTip="Remove this rule"/>
+                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="MoveUp_Click" ToolTip="Move up" AutomationProperties.Name="Move rule up"/>
+                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down" AutomationProperties.Name="Move rule down"/>
+                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="RemoveRule_Click" ToolTip="Remove this rule" AutomationProperties.Name="Remove rule"/>
                                 </StackPanel>
                             </Grid>
                         </DataTemplate>
@@ -101,7 +101,7 @@
         </Border>
 
         <!-- lint -->
-        <ScrollViewer Grid.Row="3" MaxHeight="84" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" MaxHeight="84" Margin="2,8,0,0" VerticalScrollBarVisibility="Auto">
             <TextBlock x:Name="lintText" TextWrapping="Wrap"/>
         </ScrollViewer>
 
@@ -126,11 +126,11 @@
         <!-- buttons -->
         <DockPanel Grid.Row="5" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button x:Name="saveButton" Content="Save" Padding="18,4" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>
-                <Button Content="Cancel" Padding="18,4" IsCancel="True" Click="Cancel_Click"/>
+                <Button x:Name="saveButton" Content="Save" MinHeight="32" Padding="18,4" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>
+                <Button Content="Cancel" MinHeight="32" Padding="18,4" IsCancel="True" Click="Cancel_Click"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="deleteButton" Content="Delete filter" Padding="12,4" Click="Delete_Click" Visibility="Collapsed"
+                <Button x:Name="deleteButton" Content="Delete filter" MinHeight="32" Padding="12,4" Click="Delete_Click" Visibility="Collapsed"
                         ToolTip="Delete this filter and its file"/>
                 <TextBlock x:Name="fileText" Foreground="{DynamicResource ThemeSubtle}" VerticalAlignment="Center" Margin="12,0,0,0"
                            TextTrimming="CharacterEllipsis"/>
