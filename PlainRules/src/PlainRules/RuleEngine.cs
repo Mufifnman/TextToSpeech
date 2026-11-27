@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace PlainRules;
@@ -24,7 +25,7 @@ public sealed class RuleStepResult
 /// <summary>A rule set turned into ready-to-run regexes. Build once, apply many times.</summary>
 public sealed class CompiledRuleSet
 {
-    private sealed record Step(int RuleIndex, Regex? Regex, string Replacement, string? Error, bool Skipped);
+    private sealed record Step(int RuleIndex, Regex? Regex, string Replacement, string? Error, bool Skipped, Regex? Block = null, bool Inside = false);
 
     private readonly List<Step> _steps = new();
 
@@ -37,9 +38,11 @@ public sealed class CompiledRuleSet
             try
             {
                 var parts = RuleCompiler.Expand(rule);
+                var scope = RuleCompiler.ExpandScope(rule);
+                Regex? block = scope is { } sc ? new Regex(sc.Pattern, sc.Options, timeout) : null;
                 if (parts.Count == 0) { _steps.Add(new Step(i, null, "", "Nothing to do.", true)); continue; }
                 foreach (var p in parts)
-                    _steps.Add(new Step(i, new Regex(p.Pattern, p.Options | RegexOptions.CultureInvariant, timeout), p.Replacement, null, false));
+                    _steps.Add(new Step(i, new Regex(p.Pattern, p.Options | RegexOptions.CultureInvariant, timeout), p.Replacement, null, false, block, scope?.Inside ?? false));
             }
             catch (Exception ex) when (ex is ArgumentException or RegexParseException or InvalidOperationException)
             {
@@ -74,11 +77,12 @@ public sealed class CompiledRuleSet
             try
             {
                 int count = 0;
-                text = s.Regex.Replace(text, m =>
+                string Replace(string segment) => s.Regex.Replace(segment, m =>
                 {
                     count++;
                     return m.Result(s.Replacement);
                 });
+                text = s.Block == null ? Replace(text) : ReplaceInBlocks(text, s.Block, s.Inside, Replace);
                 report?.Invoke(s.RuleIndex, count, null);
             }
             catch (RegexMatchTimeoutException)
@@ -87,6 +91,27 @@ public sealed class CompiledRuleSet
             }
         }
         return text;
+    }
+
+    /// <summary>
+    /// Run <paramref name="replace"/> only on the parts of the text inside the blocks, or only on the parts outside them.
+    /// Each part is handled on its own, so a match never crosses a block border.
+    /// </summary>
+    private static string ReplaceInBlocks(string text, Regex block, bool inside, Func<string, string> replace)
+    {
+        var sb = new StringBuilder(text.Length);
+        int pos = 0;
+        foreach (Match b in block.Matches(text))
+        {
+            if (b.Length == 0) continue;
+            string gap = text.Substring(pos, b.Index - pos);
+            sb.Append(inside ? gap : replace(gap));
+            sb.Append(inside ? replace(b.Value) : b.Value);
+            pos = b.Index + b.Length;
+        }
+        string tail = text.Substring(pos);
+        sb.Append(inside ? tail : replace(tail));
+        return sb.ToString();
     }
 }
 

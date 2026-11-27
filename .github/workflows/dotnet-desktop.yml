@@ -41,6 +41,10 @@ jobs:
     - name: Test
       run: dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
 
+    # The standalone rule engine has its own tests
+    - name: Test PlainRules
+      run: dotnet test PlainRules/PlainRules.sln --configuration Release
+
     # Upload build artifacts (the built executable files)
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

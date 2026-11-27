@@ -4,6 +4,8 @@ Describe text clean-up rules in plain language instead of regex. A small, depend
 
 - **Rules** in plain words: remove text, replace, remove lines, remove between two markers, remove a list of words.
 - **Ready-made clean-ups** (presets): web links, citation numbers, markdown symbols, emoji, repeated punctuation, page numbers, hard line wraps and more (`Presets.All`).
+- **Blocks**: remove code blocks, quotes, lists, text in brackets or text between your own markers, or limit any rule to the inside or outside of such blocks.
+- **Templates**: ready-made starting filters (`Templates.All`).
 - **Lint** that explains mistakes in plain language (`RuleLinter.Check`).
 - **Live preview** with a match count per rule (`RuleEngine.Preview`).
 - **Hand-editable JSON** files (comments and trailing commas allowed).
@@ -54,8 +56,27 @@ One rule set per file. Rules run from top to bottom.
 }
 ```
 
-Kinds: `removeText`, `replace`, `removeLinesStarting`, `removeLinesContaining`, `removeBetween`, `removeWords`, `preset`, `regex`.
+Kinds: `removeText`, `replace`, `removeLinesStarting`, `removeLinesContaining`, `removeBetween`, `removeWords`, `preset`, `regex`, `removeBlock`.
 Options on any rule: `ignoreCase`, `wholeWords` (text rules only), `disabled`.
+
+## Blocks
+
+A block is a part of the text with a recognizable shape. `removeBlock` removes every block of one kind (or replaces it with `with`):
+
+```jsonc
+{ "kind": "removeBlock", "block": "code-blocks", "with": "(code skipped)" }
+{ "kind": "removeBlock", "block": "between", "blockStart": "<<", "blockEnd": ">>" }
+```
+
+Any other rule can be limited to blocks with `scope` (`inside` or `outside`, default is everywhere) and `block`:
+
+```jsonc
+{ "kind": "replace", "value": "&", "with": "and", "scope": "outside", "block": "code-blocks" }
+```
+
+Block ids (`Blocks.All`): `code-blocks`, `inline-code`, `quotes`, `lists`, `headings`, `tables`, `brackets`, `square-brackets`, `quoted-text`, and `between` (with `blockStart` and `blockEnd`).
+A scoped rule runs on each block (or each stretch of text between blocks) on its own, so a match never crosses a block border. Rules run top to bottom, so a later rule sees the text after earlier removals.
+Files without these fields keep working unchanged.
 
 ## Presets
 
