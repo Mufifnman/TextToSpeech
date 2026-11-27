@@ -74,6 +74,38 @@ namespace TextToSpeech
         /// <summary>Preferred API port; a free one is used if it is taken (api.json always says which).</summary>
         public int ApiPort { get; set; } = 47821;
 
+        // ---- Agents (Claude Code and other programs that read through the local API) ----
+
+        /// <summary>Agents may read aloud at all. Off silences everything that comes through the API with an agent id.</summary>
+        public bool AgentReadingEnabled { get; set; } = true;
+
+        /// <summary>What the Claude Code plugin reads when a reply finishes: off, announce ("Claude Code finished") or reply.</summary>
+        public string AgentAutoRead { get; set; } = "off";
+
+        /// <summary>Agents read only while headphones or a headset are the audio output.</summary>
+        public bool AgentRequireHeadphones { get; set; } = false;
+
+        /// <summary>Quiet hours "HH:mm" to "HH:mm" (local time, may cross midnight); empty means none.</summary>
+        public string AgentQuietFrom { get; set; } = "";
+        public string AgentQuietTo { get; set; } = "";
+
+        /// <summary>Switching to an agent's window that has waiting text: off, next (read after the current one) or now (interrupt).</summary>
+        public string AgentFocusMode { get; set; } = "next";
+
+        /// <summary>Bring the reading agent's window to the front when its turn starts. Off: nothing on screen is moved.</summary>
+        public bool AgentBringToFront { get; set; } = false;
+
+        public TextToSpeech.Api.Arbitration.ReadPolicy ToReadPolicy() => new()
+        {
+            Enabled = AgentReadingEnabled,
+            AutoRead = AgentAutoRead is "announce" or "reply" ? AgentAutoRead : "off",
+            RequireHeadphones = AgentRequireHeadphones,
+            QuietFrom = string.IsNullOrWhiteSpace(AgentQuietFrom) ? null : AgentQuietFrom,
+            QuietTo = string.IsNullOrWhiteSpace(AgentQuietTo) ? null : AgentQuietTo,
+            FocusMode = AgentFocusMode is "off" or "now" ? AgentFocusMode : "next",
+            BringToFront = AgentBringToFront,
+        };
+
         /// <summary>The one-time "still running in the tray" hint has been shown.</summary>
         public bool TrayHintShown { get; set; } = false;
 

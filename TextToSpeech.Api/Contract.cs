@@ -35,8 +35,9 @@ namespace TextToSpeech.Api
     /// <param name="ApplyFilters">Run the app's text filters on the text. Default false for API text.</param>
     /// <param name="Popup">false reads without showing the reading popup. Default true.</param>
     /// <param name="Voice">Reserved: rejected for now (use PUT /v1/voice). Same for Rate and Volume.</param>
+    /// <param name="Agent">Who is asking. Set, the request goes through arbitration (policy and turn taking); left out, it is spoken straight away as before.</param>
     public sealed record SpeakRequest(string? Text, string? Source, string? Mode, bool? ApplyFilters, bool? Popup,
-        string? Voice, int? Rate, int? Volume);
+        string? Voice, int? Rate, int? Volume, TextToSpeech.Api.Arbitration.AgentRef? Agent = null);
 
     public sealed record JumpRequest(string? SessionId, int Sentence, int Word);
     public sealed record VoiceRequest(string? Id);
@@ -72,7 +73,18 @@ namespace TextToSpeech.Api
     public sealed record StatusDto(string State, VoiceDto? Voice, int Rate, int Volume, SessionSummary? ActiveSession,
         IReadOnlyList<QueuedSession> Queued, WindowDto Window, int ApiVersion);
 
-    public sealed record SpeakResponse(string SessionId, int Revision, string State, int QueuePosition, bool Skipped);
+    /// <param name="Decision">Only with an agent: speaking, waiting, skipped or denied. Waiting text has no session yet (SessionId is empty).</param>
+    public sealed record SpeakResponse(string SessionId, int Revision, string State, int QueuePosition, bool Skipped,
+        string? Decision = null, string? Reason = null, string? HeldBy = null);
+
+    public sealed record MuteRequest(int? Minutes);
+
+    public sealed record AgentDto(string Id, string Label, int Priority, bool IsHolder, bool IsFocused, int Waiting, int WaitPosition);
+
+    public sealed record PolicyResponse(bool MayRead, IReadOnlyList<string> Reasons, TextToSpeech.Api.Arbitration.ReadPolicy Policy,
+        bool? HeadphonesConnected, string? MutedUntil);
+
+    public sealed record ArbiterStatus(IReadOnlyList<AgentDto> Agents, string? HolderId, string? FocusedId, PolicyResponse Policy);
 
     /// <summary><c>ReadText + Remainder</c> always equals the session's text.</summary>
     public sealed record PeekResponse(string SessionId, int Revision, string State, string ReadText, string Remainder, PositionDto Position);

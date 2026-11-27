@@ -27,16 +27,25 @@ Or from a local checkout: `/plugin marketplace add C:/Git/TextToSpeech`. To try 
 | `/tts:pause`, `/tts:resume`, `/tts:skip`, `/tts:stop`, `/tts:status` | Control reading |
 | `read-aloud` skill | Lets you just say "read that to me" or "read this file aloud" |
 | `text-to-speech` MCP server | Tools `speak`, `pause`, `set_voice`, `set_rate`, `take_remainder` and more (see `integrations/README.md`) |
-| Stop hook (off by default) | Reads each reply aloud when it finishes |
+| Stop hook (off by default) | Reads each reply aloud when it finishes, if the app's rules allow |
+| UserPromptSubmit hook | Tells the app this window is the one you are using (moves its waiting text up) |
 
-## Auto-read replies (optional, off by default)
+## Several windows, one voice
 
-Set an environment variable before starting Claude Code (or in `env` in your Claude Code settings):
+Every Claude Code window (identified by its project folder) is an "agent" of the app. Agents take turns: while one is
+reading, text from another waits in the app and is read when the first is done, or sooner when you switch to that
+window (the plugin tells the app when you submit a prompt there, and the app also notices window focus). The app
+decides whether reading is allowed at all, with rules you set in **Settings, Agents (Claude Code) reading rules**:
+allow agents, headphones only, quiet hours, what switching windows does, and whether the reading window is brought to
+the front (off by default). Claude can ask with the `reading_policy` tool, and can mute itself with `mute_reading`,
+but cannot loosen your rules.
 
-- `TTS_AUTO_READ=reply` reads every reply aloud (code, tables and links removed, trimmed to about 1500 characters).
-- `TTS_AUTO_READ=announce` only says "Claude Code finished" (never cuts off current reading).
+## Auto-read replies (off by default)
 
-Unset, the hook does nothing. If the app is not running the hook stays silent.
+Choose **Auto-read replies** in the same settings section: off, "Say that it finished", or "Read the reply" (code,
+tables and links removed, trimmed to about 1500 characters). For one window only, the environment variable
+`TTS_AUTO_READ=off|announce|reply` (before starting Claude Code, or in `env` in your Claude Code settings) overrides it.
+If the app is not running, or the rules say no, the hook stays silent.
 
 ## Notes
 

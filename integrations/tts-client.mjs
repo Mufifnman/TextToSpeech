@@ -3,8 +3,9 @@
 // It finds the running app through api.json (port, token), which the app writes while the local API is enabled.
 // The token changes every time the app starts, so it is read again for every call.
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 
 export class TtsError extends Error {
   constructor(message, { status = 0, code = 'error' } = {}) {
@@ -63,6 +64,17 @@ export async function call(method, path, body, { env = process.env, fetchImpl = 
   return json;
 }
 
+/**
+ * How this Claude Code window names itself to the app's reading arbiter. The id comes from the project folder so the
+ * hooks, the MCP server and the CLI of one window agree on it (windows on the same folder share one identity).
+ * `pid` is this process's parent (Claude Code or a shell under it), which lets the app find the window it runs in.
+ */
+export function agentFromContext({ cwd = process.cwd(), pid = process.ppid, label } = {}) {
+  const folder = basename(cwd) || 'claude';
+  const id = `claude-${createHash('sha1').update(cwd.toLowerCase()).digest('hex').slice(0, 10)}`;
+  return { id, label: label ?? folder, pid, titleHint: folder };
+}
+
 // Named operations, shared by the CLI and the MCP server.
 export const api = {
   status: (o) => call('GET', '/v1/status', undefined, o),
@@ -73,7 +85,14 @@ export const api = {
     mode: args.mode,
     applyFilters: args.applyFilters,
     popup: args.popup,
+    agent: args.agent,
   }, o),
+  policy: (o) => call('GET', '/v1/policy', undefined, o),
+  mute: (minutes, o) => call('POST', '/v1/policy/mute', { minutes }, o),
+  agents: (o) => call('GET', '/v1/agents', undefined, o),
+  registerAgent: (agent, o) => call('POST', '/v1/agents', agent, o),
+  focusAgent: (agent, o) => call('POST', '/v1/agents/focus', agent, o),
+  unregisterAgent: (id, o) => call('DELETE', `/v1/agents/${encodeURIComponent(id)}`, undefined, o),
   control: (action, o) => call('POST', `/v1/${action}`, undefined, o),
   jump: (args, o) => call('POST', '/v1/jump', args, o),
   setVoice: (id, o) => call('PUT', '/v1/voice', { id }, o),

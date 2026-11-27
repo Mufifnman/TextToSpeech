@@ -103,6 +103,32 @@
             <TextBlock Text="OCR engine (for Read Region)" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </DockPanel>
 
+        <Expander x:Name="agentsExpander" Header="Agents (Claude Code) reading rules" Tag="agents">
+            <StackPanel Margin="0,4,0,10">
+                <TextBlock Text="Applies to programs that read through the local API and identify themselves as an agent, such as the Claude Code plugin. They take turns, so two windows never talk over each other."
+                           TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12" Margin="0,0,0,6"/>
+                <CheckBox x:Name="agentEnabledBox" Content="Allow agents to read aloud" Margin="0,0,0,6"/>
+                <CheckBox x:Name="agentHeadphonesBox" Content="Only when headphones or a headset are the audio output" Margin="0,0,0,6"
+                          ToolTip="Uses the default Windows output device type. If it cannot tell, agents stay quiet."/>
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock Text="Quiet hours" VerticalAlignment="Center" Width="110"/>
+                    <TextBox x:Name="agentQuietFromBox" Width="56" ToolTip="Start, like 22:00. Leave empty for none."/>
+                    <TextBlock Text=" to " VerticalAlignment="Center"/>
+                    <TextBox x:Name="agentQuietToBox" Width="56" ToolTip="End, like 07:00."/>
+                </DockPanel>
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock Text="Auto-read replies" VerticalAlignment="Center" Width="110"/>
+                    <ComboBox x:Name="agentAutoReadBox" Width="200" ToolTip="What the Claude Code plugin reads when a reply finishes. Reply reads the whole reply as plain text."/>
+                </DockPanel>
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock Text="Switch to window" VerticalAlignment="Center" Width="110"/>
+                    <ComboBox x:Name="agentFocusBox" Width="200" ToolTip="When you switch to a window with text waiting to be read."/>
+                </DockPanel>
+                <CheckBox x:Name="agentFrontBox" Content="Bring the reading window to the front" Margin="0,0,0,2"
+                          ToolTip="Moves that window above others when its turn starts. Off by default because it changes what is on your screen."/>
+            </StackPanel>
+        </Expander>
+
         <Expander x:Name="hotkeyExpander" Header="Hotkeys" Tag="hotkeys">
             <StackPanel>
             <TextBlock Text="Click a box, then press the new shortcut. Backspace puts the default back." Margin="0,2,0,6"

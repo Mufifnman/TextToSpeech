@@ -23,11 +23,14 @@ namespace TextToSpeech.Api
         private readonly List<Channel<string>> eventClients = new();
         private HttpListener? listener;
         private ApiRouter? router;
+        private readonly IReadingHost front;
 
+        /// <param name="front">What requests are routed to when it is not the host itself (the arbitrating wrapper around it).</param>
         /// <param name="runOnUi">Runs the given work on the UI thread and returns its result (tests pass <c>work =&gt; work()</c>).</param>
-        public LocalApiServer(ReadingHost host, string token, Func<Func<Task<ApiResponse>>, Task<ApiResponse>> runOnUi)
+        public LocalApiServer(ReadingHost host, string token, Func<Func<Task<ApiResponse>>, Task<ApiResponse>> runOnUi, IReadingHost? front = null)
         {
             this.host = host;
+            this.front = front ?? host;
             this.token = token;
             this.runOnUi = runOnUi;
         }
@@ -64,7 +67,7 @@ namespace TextToSpeech.Api
                 throw new InvalidOperationException("Could not open a local port for the API: " + last?.Message, last);
             }
 
-            router = new ApiRouter(host, new ApiSecurity(token, Port));
+            router = new ApiRouter(front, new ApiSecurity(token, Port));
             host.Event += OnHostEvent;
             _ = Task.Run(AcceptLoopAsync);
         }
