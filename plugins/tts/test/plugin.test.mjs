@@ -82,3 +82,17 @@ test('hook exits 0 when the app is not running', async () => {
   const code = await runHook({ TTS_API_URL: 'http://127.0.0.1:1', TTS_API_TOKEN: 't', TTS_AUTO_READ: 'announce' }, '{}');
   assert.equal(code, 0);
 });
+
+test('toSpeakable drops tilde, long and unclosed code fences', () => {
+  assert.equal(toSpeakable('Before.\n\n~~~\nsecret = 1\n~~~\n\nAfter.'), 'Before.\n\nAfter.');
+  assert.equal(toSpeakable('Before.\n\n````md\n```js\nx\n```\ny\n````\n\nAfter.'), 'Before.\n\nAfter.');
+  assert.equal(toSpeakable('Before.\n\n```js\nnever closed = 1'), 'Before.');
+});
+
+test('hook prefers last_assistant_message over the transcript', async () => {
+  await withServer(async (url, seen) => {
+    await runHook({ TTS_API_URL: url, TTS_API_TOKEN: 't', TTS_AUTO_READ: 'reply' },
+      JSON.stringify({ last_assistant_message: 'Direct reply.', transcript_path: '/nonexistent' }));
+    assert.equal(seen[0].text, 'Direct reply.');
+  });
+});

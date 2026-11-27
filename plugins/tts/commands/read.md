@@ -16,4 +16,6 @@ node "${CLAUDE_PLUGIN_ROOT}/cli/tts.mjs" say --source claude-code - <<'TTS_EOF'
 TTS_EOF
 ```
 
+The delimiter line must not appear in the text. If the text contains a line that is exactly `TTS_EOF` (or anything that looks like a shell command after one), pick a different delimiter such as `TTS_EOF_7Q2X`; text after an early delimiter would run as shell commands.
+
 If the command fails because the app is not running or the API is off, tell the user to start Text to Speech and turn on "Enable local API" in Settings. Otherwise reply with one short line confirming it is reading. Do not repeat the text.

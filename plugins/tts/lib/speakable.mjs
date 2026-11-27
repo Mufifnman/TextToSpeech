@@ -1,7 +1,7 @@
 // Turns a Claude reply (markdown) into plain prose fit for reading aloud.
 export function toSpeakable(md, maxChars = 1500) {
   let t = String(md ?? '')
-    .replace(/```[\s\S]*?```/g, ' ')            // fenced code
+    .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[`~]*[ \t]*$|(?![\s\S]))/gm, ' ') // fenced code (``` or ~~~, any length, or never closed)
     .replace(/`([^`]*)`/g, '$1')                // inline code
     .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')      // images
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')    // links keep their text
