@@ -223,4 +223,81 @@ public class BlockTests
         Assert.DoesNotContain("http", output);
         Assert.Contains("link", output);
     }
+
+    // ---- version, saved blocks, CRLF, overlap, literal markers ----
+
+    [Fact]
+    public void Version_OrdinaryFiltersStayVersion1_BlockFiltersBecomeVersion2()
+    {
+        var plain = new RuleSet { Name = "t", Rules = { new Rule { Kind = RuleKind.RemoveText, Value = "a" } } };
+        var blocky = new RuleSet { Name = "t", Rules = { Remove("quotes") } };
+        Assert.Contains("\"version\": 1", RuleSerializer.ToJson(plain));
+        Assert.Contains("\"version\": 2", RuleSerializer.ToJson(blocky));
+        Assert.Equal(1, plain.Version);   // saving never changes the caller's set
+    }
+
+    [Fact]
+    public void Version_NewerThanSupported_IsRefusedWithAReadableMessage()
+    {
+        var ex = Assert.Throws<RuleFormatException>(() => RuleSerializer.FromJson("{ \"version\": 3, \"name\": \"x\", \"rules\": [] }"));
+        Assert.Contains("newer version", ex.Message);
+        Assert.False(RuleSerializer.TryFromJson("{ \"version\": 3, \"name\": \"x\", \"rules\": [] }", out _, out var error));
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void UnknownRuleKind_IsRefusedNotIgnored()
+        => Assert.Throws<RuleFormatException>(() => RuleSerializer.FromJson("{ \"name\": \"x\", \"rules\": [ { \"kind\": \"mystery\", \"value\": \"a\" } ] }"));
+
+    [Fact]
+    public void SavedBlocks_AreUsedByNameAndRoundTrip()
+    {
+        var set = new RuleSet
+        {
+            Name = "t",
+            Blocks = new() { new BlockDef { Id = "notes", Start = "<<", End = ">>" } },
+            Rules = { new Rule { Kind = RuleKind.RemoveBlock, Block = "my:notes" }, new Rule { Kind = RuleKind.RemoveText, Value = "x", Scope = RuleScope.Outside, Block = "my:notes" } },
+        };
+        var back = RuleSerializer.FromJson(RuleSerializer.ToJson(set));
+        Assert.Equal("a  b", RuleEngine.Apply(back, "a <<n>> b"));
+        Assert.Equal("a <<xx>>", RuleEngine.Apply(new RuleSet { Name = "t", Blocks = set.Blocks, Rules = { set.Rules[1] } }, "xa <<xx>>x"));
+        Assert.True(RuleLinter.IsValid(RuleLinter.Check(back)));
+    }
+
+    [Fact]
+    public void SavedBlocks_UnknownName_IsLintError()
+    {
+        var set = new RuleSet { Name = "t", Rules = { new Rule { Kind = RuleKind.RemoveBlock, Block = "my:nope" } } };
+        Assert.True(Has(RuleLinter.Check(set), "BadBlock"));
+    }
+
+    [Fact]
+    public void Crlf_LineBasedBlocksWork()
+    {
+        Assert.Equal("a\r\n\r\nb", Run(Remove("quotes"), "a\r\n> q1\r\n> q2\r\nb"));
+        Assert.Equal("a\r\n\r\nb", Run(Remove("lists"), "a\r\n- x\r\n2. y\r\nb"));
+        Assert.Equal("a\r\n(code)\r\nb", Run(Remove("code-blocks", "(code)"), "a\r\n```\r\nz\r\n```\r\nb"));
+        Assert.Equal("a\r\n\r\nb", Run(Remove("headings"), "a\r\n## h\r\nb"));
+    }
+
+    [Fact]
+    public void Crlf_ScopeInsideQuotes()
+    {
+        var r = new Rule { Kind = RuleKind.RemoveText, Value = "x", Scope = RuleScope.Inside, Block = "quotes" };
+        Assert.Equal("x\r\n> a\r\n> b\r\nx", Run(r, "x\r\n> xa\r\n> xb\r\nx"));
+    }
+
+    [Fact]
+    public void Overlap_SameKind_LeftmostBlockWinsAndBlocksDoNotNest()
+    {
+        var r = new Rule { Kind = RuleKind.RemoveBlock, Block = "between", BlockStart = "<<", BlockEnd = ">>" };
+        Assert.Equal(" c>>", Run(r, "<<a <<b>> c>>"));
+    }
+
+    [Fact]
+    public void Markers_AreLiteralNotRegex()
+    {
+        var r = new Rule { Kind = RuleKind.RemoveBlock, Block = "between", BlockStart = "[.*", BlockEnd = ".*]" };
+        Assert.Equal("a  b [zzz] c", Run(r, "a [.*x.*] b [zzz] c"));
+    }
 }

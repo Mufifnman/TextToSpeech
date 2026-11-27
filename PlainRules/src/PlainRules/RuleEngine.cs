@@ -37,8 +37,8 @@ public sealed class CompiledRuleSet
             if (rule.Disabled) { _steps.Add(new Step(i, null, "", null, true)); continue; }
             try
             {
-                var parts = RuleCompiler.Expand(rule);
-                var scope = RuleCompiler.ExpandScope(rule);
+                var parts = RuleCompiler.Expand(rule, set.Blocks);
+                var scope = RuleCompiler.ExpandScope(rule, set.Blocks);
                 Regex? block = scope is { } sc ? new Regex(sc.Pattern, sc.Options, timeout) : null;
                 if (parts.Count == 0) { _steps.Add(new Step(i, null, "", "Nothing to do.", true)); continue; }
                 foreach (var p in parts)

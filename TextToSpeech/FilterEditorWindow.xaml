@@ -106,6 +106,9 @@
                                     </StackPanel>
                                 </Grid>
 
+                                <TextBlock Text="{Binding Summary}" Margin="206,2,0,0" FontSize="12" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource ThemeSubtle}"/>
+
                                 <!-- start and end markers of a block you define yourself -->
                                 <StackPanel Orientation="Horizontal" Margin="206,4,0,0"
                                             Visibility="{Binding ShowMarkers, Converter={StaticResource BoolToVis}}">

@@ -82,8 +82,9 @@ public sealed class Rule
 
     private string BlockName()
     {
-        if (Block == Blocks.Between) return "text between " + (BlockStart ?? "") + " and " + (BlockEnd ?? "");
-        return Blocks.Find(Block)?.Name ?? "blocks";
+        if (Block != null && Block.StartsWith(PlainRules.Blocks.CustomPrefix, StringComparison.OrdinalIgnoreCase)) return Block.Substring(PlainRules.Blocks.CustomPrefix.Length);
+        if (Block == PlainRules.Blocks.Between) return "text between " + (BlockStart ?? "") + " and " + (BlockEnd ?? "");
+        return PlainRules.Blocks.Find(Block)?.Name ?? "blocks";
     }
 
     private string DescribeKind()
@@ -118,6 +119,9 @@ public sealed class RuleSet
     public string? Group { get; set; }
 
     public string? Description { get; set; }
+
+    /// <summary>Reusable blocks defined by this file, referred to by rules as "my:&lt;id&gt;". Null when there are none.</summary>
+    public List<BlockDef>? Blocks { get; set; }
 
     /// <summary>Rules, applied from first to last.</summary>
     public List<Rule> Rules { get; set; } = new();

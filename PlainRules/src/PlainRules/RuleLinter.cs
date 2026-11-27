@@ -45,7 +45,7 @@ public static class RuleLinter
             if (!seen.Add(key)) Add(i, LintSeverity.Warning, "DuplicateRule", "Same as an earlier rule.");
 
             List<RuleCompiler.Part> parts;
-            try { parts = RuleCompiler.Expand(r); }
+            try { parts = RuleCompiler.Expand(r, set.Blocks); }
             catch (ArgumentException ex)
             {
                 var code = r.Kind == RuleKind.Preset ? "UnknownPreset"
@@ -56,7 +56,7 @@ public static class RuleLinter
                 continue;
             }
 
-            try { _ = RuleCompiler.ExpandScope(r); }
+            try { _ = RuleCompiler.ExpandScope(r, set.Blocks); }
             catch (ArgumentException ex)
             {
                 Add(i, LintSeverity.Error, "BadScope", ex.Message);

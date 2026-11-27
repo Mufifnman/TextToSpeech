@@ -128,14 +128,23 @@ namespace TextToSpeech
             PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
         }
 
+        /// <summary>Built-in blocks plus any blocks the filter file defines itself ("my:name").</summary>
+        private IEnumerable<(string Id, string Name, string Tip)> BlockChoices()
+        {
+            foreach (var b in Blocks.All) yield return (b.Id, b.Name, b.Description + "\n" + b.Example);
+            foreach (var d in existing?.Set?.Blocks ?? new List<BlockDef>())
+                if (d != null && !string.IsNullOrWhiteSpace(d.Id))
+                    yield return (Blocks.CustomPrefix + d.Id.Trim(), d.Name ?? d.Id.Trim(), "Saved in this filter: " + d.Start + " ... " + d.End);
+        }
+
         private void BlockButton_Click(object sender, RoutedEventArgs e)
         {
             if (RowOf(sender) is not { } row) return;
             var menu = new ContextMenu();
-            foreach (var block in Blocks.All)
+            foreach (var block in BlockChoices())
             {
                 var id = block.Id;
-                var item = new MenuItem { Header = block.Name, ToolTip = block.Description + "\n" + block.Example, IsChecked = row.Block == id };
+                var item = new MenuItem { Header = block.Name, ToolTip = block.Tip, IsChecked = row.Block == id };
                 item.Click += (_, _) => row.Block = id;
                 menu.Items.Add(item);
             }
@@ -153,14 +162,14 @@ namespace TextToSpeech
             foreach (var (scope, title) in new[] { (RuleScope.Inside, "Only inside..."), (RuleScope.Outside, "Everywhere except inside...") })
             {
                 var parent = new MenuItem { Header = title, IsChecked = row.Scope == scope };
-                foreach (var block in Blocks.All)
+                foreach (var block in BlockChoices())
                 {
                     var chosenScope = scope;
                     var id = block.Id;
                     var item = new MenuItem
                     {
                         Header = block.Name,
-                        ToolTip = block.Description + "\n" + block.Example,
+                        ToolTip = block.Tip,
                         IsChecked = row.Scope == scope && row.Block == id,
                     };
                     item.Click += (_, _) => row.SetScope(chosenScope, id);
@@ -264,6 +273,7 @@ namespace TextToSpeech
                 Name = name,
                 Group = group,
                 Description = existing?.Set?.Description,
+                Blocks = existing?.Set?.Blocks,   // saved blocks defined in the file by hand are kept
                 Rules = rows.Select(r => r.ToRule()).ToList(),
             };
         }
@@ -439,12 +449,19 @@ namespace TextToSpeech
             public bool ShowMarkers => UsesBlock && block == Blocks.Between;
             public bool HasAdvanced => (ShowCaseOptions && (ignoreCase || wholeWords)) || (ShowScope && scope != RuleScope.Everywhere) || disabled;
             public string MoreLabel => HasAdvanced ? "More •" : "More";
-            public string BlockLabel => Blocks.Find(block)?.Name ?? "Choose a block...";
+            private string BlockName =>
+                Blocks.Find(block)?.Name
+                ?? (block.StartsWith(Blocks.CustomPrefix, StringComparison.OrdinalIgnoreCase) ? block.Substring(Blocks.CustomPrefix.Length) : null)
+                ?? "a block";
+            public string BlockLabel => block.Length == 0 ? "Choose a block..." : BlockName;
+
+            /// <summary>One plain sentence saying what the rule does, shown under it.</summary>
+            public string Summary => ToRule().Describe();
             public string ScopeLabel
             {
                 get
                 {
-                    string name = Blocks.Find(block)?.Name ?? "a block";
+                    string name = BlockName;
                     return scope switch
                     {
                         RuleScope.Inside => "Only inside " + name,

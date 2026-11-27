@@ -24,11 +24,26 @@ public sealed class BlockType
     internal RegexOptions Options { get; }
 }
 
+/// <summary>A reusable block you define once in a filter file (<see cref="RuleSet.Blocks"/>) and refer to as "my:&lt;id&gt;".</summary>
+public sealed class BlockDef
+{
+    /// <summary>Short name without spaces, for example "notes". Rules refer to it as "my:notes".</summary>
+    public string Id { get; set; } = "";
+    public string? Name { get; set; }
+    /// <summary>Literal start marker (not a regex).</summary>
+    public string Start { get; set; } = "";
+    /// <summary>Literal end marker (not a regex). The first end marker after a start marker closes the block; blocks do not nest.</summary>
+    public string End { get; set; } = "";
+}
+
 /// <summary>The built-in block types, plus the "between two markers" block you define yourself.</summary>
 public static class Blocks
 {
     /// <summary>Id of the block you define yourself with <see cref="Rule.BlockStart"/> and <see cref="Rule.BlockEnd"/>.</summary>
     public const string Between = "between";
+
+    /// <summary>Prefix for ids of blocks defined in the filter file. Ids without a prefix are built in.</summary>
+    public const string CustomPrefix = "my:";
 
     private const RegexOptions M = RegexOptions.Multiline;
     private const string Bullet = @"(?:[-*+•]|\d+[.)])[ \t]+";
@@ -81,12 +96,25 @@ public static class Blocks
         All.FirstOrDefault(b => string.Equals(b.Id, id?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The regex that finds the blocks a rule refers to. Throws <see cref="ArgumentException"/> for a missing or unknown block.</summary>
-    internal static (string Pattern, RegexOptions Options) PatternFor(string? id, string? start, string? end)
+    internal static (string Pattern, RegexOptions Options) PatternFor(string? id, string? start, string? end, IReadOnlyList<BlockDef>? custom = null)
     {
+        if (id != null && id.StartsWith(CustomPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var name = id.Substring(CustomPrefix.Length).Trim();
+            var def = custom?.FirstOrDefault(d => d != null && string.Equals(d.Id?.Trim(), name, StringComparison.OrdinalIgnoreCase))
+                      ?? throw new ArgumentException($"Unknown saved block \"{name}\".");
+            return (MarkerPattern(def.Start, def.End), RegexOptions.None);
+        }
         var block = Find(id) ?? throw new ArgumentException(string.IsNullOrWhiteSpace(id) ? "Choose which kind of block." : $"Unknown block \"{id}\".");
         if (block.Id != Between) return (block.Pattern, block.Options);
+        return (MarkerPattern(start, end), RegexOptions.None);
+    }
+
+    /// <summary>Markers are always literal text, never regex.</summary>
+    private static string MarkerPattern(string? start, string? end)
+    {
         if (string.IsNullOrEmpty(start)) throw new ArgumentException("Missing start marker.");
         if (string.IsNullOrEmpty(end)) throw new ArgumentException("Missing end marker.");
-        return (Regex.Escape(start) + @"[\s\S]*?" + Regex.Escape(end), RegexOptions.None);
+        return Regex.Escape(start) + @"[\s\S]*?" + Regex.Escape(end);
     }
 }

@@ -78,6 +78,24 @@ Block ids (`Blocks.All`): `code-blocks`, `inline-code`, `quotes`, `lists`, `head
 A scoped rule runs on each block (or each stretch of text between blocks) on its own, so a match never crosses a block border. Rules run top to bottom, so a later rule sees the text after earlier removals.
 Files without these fields keep working unchanged.
 
+**Detection rules**
+- Each rule uses one block kind. Within a kind, blocks are found left to right and never overlap: the leftmost block wins and blocks do not nest (for markers, the first end marker closes the block).
+- Line-based kinds (`quotes`, `lists`, `headings`, `tables`, `code-blocks`) handle both `\n` and `\r\n` (clipboard text is usually `\r\n`).
+- Markers (`blockStart`, `blockEnd`) are literal text, never regex.
+- Detection works on plain text only. OCR output has no fences or tables, so those find nothing there, but line-based kinds can match OCR lines that happen to start with `>`, `-` or `1.`. Custom filters run on both clipboard text and OCR.
+- Rules run top to bottom; a rule sees the text after earlier rules, and its match count in `Preview` counts only matches inside its scope.
+- Every rule, and the block search of a scoped rule, runs under the match timeout (`RuleEngine.DefaultTimeout`, 300 ms); a rule that times out is skipped.
+
+**Saved blocks.** Define a block once in the file and use it by name, so markers are not retyped:
+
+```jsonc
+{ "version": 2, "name": "Notes", "blocks": [ { "id": "notes", "start": "<<", "end": ">>" } ],
+  "rules": [ { "kind": "removeBlock", "block": "my:notes" } ] }
+```
+Built-in ids have no prefix; ids you define are written `my:<id>`.
+
+**File version.** A file is written as version 2 only when it uses blocks, scopes or `removeBlock`; other files stay version 1. This version refuses a file newer than it understands with a readable message. Older builds do not check the version and would run a scoped rule everywhere, so keep scoped filters on builds that include this change.
+
 ## Presets
 
 | id | what it does |

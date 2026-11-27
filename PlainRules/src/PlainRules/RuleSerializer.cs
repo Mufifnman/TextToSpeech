@@ -17,7 +17,24 @@ public static class RuleSerializer
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) },
     };
 
-    public static string ToJson(RuleSet set) => JsonSerializer.Serialize(set, Options);
+    /// <summary>Newest file version this library understands. Version 2 adds blocks, scopes and the removeBlock kind.</summary>
+    public const int SupportedVersion = 2;
+
+    /// <summary>True when the set uses a feature that older versions of this library would silently get wrong.</summary>
+    public static bool UsesBlockFeatures(RuleSet set) =>
+        set.Blocks is { Count: > 0 } || set.Rules.Any(r => r.Kind == RuleKind.RemoveBlock || r.Scope != RuleScope.Everywhere || r.Block != null);
+
+    /// <summary>Writes version 2 only when the set needs it, so ordinary filters stay readable by older builds.</summary>
+    public static string ToJson(RuleSet set)
+    {
+        var copy = new RuleSet
+        {
+            Version = UsesBlockFeatures(set) ? Math.Max(set.Version, 2) : set.Version,
+            Name = set.Name, Group = set.Group, Description = set.Description, Rules = set.Rules,
+            Blocks = set.Blocks is { Count: > 0 } ? set.Blocks : null,
+        };
+        return JsonSerializer.Serialize(copy, Options);
+    }
 
     /// <summary>Parse JSON; throws <see cref="RuleFormatException"/> with a readable message on bad input.</summary>
     public static RuleSet FromJson(string json)
@@ -26,9 +43,12 @@ public static class RuleSerializer
         {
             var set = JsonSerializer.Deserialize<RuleSet>(json, Options)
                       ?? throw new RuleFormatException("The file is empty.");
+            if (set.Version > SupportedVersion)
+                throw new RuleFormatException($"This filter file is version {set.Version}, made by a newer version of the app (this one reads up to version {SupportedVersion}). Update the app to use it.");
             // A hand-edited file can hold "rules": null or a null entry; neither may crash the loader.
             set.Rules = (set.Rules ?? new()).Where(r => r != null).ToList();
             foreach (var r in set.Rules) r.Value ??= "";
+            if (set.Blocks != null) set.Blocks = set.Blocks.Where(b => b != null).ToList();
             return set;
         }
         catch (JsonException ex)
