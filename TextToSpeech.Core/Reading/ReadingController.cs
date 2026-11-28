@@ -137,6 +137,7 @@ namespace TextToSpeech.Core.Reading
         public void Rewind()
         {
             ClearPausedAt(markAnswered: false);
+            stopAfterSentence = -1;   // moving by hand ends "play just this line"
             document.Rewind();
             AfterMove();
         }
@@ -145,6 +146,7 @@ namespace TextToSpeech.Core.Reading
         {
             // Skipping while waiting at a question counts as moving past it.
             ClearPausedAt(markAnswered: true);
+            stopAfterSentence = -1;   // moving by hand ends "play just this line"
             if (document.Skip())
             {
                 AfterMove();
@@ -196,6 +198,10 @@ namespace TextToSpeech.Core.Reading
         /// </summary>
         public void PlayRange(int first, int last)
         {
+            if (first < 0 || first >= document.Count)
+            {
+                return;   // the text changed since the click: nothing to play
+            }
             ClearPausedAt(markAnswered: false);
             document.JumpTo(first, 0);
             stopAfterSentence = Math.Clamp(last, first, document.Count - 1);

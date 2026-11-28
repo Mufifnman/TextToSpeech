@@ -133,6 +133,27 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void PlayRange_IsEndedBySkip_SoReadingCarriesOnNormally()
+        {
+            var rig = new Rig("One.\n\nTwo.\n\nThree.\n\nFour.");
+            rig.Controller.PlayRange(0, 0);
+            rig.Controller.Skip();                 // the user moved on by hand
+            rig.Engine.Finish(1);                  // "Two." done: no longer a one-line request, so Three follows
+
+            Assert.Equal("Three.", rig.Engine.Calls[2].Text);
+            Assert.True(rig.Controller.IsPlaying);
+        }
+
+        [Fact]
+        public void PlayRange_WithAnIndexPastTheEnd_DoesNothing()
+        {
+            var rig = new Rig("Only.");
+            rig.Controller.PlayRange(5, 6);
+
+            Assert.Empty(rig.Engine.Calls);
+        }
+
+        [Fact]
         public void PlayRange_StopsAfterTheLine_AndNormalPlayContinues()
         {
             var rig = new Rig("First.\n\nSecond.\n\nThird.");
