@@ -52,7 +52,7 @@
                     <Button x:Name="skipButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
-                    <Button x:Name="playAllButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" Visibility="Collapsed"
+                    <Button x:Name="playAllButton" AutomationProperties.Name="Play all without stopping at questions" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" Visibility="Collapsed"
                             ToolTip="Stops after each question. Click to read straight through." Click="PlayAll_Click">
                         <TextBlock x:Name="playAllGlyph" Text="&#x25B6;&#x25B6;" FontSize="10" Foreground="{DynamicResource ThemeSubtle}"/>
                     </Button>
@@ -61,6 +61,10 @@
                     </Button>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="rawButton" AutomationProperties.Name="Show original text" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" Visibility="Collapsed"
+                            ToolTip="Show the original text with its symbols." Click="Raw_Click">
+                        <TextBlock x:Name="rawGlyph" Text="&lt;/&gt;" FontFamily="Consolas" FontSize="11" Foreground="{DynamicResource ThemeSubtle}"/>
+                    </Button>
                     <Button x:Name="openButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Open the full window" Click="Open_Click">
                         <TextBlock Text="&#xE8A7;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
