@@ -2,7 +2,9 @@
 version: 2
 updates:
   - package-ecosystem: "nuget"
-    directory: "/"
+    directories:
+      - "/"
+      - "/PlainRules"   # its own solution, not part of the app's TextToSpeech.sln
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
