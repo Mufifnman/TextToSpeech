@@ -116,6 +116,8 @@ namespace TextToSpeech.Core.Reading
             Func<string, bool>? keepSentence = null, string? owner = null)
         {
             var blocks = MarkdownReader.Parse(text, markdown);
+            // Text with nothing but plain paragraphs has no layout to show: keep it as flowing text, as plain text always was.
+            bool laidOut = markdown && blocks.Any(x => x.Kind != BlockKind.Paragraph);
             var added = new List<Sentence>();
             var lastOfBlock = new int[blocks.Count];   // index in added of each block's last sentence, -1 when none
             for (int b = 0; b < blocks.Count; b++)
@@ -136,7 +138,7 @@ namespace TextToSpeech.Core.Reading
                     bool first = k == 0;
                     bool last = k == parts.Count - 1;
                     SentenceFormat? format = null;
-                    if (markdown)
+                    if (laidOut)
                     {
                         string prefix = first && block.Ordinal is int n ? NumberWords.Spoken(n) + ". " : "";
                         int factor = last && block.Kind == BlockKind.ListItem ? 2 : 1;

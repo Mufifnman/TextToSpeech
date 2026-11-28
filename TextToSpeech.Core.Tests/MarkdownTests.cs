@@ -133,5 +133,17 @@ namespace TextToSpeech.Core.Tests
             Assert.StartsWith("# Not a heading.", doc.Sentences[0].Text);
             Assert.Null(doc.Sentences[0].Format);
         }
+
+        [Fact]
+        public void PlainParagraphs_StayFlowingText_ButRichTextIsLaidOut()
+        {
+            var plain = new ReadingDocument();
+            plain.AppendMarkdown("First one. Second one.\n\nNext paragraph.", markdown: true);
+            Assert.All(plain.Sentences, s => Assert.Null(s.Format));   // nothing to lay out: drawn as a flowing paragraph
+
+            var rich = new ReadingDocument();
+            rich.AppendMarkdown("Intro.\n\n- one\n- two", markdown: true);
+            Assert.All(rich.Sentences, s => Assert.NotNull(s.Format));
+        }
     }
 }
