@@ -52,6 +52,10 @@
                     <Button x:Name="skipButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" ToolTip="Next sentence" Click="Skip_Click">
                         <TextBlock Text="&#xE893;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>
+                    <Button x:Name="playAllButton" Width="34" Height="26" Margin="0,0,4,0" Focusable="False" Visibility="Collapsed"
+                            ToolTip="Stops after each question. Click to read straight through." Click="PlayAll_Click">
+                        <TextBlock x:Name="playAllGlyph" Text="&#x25B6;&#x25B6;" FontSize="10" Foreground="{DynamicResource ThemeSubtle}"/>
+                    </Button>
                     <Button x:Name="clearButton" Width="34" Height="26" Focusable="False" ToolTip="Clear the text" Click="Clear_Click">
                         <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                     </Button>

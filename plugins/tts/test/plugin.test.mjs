@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { toSpeakable, lastAssistantText } from '../lib/speakable.mjs';
+import { toSpeakable, toReadableMarkdown, extractQuestions, lastAssistantText } from '../lib/speakable.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -107,7 +107,7 @@ test('hook reads the last reply when TTS_AUTO_READ=reply', async () => {
   await withServer(async (url, seen) => {
     const code = await runHook(E(url, { TTS_AUTO_READ: 'reply' }), JSON.stringify({ transcript_path: tp }));
     assert.equal(code, 0);
-    assert.equal(seen[0].text, 'All done.'); assert.equal(seen[0].popup, false);
+    assert.equal(seen[0].text, 'All **done**.'); assert.equal(seen[0].popup, false);   // markdown goes on as written
   });
 });
 
@@ -158,5 +158,45 @@ test('hook prefers last_assistant_message over the transcript', async () => {
     await runHook(E(url, { TTS_AUTO_READ: 'reply' }),
       JSON.stringify({ last_assistant_message: 'Direct reply.', transcript_path: '/nonexistent' }));
     assert.equal(seen[0].text, 'Direct reply.');
+  });
+});
+
+test('toReadableMarkdown keeps headings and lists, drops code and links', () => {
+  const t = toReadableMarkdown('# Title\n\nSee [docs](https://x.io) or https://y.io.\n\n```js\nconst a = 1;\n```\n\n- one\n- **two**\n');
+  assert.equal(t, '# Title\n\nSee docs or\n\n- one\n- **two**');
+});
+
+test('extractQuestions takes the tts-questions block out of the reply', () => {
+  const r = extractQuestions('All done.\n\n```tts-questions\n1. Which branch?\n- Add tests?\n\n```\n');
+  assert.deepEqual(r.questions, ['Which branch?', 'Add tests?']);
+  assert.equal(r.text, 'All done.');
+  assert.deepEqual(extractQuestions('Nothing to ask?').questions, []);
+});
+
+test('hook passes the questions and shows the popup when the reply has them', async () => {
+  await withServer(async (url, seen) => {
+    await runHook(E(url, { TTS_AUTO_READ: 'reply' }),
+      JSON.stringify({ last_assistant_message: 'Parser fixed.\n\n```tts-questions\nWhich branch?\nAdd tests?\n```' }));
+    assert.equal(seen[0].text, 'Parser fixed.');
+    assert.deepEqual(seen[0].questions, ['Which branch?', 'Add tests?']);
+    assert.equal(seen[0].popup, undefined);
+  });
+});
+
+test('cli say passes repeated --question and next/answered call the right routes', async () => {
+  await withServer(async (url, seen, urls) => {
+    const env = E(url);
+    await new Promise((resolve) => {
+      const p = spawn(process.execPath, [join(root, 'cli/tts.mjs'), 'say', '--question', 'A?', '--question', 'B?', 'Hello.'], { env: { ...process.env, ...env } });
+      p.on('close', resolve);
+    });
+    assert.deepEqual(seen[0].questions, ['A?', 'B?']);
+    for (const args of [['next'], ['answered', 'q1']]) {
+      await new Promise((resolve) => {
+        const p = spawn(process.execPath, [join(root, 'cli/tts.mjs'), ...args], { env: { ...process.env, ...env } });
+        p.on('close', resolve);
+      });
+    }
+    assert.deepEqual(urls.slice(1), ['POST /v1/next', 'POST /v1/pauses/q1/answered']);
   });
 });

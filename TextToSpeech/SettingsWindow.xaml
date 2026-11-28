@@ -27,7 +27,15 @@
                           ToolTip="A small window above the tray with the text being read, shown only while the full window is hidden."/>
                 <CheckBox x:Name="popupUnfocusedBox" Content="Also show it while the window is open but not in focus" Margin="22,0,0,6"
                           ToolTip="Off: the popup hides whenever the full window is open. On: it hides only while you are using the window."/>
-                <CheckBox x:Name="popupAutoHideBox" Content="Hide popup when reading finishes" Margin="22,0,0,6"/>
+                <CheckBox x:Name="popupAutoHideBox" Content="Hide popup when reading finishes" Margin="22,0,0,6"
+                          ToolTip="It hides after the longer of the Auto clear delay and the time below, never before the text clears."/>
+                <DockPanel Margin="44,0,0,6">
+                    <TextBlock x:Name="popupStayText" DockPanel.Dock="Right" Width="90" TextAlignment="Right" VerticalAlignment="Center"/>
+                    <TextBlock Text="Stay open" VerticalAlignment="Center" Margin="0,0,10,0"
+                               ToolTip="How long the popup stays after reading ends. 0 follows Auto clear."/>
+                    <Slider x:Name="popupStaySlider" Minimum="0" Maximum="120" TickFrequency="1" IsSnapToTickEnabled="True"
+                            SmallChange="1" LargeChange="10" VerticalAlignment="Center"/>
+                </DockPanel>
                 <CheckBox x:Name="popupKeepBox" Content="Keep popup open when paused" Margin="22,0,0,6"
                           ToolTip="Off: pausing or stopping hides the popup until reading resumes."/>
                 <TextBlock Text="Opacity" FontWeight="SemiBold" Margin="0,6,0,0"/>
@@ -86,6 +94,18 @@
             <TextBlock x:Name="autoClearText" DockPanel.Dock="Right" Width="60" TextAlignment="Right" VerticalAlignment="Center"/>
             <Slider x:Name="autoClearSlider" Minimum="1" Maximum="30" TickFrequency="1" IsSnapToTickEnabled="True"
                     SmallChange="1" LargeChange="5" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <CheckBox x:Name="markdownBox" Content="Show markdown laid out (lists, headings, code) and never read the markup" Margin="0,0,0,6"
+                  ToolTip="Applies to text from the API and plugin, and to pasted text that has headings, lists or code blocks."/>
+        <CheckBox x:Name="playAllBox" Content="Read through questions without stopping (play all by default)" Margin="0,0,0,10"
+                  ToolTip="Off: reading stops after each question that a program marked, until you press play. The Play all button in the window and popup switches it for the current text."/>
+        <TextBlock Text="Text size in the window" FontWeight="SemiBold"/>
+        <DockPanel Margin="0,6,0,14">
+            <TextBlock x:Name="mainTextSizeText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>
+            <Slider x:Name="mainTextSizeSlider" Minimum="10" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="True"
+                    SmallChange="1" LargeChange="2" VerticalAlignment="Center"
+                    ToolTip="Ctrl+mouse wheel over the reading text changes it too."/>
         </DockPanel>
 
         <CheckBox x:Name="autoShowBox" Content="Bring the window up when reading starts and hide it when reading ends" Margin="0,0,0,14"

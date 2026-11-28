@@ -16,7 +16,8 @@ namespace TextToSpeech
         Action<int, int> JumpTo,
         Action OpenFullWindow,
         Action Dismiss,
-        Action TakeBack);
+        Action TakeBack,
+        Action TogglePlayAll);
 
     /// <summary>
     /// A small always-on-top window in the bottom right corner (above the tray) that shows the reading text with the
@@ -59,6 +60,16 @@ namespace TextToSpeech
             var work = SystemParameters.WorkArea;
             Left = work.Right - ActualWidth - EdgeGap;
             Top = work.Bottom - ActualHeight - EdgeGap;
+        }
+
+        /// <summary>The Play all button: shown only when the text has marked questions, lit while play-all is on.</summary>
+        public void SetPlayAll(bool visible, bool on)
+        {
+            playAllButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            playAllGlyph.Foreground = on
+                ? (System.Windows.Media.Brush?)TryFindResource("ReadWordBrush") ?? System.Windows.Media.Brushes.Orange
+                : (System.Windows.Media.Brush?)TryFindResource("ThemeSubtle") ?? System.Windows.Media.Brushes.Gray;
+            playAllButton.ToolTip = on ? "Play all is on: no stopping at questions. Click to stop at each question." : "Stops after each question. Click to read straight through.";
         }
 
         public void SetPlaying(bool playing) => playGlyph.Text = playing ? "" : "";   // pause / play
@@ -167,6 +178,7 @@ namespace TextToSpeech
         private void PlayPause_Click(object sender, RoutedEventArgs e) => actions.PlayPause();
         private void Clear_Click(object sender, RoutedEventArgs e) => actions.Clear();
         private void Skip_Click(object sender, RoutedEventArgs e) => actions.Skip();
+        private void PlayAll_Click(object sender, RoutedEventArgs e) => actions.TogglePlayAll();
         private void Open_Click(object sender, RoutedEventArgs e) => actions.OpenFullWindow();
         private void Close_Click(object sender, RoutedEventArgs e) => actions.Dismiss();
         private void TakeBack_Click(object sender, RoutedEventArgs e) => actions.TakeBack();

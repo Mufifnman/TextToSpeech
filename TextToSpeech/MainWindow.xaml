@@ -165,6 +165,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Button x:Name="___RewindButton_" Margin="2,0" Grid.Column="0" Click="Rewind_Click" Focusable="False" ToolTip="Restart sentence, or go back one (Ctrl+Left)">
                     <StackPanel Orientation="Horizontal">
@@ -194,6 +195,13 @@
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" Foreground="#7A7A7A" FontSize="15" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock Text="Clear" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="playAllButton" Margin="2,0" Padding="10,0" Grid.Column="5" Click="PlayAll_Click" Focusable="False" Visibility="Collapsed"
+                        ToolTip="Stops after each question. Click to read straight through without stopping.">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#x25B6;&#x25B6;" Foreground="#2E9E4F" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="playAllLabel" Text="Play all" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 </Grid>
