@@ -316,6 +316,7 @@ namespace TextToSpeech
                 lintText.Inlines.Add(new Run("No problems found.") { Foreground = (Brush)FindResource("ThemeSubtle") });
                 return;
             }
+            bool first = true;
             foreach (var issue in issues.OrderByDescending(i => i.Severity))
             {
                 (string mark, Brush brush) = issue.Severity switch
@@ -324,7 +325,8 @@ namespace TextToSpeech
                     LintSeverity.Warning => ("⚠ ", Brushes.DarkOrange),
                     _ => ("ℹ ", (Brush)FindResource("ThemeSubtle")),
                 };
-                lintText.Inlines.Add(new Run(mark + issue + "\n") { Foreground = brush });
+                lintText.Inlines.Add(new Run((first ? "" : "\n") + mark + issue) { Foreground = brush });
+                first = false;
             }
         }
 
