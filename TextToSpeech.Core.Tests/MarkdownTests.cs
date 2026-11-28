@@ -127,6 +127,25 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void QuestionList_OnlyTakesAnActualQuestion_NotAStatementWithTheSameWords()
+        {
+            var (text, pauses) = QuestionList.Append("Here is why it fails. Tell me which branch you use.", new[] { "Why?", "Which branch?" });
+            Assert.Equal("Here is why it fails. Tell me which branch you use.\n\n1. Why?\n2. Which branch?\n", text);
+            Assert.All(pauses, p => Assert.True(p.At >= "Here is why it fails. Tell me which branch you use.".Length));
+        }
+
+        [Fact]
+        public void QuestionList_TwoQuestionsInOneParagraph_SecondIsAskedInTheList()
+        {
+            var (text, pauses) = QuestionList.Append("Which branch? And should I add tests?", new[] { "Which branch?", "Should I add tests?" });
+            Assert.Equal("Which branch? And should I add tests?\n\n1. Should I add tests?\n", text);
+            Assert.Equal(new[] { "q1", "q2" }, pauses.Select(p => p.Id));
+            var doc = new ReadingDocument();
+            doc.AppendMarkdown(text, pauses: pauses);
+            Assert.Equal(2, doc.Pauses().Count);   // both questions have a wait point
+        }
+
+        [Fact]
         public void QuestionList_AddsANumberedList_WithOnePausePerQuestion()
         {
             var (text, pauses) = QuestionList.Append("Done with the parser.", new[] { "Which branch?", "  ", "Add tests?" });

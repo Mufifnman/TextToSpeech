@@ -20,6 +20,8 @@ namespace TextToSpeech.Core.Reading
             var pauses = new List<PauseSpec>();
             var section = new List<(int Id, string Question)>();
             int id = 0;
+            var blocks = MarkdownReader.Parse(body, true);
+            var usedBlocks = new HashSet<int>();
             foreach (var raw in questions)
             {
                 string q = string.Join(" ", (raw ?? "").Split('\n', '\r').Select(x => x.Trim()).Where(x => x.Length > 0));
@@ -29,6 +31,10 @@ namespace TextToSpeech.Core.Reading
                 }
                 id++;
                 int at = FindIn(body, q);
+                if (at >= 0 && !usedBlocks.Add(BlockOf(blocks, at)))
+                {
+                    at = -1;   // that block already holds a wait point (a block holds one): ask this one in the list instead
+                }
                 if (at >= 0)
                 {
                     pauses.Add(new PauseSpec("q" + id, q, at));   // already said in the text: wait there
@@ -58,7 +64,24 @@ namespace TextToSpeech.Core.Reading
             return (sb.ToString(), pauses);
         }
 
-        /// <summary>Where <paramref name="question"/> occurs in <paramref name="body"/> (words in order, any punctuation or markup between), or -1.</summary>
+        /// <summary>The block (as the reading list will split the text) that holds source offset <paramref name="at"/>.</summary>
+        private static int BlockOf(IReadOnlyList<MarkdownBlock> blocks, int at)
+        {
+            for (int i = blocks.Count - 1; i >= 0; i--)
+            {
+                if (blocks[i].SourceStart <= at)
+                {
+                    return i;
+                }
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Where <paramref name="question"/> occurs in <paramref name="body"/> (whole words in order, any punctuation or markup
+        /// between), or -1. A question that ends with "?" only counts where the text asks it with a "?" too, so a statement that
+        /// merely uses the same words ("here is why it fails" for "Why?") is not taken for the question.
+        /// </summary>
         private static int FindIn(string body, string question)
         {
             var words = Regex.Matches(question, @"[\p{L}\p{N}]+").Select(m => Regex.Escape(m.Value)).ToList();
@@ -66,7 +89,12 @@ namespace TextToSpeech.Core.Reading
             {
                 return -1;
             }
-            var match = Regex.Match(body, string.Join(@"[\W_]+", words), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            string pattern = @"(?<![\p{L}\p{N}])" + string.Join(@"[\W_]+", words) + @"(?![\p{L}\p{N}])";
+            if (question.TrimEnd().EndsWith('?'))
+            {
+                pattern += @"(?=[\s*_`""')\]]*\?)";
+            }
+            var match = Regex.Match(body, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
             return match.Success ? match.Index : -1;
         }
     }
