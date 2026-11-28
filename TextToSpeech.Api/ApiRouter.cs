@@ -81,6 +81,18 @@ namespace TextToSpeech.Api
                     Expect(method, "POST");
                     return Accepted(await host.SpeakAsync(ValidateSpeak(Body<SpeakRequest>(request))));
 
+                case "prewarm" when parts.Length == 2:
+                    if (method == "GET")
+                    {
+                        return Ok(await host.GetPrewarmAsync());
+                    }
+                    Expect(method, "POST");
+                    return Ok(await host.PrewarmAsync(ValidatePrewarm(Body<PrewarmRequest>(request))));
+
+                case "prewarm" when parts.Length == 3 && parts[2] == "cancel":
+                    Expect(method, "POST");
+                    return Ok(await host.CancelPrewarmAsync(BodyOrDefault(request, new CancelPrewarmRequest())));
+
                 case "jump" when parts.Length == 2:
                     Expect(method, "POST");
                     return Ok(await host.JumpAsync(ValidateJump(Body<JumpRequest>(request))));
@@ -202,6 +214,19 @@ namespace TextToSpeech.Api
                 throw ApiException.BadRequest("agent.priority must be between -100 and 100.");
             }
             return a;
+        }
+
+        private static PrewarmRequest ValidatePrewarm(PrewarmRequest r)
+        {
+            if (string.IsNullOrWhiteSpace(r.Text))
+            {
+                throw ApiException.BadRequest("text is required.");
+            }
+            if ((r.Agent?.Id?.Length ?? 0) > 200)
+            {
+                throw ApiException.BadRequest("agent.id is too long.");
+            }
+            return r;
         }
 
         private static SpeakRequest ValidateSpeak(SpeakRequest r)

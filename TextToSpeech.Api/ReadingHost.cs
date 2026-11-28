@@ -24,8 +24,33 @@ namespace TextToSpeech.Api
         // Taken while the reader was on this session's text and playing: Release should carry on reading it.
         private readonly HashSet<string> resumeOnRelease = new();
 
-        public ReadingHost(ReadingController reading, IAppControl app, SessionStore? store = null)
+        // ---- prewarm hints (a caller says what it is about to ask us to read) ----
+        private sealed class Hint
         {
+            public required IReadOnlyList<string> Texts { get; init; }
+            public DateTimeOffset Expires { get; init; }
+            public bool Confirmed { get; set; }
+        }
+
+        /// <summary>A hint nobody reads is dropped after this long, so nothing lingers.</summary>
+        public static readonly TimeSpan HintLife = TimeSpan.FromMinutes(2);
+
+        /// <summary>Only the first sentences of a hint are prepared, which keeps the work and memory small.</summary>
+        public const int MaxHintSentences = 8;
+
+        /// <summary>Only the start of a hint's text is looked at (a hint is for the next few sentences).</summary>
+        public const int MaxHintChars = 5000;
+
+        /// <summary>At most this many callers have a hint at once; a new caller beyond that pushes out the one that expires first.</summary>
+        public const int MaxHintCallers = 8;
+
+        private readonly Func<DateTimeOffset> now;
+        private readonly Dictionary<string, Hint> hints = new();
+        private int hintsSent, hintsConfirmed, hintsReplaced, hintsCancelled, hintsTimedOut;
+
+        public ReadingHost(ReadingController reading, IAppControl app, SessionStore? store = null, Func<DateTimeOffset>? now = null)
+        {
+            this.now = now ?? (() => DateTimeOffset.UtcNow);
             this.reading = reading;
             this.app = app;
             this.store = store ?? new SessionStore();
@@ -47,6 +72,8 @@ namespace TextToSpeech.Api
 
         private void OnCleared()
         {
+            hintsCancelled += hints.Values.Count(h => !h.Confirmed);
+            hints.Clear();   // the reading list was cleared, which also drops prepared audio
             foreach (var closed in store.CloseHandoffs("cleared"))
             {
                 resumeOnRelease.Remove(closed.HandoffId);
@@ -69,6 +96,113 @@ namespace TextToSpeech.Api
                 Raise("handoff-expired", expired.Session.Id, expired.Reason);
             }
             store.Prune(id => doc.OwnerSentenceCount(id) > 0);
+
+            var current = now();
+            foreach (var (key, hint) in hints.Where(h => h.Value.Expires <= current).ToList())
+            {
+                hints.Remove(key);
+                if (!hint.Confirmed) hintsTimedOut++;
+                reading.PrewarmHint(key, Array.Empty<string>());
+            }
+        }
+
+        // ---------- prewarm hints ----------
+
+        private static string HintKey(string? agentId) => string.IsNullOrWhiteSpace(agentId) ? "default" : agentId!;
+
+        /// <summary>The sentences exactly as they would be handed to the speech engine if this text were read.</summary>
+        private IReadOnlyList<string> SpokenSentences(string text)
+        {
+            var scratch = new ReadingDocument();
+            scratch.AppendMarkdown(text, app.MarkdownEnabled, null);
+            return scratch.Sentences.Select(s => s.SpokenText).ToList();
+        }
+
+        public Task<PrewarmResponse> PrewarmAsync(PrewarmRequest request)
+        {
+            Tick();
+            string text = request.ApplyFilters == true ? app.ApplyFilters(request.Text!) : request.Text!;
+            bool cut = text.Length > MaxHintChars;
+            var sentences = SpokenSentences(cut ? text.Substring(0, MaxHintChars) : text);
+            if (cut && sentences.Count > 1)
+            {
+                sentences = sentences.Take(sentences.Count - 1).ToList();   // the last one may have been cut in the middle
+            }
+            var texts = sentences.Take(MaxHintSentences).ToList();
+            if (texts.Count == 0)
+            {
+                throw ApiException.BadRequest("There is no speakable text in the request.", "no_speakable_text");
+            }
+            string key = HintKey(request.Agent?.Id);
+            if (hints.TryGetValue(key, out var old) && !old.Confirmed) hintsReplaced++;   // replaced by this newer hint
+            if (!hints.ContainsKey(key) && hints.Count >= MaxHintCallers)
+            {
+                // Too many callers: the hint that would expire first goes (used ones before active ones).
+                var (evictKey, evicted) = hints.OrderByDescending(h => h.Value.Confirmed).ThenBy(h => h.Value.Expires).First();
+                hints.Remove(evictKey);
+                if (!evicted.Confirmed) hintsCancelled++;
+                reading.PrewarmHint(evictKey, Array.Empty<string>());
+            }
+            hints[key] = new Hint { Texts = texts, Expires = now() + HintLife };
+            hintsSent++;
+            reading.PrewarmHint(key, texts);
+            return Task.FromResult(PrewarmSnapshot());
+        }
+
+        public Task<PrewarmResponse> CancelPrewarmAsync(CancelPrewarmRequest request)
+        {
+            Tick();
+            string key = HintKey(request.Agent?.Id);
+            if (hints.Remove(key, out var hint))
+            {
+                if (!hint.Confirmed) hintsCancelled++;
+                reading.PrewarmHint(key, Array.Empty<string>());
+            }
+            return Task.FromResult(PrewarmSnapshot());
+        }
+
+        public Task<PrewarmResponse> GetPrewarmAsync()
+        {
+            Tick();
+            return Task.FromResult(PrewarmSnapshot());
+        }
+
+        private PrewarmResponse PrewarmSnapshot()
+        {
+            var current = now();
+            var list = hints.Select(h => new PrewarmHintDto(h.Key, h.Value.Confirmed ? "used" : "active", h.Value.Texts.Count,
+                Math.Max(0, (int)(h.Value.Expires - current).TotalSeconds))).ToList();
+            var audio = reading.LookAheadStats;
+            return new PrewarmResponse(list, new PrewarmStatsDto(hintsSent, hintsConfirmed, hintsReplaced, hintsCancelled, hintsTimedOut,
+                audio?.DemandsReady ?? 0, audio?.DemandsRunning ?? 0, audio?.DemandsFresh ?? 0, audio?.GuessesUsed ?? 0, audio?.GuessesWasted ?? 0));
+        }
+
+        /// <summary>
+        /// The real read arrived for a caller that sent a hint: confirmed when it starts with the hinted sentences
+        /// (the prepared audio is then used), otherwise the hint is replaced by this final version and its audio dropped.
+        /// Sentences the hint and the final text share are still reused either way.
+        /// </summary>
+        private void ResolveHint(string? agentId, string finalText)
+        {
+            string key = HintKey(agentId);
+            if (!hints.TryGetValue(key, out var hint) || hint.Confirmed) return;
+
+            var spoken = SpokenSentences(finalText);
+            bool matches = spoken.Count >= hint.Texts.Count && hint.Texts.Select((t, i) => spoken[i] == t).All(same => same);
+            if (matches)
+            {
+                hint.Confirmed = true;
+                hintsConfirmed++;
+            }
+            else
+            {
+                // Replaced by the final version: prepare its sentences instead (any shared with the old hint are reused),
+                // and keep the record only so the leftovers are cleared when it times out.
+                hintsReplaced++;
+                var finalSentences = spoken.Take(MaxHintSentences).ToList();
+                hints[key] = new Hint { Texts = finalSentences, Expires = now() + HintLife, Confirmed = true };
+                reading.PrewarmHint(key, finalSentences);
+            }
         }
 
         /// <summary>Sources (client names) of sessions whose remainder is currently taken.</summary>
@@ -224,6 +358,7 @@ namespace TextToSpeech.Api
                 text = withQuestions.Text;
                 specs.AddRange(withQuestions.Pauses);
             }
+            ResolveHint(request.Agent?.Id, text);
             var session = store.Create(request.Source ?? "api", text);
 
             bool wasPlaying = reading.IsPlaying;

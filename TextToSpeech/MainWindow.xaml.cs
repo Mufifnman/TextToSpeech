@@ -965,6 +965,7 @@ namespace TextToSpeech
         private void ApplyWindowSettings()
         {
             reading.GapMs = settings.SentenceGapMs;
+            catalog.Neural.ChunkLongSentences = settings.ChunkLongSentences;
             __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);

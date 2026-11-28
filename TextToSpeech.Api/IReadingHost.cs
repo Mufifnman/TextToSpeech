@@ -26,6 +26,16 @@ namespace TextToSpeech.Api
         Task<StatusDto> ReleaseAsync(string sessionId, ReleaseRequest request);
         Task<StatusDto> PatchAsync(string sessionId, PatchRequest request);
 
+        /// <summary>Text that will probably be read soon: the app prepares the audio. One hint per caller; a new one replaces it.</summary>
+        Task<PrewarmResponse> PrewarmAsync(PrewarmRequest request) =>
+            throw ApiException.NotFound("Prewarming is not supported here.", "unsupported");
+
+        Task<PrewarmResponse> CancelPrewarmAsync(CancelPrewarmRequest request) =>
+            throw ApiException.NotFound("Prewarming is not supported here.", "unsupported");
+
+        Task<PrewarmResponse> GetPrewarmAsync() =>
+            throw ApiException.NotFound("Prewarming is not supported here.", "unsupported");
+
         /// <summary>Marks a pause point answered; when reading is waiting at it, carries on.</summary>
         Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId) =>
             throw ApiException.NotFound("Pause points are not supported here.", "unsupported");

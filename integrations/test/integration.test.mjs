@@ -152,3 +152,22 @@ test('mcp speak identifies the window as an agent; policy and mute tools exist',
   await handle({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'mute_reading', arguments: { minutes: 30 } } });
   assert.deepEqual(seen.find((s) => s.url === '/v1/policy/mute').body, { minutes: 30 });
 });
+
+test('prewarm calls: cli sends a hint, cancel and stats; mcp ties the hint to this window', async () => {
+  seen = [];
+  await run(['prewarm', 'a', 'long', 'reply', '--agent', 'w1'], { out: () => {} });
+  assert.equal(seen[0].url, '/v1/prewarm');
+  assert.equal(seen[0].method, 'POST');
+  assert.deepEqual(seen[0].body, { text: 'a long reply', agent: { id: 'w1' } });
+
+  await run(['prewarm-cancel'], { out: () => {} });
+  assert.equal(seen[1].url, '/v1/prewarm/cancel');
+  await run(['prewarm-stats'], { out: () => {} });
+  assert.equal(seen[2].method, 'GET');
+  assert.equal(seen[2].url, '/v1/prewarm');
+
+  await handle({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'prewarm_reading', arguments: { text: 'hello' } } });
+  const hint = seen.find((s) => s.url === '/v1/prewarm' && s.method === 'POST' && s.body.text === 'hello');
+  assert.match(hint.body.agent.id, /^claude-[0-9a-f]{10}$/);   // same identity as speak, so the real read confirms it
+  assert.ok(TOOLS.some((t) => t.name === 'cancel_prewarm') && TOOLS.some((t) => t.name === 'prewarm_stats'));
+});

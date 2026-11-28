@@ -52,6 +52,22 @@ namespace TextToSpeech.Speech
         /// </summary>
         void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate);
 
+        /// <summary>
+        /// A guess about what will be read next (the rest of a sentence after a pause). Engines that generate audio
+        /// may prepare it while idle and drop it when something else is read. No-op by default.
+        /// </summary>
+        void PrepareResume(string text, VoiceInfo? voice, int rate) { }
+
+        /// <summary>
+        /// A caller (the local API) says this text will probably be read soon, under <paramref name="key"/>. Engines that
+        /// generate audio may prepare it while idle. Calling again with the same key replaces the earlier hint; an empty
+        /// list withdraws it. No-op by default.
+        /// </summary>
+        void PrepareHint(string key, IReadOnlyList<string> texts, VoiceInfo? voice, int rate) { }
+
+        /// <summary>How well look-ahead is working, for engines that have it; null otherwise.</summary>
+        SynthesisStats? LookAheadStats => null;
+
         /// <summary>Forget prepared audio (the reading list was cleared).</summary>
         void ClearUpcoming();
 

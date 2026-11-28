@@ -73,3 +73,7 @@ If the app is not running, or the rules say no, the hook stays silent.
 
 - `tts-client.mjs`, `cli/` and `mcp/` here are copies of `integrations/`, because an installed plugin only gets its own folder. A test fails if they drift; copy them again after changing `integrations/`.
 - Tests: `node --test "plugins/tts/test/*.test.mjs"`.
+
+## Prewarm (experimental proof of concept)
+
+Tools `prewarm_reading`, `cancel_prewarm` and `prewarm_stats` (and `tts prewarm`, `prewarm-cancel`, `prewarm-stats` on the CLI) tell the app text that will probably be read soon so it makes the audio in advance. One hint per window: a newer hint replaces it; `speak` with the final text confirms it (same sentences) or replaces it (different text, shared sentences are reused); `cancel_prewarm` withdraws it; an unread hint is dropped after 2 minutes. `prewarm_stats` shows how each hint ended and how often audio was ready in time, so we can tell whether it helps. A reply is only known once it is written, so this is mainly useful when text is ready a little before it is spoken.

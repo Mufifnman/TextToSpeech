@@ -68,6 +68,13 @@ namespace TextToSpeech.Api
     /// <summary>Replace everything from <paramref name="FromOffset"/> on without stopping speech.</summary>
     public sealed record PatchRequest(int? IfRevision, int? FromOffset, string? Text);
 
+    /// <param name="Text">Text that will probably be read soon (what you would send to speak). The app starts making the audio now.</param>
+    /// <param name="Agent">Who is asking (only its id is used). One hint per id: a new hint replaces the old one. Left out, the id is "default".</param>
+    /// <param name="ApplyFilters">Run the app's text filters first, as speak does when asked.</param>
+    public sealed record PrewarmRequest(string? Text, TextToSpeech.Api.Arbitration.AgentRef? Agent = null, bool? ApplyFilters = null);
+
+    public sealed record CancelPrewarmRequest(TextToSpeech.Api.Arbitration.AgentRef? Agent = null);
+
     // ---- Responses ------------------------------------------------------------------------
 
     public sealed record PositionDto(int Sentence, int Word, int CharOffset);
@@ -97,6 +104,15 @@ namespace TextToSpeech.Api
     /// <param name="Decision">Only with an agent: speaking, waiting, skipped or denied. Waiting text has no session yet (SessionId is empty).</param>
     public sealed record SpeakResponse(string SessionId, int Revision, string State, int QueuePosition, bool Skipped,
         string? Decision = null, string? Reason = null, string? HeldBy = null);
+
+    /// <param name="State">active (waiting to be read) or used (the real read arrived; kept only until it times out so leftovers are cleared).</param>
+    public sealed record PrewarmHintDto(string Key, string State, int Sentences, int SecondsLeft);
+
+    /// <summary>Hints: how each ended. Audio: how the sentences that were really read found their audio (ready, partly made, not made).</summary>
+    public sealed record PrewarmStatsDto(int Sent, int Confirmed, int Replaced, int Cancelled, int TimedOut,
+        int AudioReady, int AudioPartlyReady, int AudioFresh, int GuessesUsed, int GuessesWasted);
+
+    public sealed record PrewarmResponse(IReadOnlyList<PrewarmHintDto> Hints, PrewarmStatsDto Stats);
 
     public sealed record MuteRequest(int? Minutes);
 

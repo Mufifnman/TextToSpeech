@@ -35,6 +35,8 @@ namespace TextToSpeech.Api.Tests
         public void Prewarm(VoiceInfo? voice) { }
         public void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate) { }
         public void ClearUpcoming() { }
+        public List<(string Key, string[] Texts)> Hints { get; } = new();
+        public void PrepareHint(string key, IReadOnlyList<string> texts, VoiceInfo? voice, int rate) => Hints.Add((key, texts.ToArray()));
         public void Dispose() { }
 
         public void Finish(int index) => Calls[index].Done.TrySetResult();
@@ -70,7 +72,7 @@ namespace TextToSpeech.Api.Tests
         public HostRig()
         {
             Reading = new ReadingController(Document, _ => Engine, delay: (_, _) => Task.CompletedTask);
-            Host = new ReadingHost(Reading, App, new SessionStore(() => Now));
+            Host = new ReadingHost(Reading, App, new SessionStore(() => Now), () => Now);
             Host.Event += Events.Add;
         }
 

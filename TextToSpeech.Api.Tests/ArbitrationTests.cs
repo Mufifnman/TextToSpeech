@@ -391,7 +391,8 @@ namespace TextToSpeech.Api.Tests
             var r = await host.SpeakAsync(Req("a"));
             Assert.Equal("speaking", r.Decision);
             Assert.Equal("A", inner.LastSpeak!.Source);
-            Assert.Null(inner.LastSpeak.Agent);
+            Assert.Equal("a", inner.LastSpeak.Agent!.Id);   // passed on so a prewarm hint from this agent can be matched
+            Assert.Equal("A", inner.LastSpeak.Agent.Label);
         }
 
         [Fact]

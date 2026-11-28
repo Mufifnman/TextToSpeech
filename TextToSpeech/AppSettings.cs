@@ -18,6 +18,9 @@ namespace TextToSpeech
         /// <summary>Silence after each sentence, in milliseconds (0 to 2000). Applies to every voice.</summary>
         public int SentenceGapMs { get; set; } = SentencePacing.DefaultGapMs;
 
+        /// <summary>Neural voices: cut long sentences at commas into pieces made one after another, so speech starts sooner and has no gap before long sentences. Off: each sentence is made in one go. (Settings, next to the pause between sentences.)</summary>
+        public bool ChunkLongSentences { get; set; } = true;
+
         /// <summary>Opacity of the pop-up panels (speed and volume sliders now; the reading pop-up when it exists), 0.3 to 1.0.</summary>
         public double PopupOpacity { get; set; } = 1.0;
 

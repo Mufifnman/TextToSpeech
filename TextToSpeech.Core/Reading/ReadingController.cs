@@ -48,6 +48,15 @@ namespace TextToSpeech.Core.Reading
             this.delay = delay ?? Task.Delay;
         }
 
+        /// <summary>How many following sentences the engine is told about (it decides how many it prepares, by seconds of audio).</summary>
+        public const int UpcomingSentences = 6;
+
+        /// <summary>An API caller's hint that this text will be read soon (an empty list withdraws it). The engine may prepare the audio.</summary>
+        public void PrewarmHint(string key, IReadOnlyList<string> texts) => engineFor(Voice).PrepareHint(key, texts, Voice, Rate);
+
+        /// <summary>Look-ahead hits and misses of the engine for the current voice (null where the engine has none).</summary>
+        public SynthesisStats? LookAheadStats => engineFor(Voice).LookAheadStats;
+
         public ReadingDocument Document => document;
 
         /// <summary>The voice used for the next sentence. Changing it takes effect from the next sentence.</summary>
@@ -115,6 +124,13 @@ namespace TextToSpeech.Core.Reading
             CancelSpeech();
             document.MarkStoppedAtSpokenWord();
             StateChanged?.Invoke();
+
+            // Guess that reading resumes from here: let the engine make that audio while idle.
+            string? rest = document.GetTextToSpeak(out _);
+            if (rest != null)
+            {
+                engineFor(Voice).PrepareResume(rest, Voice, Rate);
+            }
         }
 
         /// <summary>Pauses while playing, otherwise resumes from the saved position (if anything is left).</summary>
@@ -258,13 +274,15 @@ namespace TextToSpeech.Core.Reading
 
             SentenceStarting?.Invoke();
 
-            // Tell the engine what comes next so it can prepare it while this sentence plays.
-            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(2), Voice, Rate);
-
             int myGeneration = ++generation;
             var cts = new CancellationTokenSource();
             speechCts = cts;
             _ = SpeakSentenceAsync(text, offset, myGeneration, cts);
+
+            // Tell the engine what comes next so it can prepare it while this sentence plays. This comes after the
+            // speak call on purpose: the engine has then asked for this sentence's audio, so the new list cannot
+            // throw away the audio that was prepared for it (it is not part of "what comes next").
+            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(UpcomingSentences), Voice, Rate);
             StateChanged?.Invoke();
         }
 

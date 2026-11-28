@@ -13,8 +13,10 @@ namespace TextToSpeech.Speech
         private readonly PcmPlayer player = new();
         private readonly object modelGate = new();
 
-        // Audio for the next sentences, generated while the current one plays.
-        private readonly LookAheadCache<(float[] Samples, int SampleRate)> lookAhead = new(maxEntries: 4);
+        // Audio for the next sentences, generated one at a time in reading order while the current one plays.
+        // At most about 12 seconds of finished audio waits (memory and CPU stay bounded).
+        private readonly SynthesisQueue<(float[] Samples, int SampleRate)> lookAhead =
+            new(budgetSeconds: 12, measureSeconds: a => a.SampleRate > 0 ? a.Samples.Length / (double)a.SampleRate : 0);
         private readonly object upcomingGate = new();
         private IReadOnlyList<string> upcomingTexts = Array.Empty<string>();
         private VoiceInfo? upcomingVoice;
@@ -56,6 +58,37 @@ namespace TextToSpeech.Speech
             return voices;
         }
 
+        /// <summary>
+        /// Cut long sentences into clause-sized pieces so speech starts sooner and the next piece is made while
+        /// the first plays. Short sentences are never cut. Turn off to generate each sentence in one go.
+        /// </summary>
+        public bool ChunkLongSentences { get; set; } = true;
+
+        private long lastPlaybackEndTicks;   // Environment.TickCount64 when audio last stopped; 0 = never
+
+        /// <summary>True when nothing has played for a few seconds: a new reading, a jump, or a resume after a pause.</summary>
+        private bool IsStartingFresh() =>
+            lastPlaybackEndTicks == 0 || Environment.TickCount64 - Volatile.Read(ref lastPlaybackEndTicks) > 3000;
+
+        private IReadOnlyList<TextChunk> Plan(string text, bool eager) =>
+            ChunkLongSentences
+                ? ClauseChunker.Split(text, eager ? ChunkOptions.Eager : ChunkOptions.Normal)
+                : new[] { new TextChunk(0, text.Length) };
+
+        /// <summary>
+        /// Chooses how to cut a sentence about to be spoken: the cut a guess already prepared if there is one,
+        /// else the eager cut when starting fresh, else the normal cut (what the look-ahead prepared).
+        /// </summary>
+        private IReadOnlyList<TextChunk> ChoosePlan(string dir, int sid, float speed, string text)
+        {
+            var normal = Plan(text, eager: false);
+            var eager = Plan(text, eager: true);
+            string KeyOf(TextChunk c) => CacheKey(dir, sid, speed, text.Substring(c.Start, c.Length));
+            if (lookAhead.Contains(KeyOf(normal[0]))) return normal;
+            if (lookAhead.Contains(KeyOf(eager[0]))) return eager;
+            return IsStartingFresh() ? eager : normal;
+        }
+
         public async Task SpeakAsync(string text, VoiceInfo? voice, int rate, Action<WordBoundary>? onWord, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -64,72 +97,136 @@ namespace TextToSpeech.Speech
                 throw new ArgumentException("Not a neural voice.", nameof(voice));
 
             float speed = RateToSpeed(rate);
-            string key = CacheKey(dir, sid, speed, text);
-            float[] samples;
-            int sampleRate;
+            var plan = ChoosePlan(dir, sid, speed, text);
+            var chunkTexts = plan.Select(c => text.Substring(c.Start, c.Length)).ToArray();
+            var keys = chunkTexts.Select(t => CacheKey(dir, sid, speed, t)).ToArray();
+
+            // Ask for every piece now, in order: they run before anything prepared for later sentences.
+            var tasks = new Task<(float[] Samples, int SampleRate)>[keys.Length];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                string piece = chunkTexts[i];
+                tasks[i] = lookAhead.Demand(keys[i], () => Synthesize(dir, sid, piece, speed));
+            }
+
+            int sampleRate = 0;
+            var waited = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                // Often already finished: the previous sentence's playback generated this one.
-                (samples, sampleRate) = await lookAhead.GetOrStart(key, () => Synthesize(dir, sid, text, speed)).WaitAsync(cancellationToken);
+                async Task<float[]> GetChunk(int i)
+                {
+                    var (samples, rateOfClip) = await tasks[i].WaitAsync(cancellationToken).ConfigureAwait(false);
+                    if (i == 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[prewarm] first audio after {waited.ElapsedMilliseconds} ms ({keys.Length} piece(s)); {lookAhead.Stats}");
+                    }
+                    sampleRate = rateOfClip;
+                    lookAhead.Take(keys[i]);   // used up; frees room for the next sentence
+                    // Inside one sentence the pause at a join should be the short one the comma asks for.
+                    return keys.Length == 1 ? samples
+                        : SilenceTrimmer.Trim(samples, rateOfClip, leading: i > 0, trailing: i < keys.Length - 1);
+                }
+
+                // The rate is only known once the first piece exists.
+                var first = await tasks[0].WaitAsync(cancellationToken);
+                sampleRate = first.SampleRate;
+                if (first.Samples.Length == 0 && keys.Length == 1)
+                {
+                    lookAhead.Take(keys[0]);
+                    return;
+                }
+                lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a pause guess for this spot, if any, is no longer needed
+
+                IReadOnlyList<TimedWord> WordsFor(int i, float[] samples)
+                {
+                    var estimated = WordTimingEstimator.Estimate(chunkTexts[i], samples.Length / (double)sampleRate);
+                    if (plan[i].Start == 0) return estimated;
+                    return estimated.Select(w => new TimedWord(w.StartSeconds, new WordBoundary(w.Boundary.CharOffset + plan[i].Start, w.Boundary.CharLength))).ToList();
+                }
+
+                await player.PlayAsync(sampleRate, keys.Length, GetChunk, WordsFor, onWord, cancellationToken);
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
-                lookAhead.Remove(key);   // do not keep a failed attempt
+                foreach (var key in keys) lookAhead.Take(key);   // do not keep a failed attempt
                 throw;
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            lookAhead.Remove(key);       // used up
-            if (samples.Length == 0) return;
-
-            StartLookAhead();            // generate the next sentences while this one plays
-
-            var words = WordTimingEstimator.Estimate(text, samples.Length / (double)sampleRate);
-            await player.PlayAsync(samples, sampleRate, words, onWord, cancellationToken);
+            finally
+            {
+                // Pieces not used (cancelled or failed) are dropped, so stale work never blocks the next sentence.
+                foreach (var key in keys) lookAhead.Take(key);
+                Volatile.Write(ref lastPlaybackEndTicks, Environment.TickCount64);
+            }
         }
 
         private static string CacheKey(string dir, int sid, float speed, string text) => $"{dir}|{sid}|{speed:F3}|{text}";
 
+        /// <summary>Queues the next sentences right away (they run after the sentence being spoken, in order).</summary>
         public void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate)
         {
-            lock (upcomingGate)
+            if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
+            float speed = RateToSpeed(rate);
+            lookAhead.SetWanted(1, Wanted(texts, dir, sid, speed, eager: false));
+        }
+
+        /// <summary>
+        /// A guess: the rest of the sentence after a pause is probably what is read next, so make it while idle.
+        /// Costs one sentence of CPU, once, and is dropped as soon as something else is read.
+        /// </summary>
+        public void PrepareResume(string text, VoiceInfo? voice, int rate)
+        {
+            if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
+            float speed = RateToSpeed(rate);
+            lookAhead.SetWanted(2, Wanted(new[] { text }, dir, sid, speed, eager: true));
+        }
+
+        private (string Key, Func<(float[], int)> Work)[] Wanted(IReadOnlyList<string> texts, string dir, int sid, float speed, bool eager)
+        {
+            var result = new List<(string, Func<(float[], int)>)>();
+            var seen = new HashSet<string>();
+            foreach (string sentence in texts.Where(t => !string.IsNullOrWhiteSpace(t)))
             {
-                upcomingTexts = texts;
-                upcomingVoice = voice;
-                upcomingRate = rate;
+                foreach (var chunk in Plan(sentence, eager))
+                {
+                    string piece = sentence.Substring(chunk.Start, chunk.Length);
+                    string key = CacheKey(dir, sid, speed, piece);
+                    if (seen.Add(key)) result.Add((key, () => Synthesize(dir, sid, piece, speed)));
+                }
+            }
+            return result.ToArray();
+        }
+
+        private readonly object hintGate = new();
+        private readonly Dictionary<string, (string[] Texts, string Dir, int Sid, float Speed)> hints = new();
+
+        /// <summary>An API caller's hint: made while idle, after the sentences the reading itself needs. Same key replaces, empty withdraws.</summary>
+        public void PrepareHint(string key, IReadOnlyList<string> texts, VoiceInfo? voice, int rate)
+        {
+            lock (hintGate)
+            {
+                if (texts.Count == 0 || voice == null || !TryParseId(voice.Id, out string dir, out int sid))
+                {
+                    hints.Remove(key);
+                }
+                else
+                {
+                    hints[key] = (texts.ToArray(), dir, sid, RateToSpeed(rate));
+                }
+                var wanted = hints.Values.SelectMany(h => Wanted(h.Texts, h.Dir, h.Sid, h.Speed, eager: false)).ToArray();
+                lookAhead.SetWanted(3, wanted);
             }
         }
 
         public void ClearUpcoming()
         {
-            lock (upcomingGate)
-            {
-                upcomingTexts = Array.Empty<string>();
-            }
+            lock (hintGate) { hints.Clear(); }
             lookAhead.Clear();
         }
 
-        /// <summary>Starts generating the sentences handed to <see cref="SetUpcoming"/>. Called once the current sentence's audio exists, so it never competes with it.</summary>
-        private void StartLookAhead()
-        {
-            IReadOnlyList<string> texts;
-            VoiceInfo? voice;
-            int rate;
-            lock (upcomingGate)
-            {
-                texts = upcomingTexts;
-                voice = upcomingVoice;
-                rate = upcomingRate;
-            }
-            if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
+        /// <summary>Hits and misses of look-ahead since start (or <see cref="ResetLookAheadStats"/>).</summary>
+        public SynthesisStats LookAheadStats => lookAhead.Stats;
 
-            float speed = RateToSpeed(rate);
-            foreach (string next in texts)
-            {
-                if (string.IsNullOrWhiteSpace(next)) continue;
-                string text = next;
-                lookAhead.GetOrStart(CacheKey(dir, sid, speed, text), () => Synthesize(dir, sid, text, speed));
-            }
-        }
+        public void ResetLookAheadStats() => lookAhead.ResetStats();
 
         /// <summary>Loads the model and runs a tiny synthesis in the background so the first real sentence is not slowed by loading.</summary>
         public void Prewarm(VoiceInfo? voice)
@@ -223,6 +320,8 @@ namespace TextToSpeech.Speech
 
         public void Dispose()
         {
+            lookAhead.Clear();
+            player.Dispose();
             lock (modelGate)
             {
                 loaded?.Dispose();
