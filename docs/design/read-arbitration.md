@@ -5,7 +5,7 @@ Builds on the local API and always-on design (`local-api-and-always-on.md` in th
 ## 1. What this adds
 
 1. **Turn taking.** Each Claude Code window (or any API client) is an *agent*. One agent holds the turn; others' text waits in the app and is read afterwards. No overlap, nothing lost.
-2. **Reading rules** (policy) owned by the user, in their own window (Settings, "Agent reading rules..."), not in the general settings: allow agents at all, headphones only, quiet hours, auto-read mode, what switching windows does, bring the reading window to the front. Agents can read the rules and can only make them stricter (a timed mute).
+2. **Reading rules** (policy) owned by the user, in their own window (Settings, "Agent reading rules...", shown only while "Enable local API" is ticked), not in the general settings: allow agents at all, headphones only, quiet hours, auto-read mode, what switching windows does, bring the reading window to the front. Agents can read the rules and can only make them stricter (a timed mute).
 3. **Focus promotion.** Switching to a window with waiting text moves it to the front of the line (`next`) or interrupts (`now`).
 4. **Bring to front** (opt in): when an agent's turn starts, its window is raised so the text can be seen and the keyboard is where the reply goes.
 5. **Reply by voice**: designed here, built in a follow-up PR (section 6).
