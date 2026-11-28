@@ -3,6 +3,26 @@ namespace TextToSpeech.Core.Reading
     /// <summary>A place in a <see cref="ReadingDocument"/>: a sentence and a word inside it.</summary>
     public readonly record struct ReadingPosition(int Sentence, int Word);
 
+    /// <summary>Where the caller wants reading to stop: after the block of the text that contains offset <paramref name="At"/>.</summary>
+    public sealed record PauseSpec(string Id, string? Label, int At);
+
+    /// <summary>Spoken form of list numbers.</summary>
+    public static class NumberWords
+    {
+        private static readonly string[] Words =
+        {
+            "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+            "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+        };
+
+        /// <summary>"One" for 1, up to twenty; larger numbers stay digits (the voice reads them).</summary>
+        public static string Spoken(int n)
+        {
+            string w = n >= 0 && n < Words.Length ? Words[n] : n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return char.ToUpperInvariant(w[0]) + w.Substring(1);
+        }
+    }
+
     /// <summary>
     /// One owner's text divided into what has been read and what has not. <see cref="FirstIndex"/> is the document
     /// index of the first unread sentence (-1 when everything was read), <see cref="Word"/> the word in it the
@@ -66,7 +86,6 @@ namespace TextToSpeech.Core.Reading
         /// </summary>
         public int InsertAt(int index, string? text, Func<string, bool>? keepSentence = null, string? owner = null)
         {
-            index = Math.Clamp(index, 0, sentences.Count);
             var added = new List<Sentence>();
             foreach (var s in SentenceSplitter.Split(text))
             {
@@ -76,6 +95,88 @@ namespace TextToSpeech.Core.Reading
                 }
                 added.Add(new Sentence(s, owner));
             }
+            return InsertSentences(index, added);
+        }
+
+        /// <summary>Like <see cref="Append"/> for text that may be markdown and may carry pause points; see <see cref="InsertMarkdownAt"/>.</summary>
+        public int AppendMarkdown(string? text, bool markdown = true, IReadOnlyList<PauseSpec>? pauses = null,
+            Func<string, bool>? keepSentence = null, string? owner = null) =>
+            InsertMarkdownAt(sentences.Count, text, markdown, pauses, keepSentence, owner);
+
+        /// <summary>
+        /// Inserts text as laid-out sentences. With <paramref name="markdown"/> the markup is removed (it is never
+        /// spoken or shown), list items become separate lines (numbered items are spoken with their number and
+        /// followed by a longer pause), headings and code are marked for display. Without it the text is only split
+        /// into paragraphs and sentences as plain text.
+        /// Each <see cref="PauseSpec"/> puts a <see cref="PausePoint"/> after the last sentence of the block (paragraph,
+        /// list item, heading or code line) that contains its <see cref="PauseSpec.At"/> offset in <paramref name="text"/>.
+        /// A second pause in the same block is ignored. Returns how many sentences were added.
+        /// </summary>
+        public int InsertMarkdownAt(int index, string? text, bool markdown = true, IReadOnlyList<PauseSpec>? pauses = null,
+            Func<string, bool>? keepSentence = null, string? owner = null)
+        {
+            var blocks = MarkdownReader.Parse(text, markdown);
+            var added = new List<Sentence>();
+            var lastOfBlock = new int[blocks.Count];   // index in added of each block's last sentence, -1 when none
+            for (int b = 0; b < blocks.Count; b++)
+            {
+                var block = blocks[b];
+                var parts = new List<string>();
+                IEnumerable<string> raw = block.Kind == BlockKind.Code ? new[] { block.Text } : SentenceSplitter.Split(block.Text);
+                foreach (var part in raw)
+                {
+                    if (keepSentence == null || keepSentence(part))
+                    {
+                        parts.Add(part);
+                    }
+                }
+                lastOfBlock[b] = -1;
+                for (int k = 0; k < parts.Count; k++)
+                {
+                    bool first = k == 0;
+                    bool last = k == parts.Count - 1;
+                    SentenceFormat? format = null;
+                    if (markdown)
+                    {
+                        string prefix = first && block.Ordinal is int n ? NumberWords.Spoken(n) + ". " : "";
+                        int factor = last && block.Kind == BlockKind.ListItem ? 2 : 1;
+                        format = new SentenceFormat(block.Kind, block.Level, first ? block.Marker : null, first, prefix, factor);
+                    }
+                    added.Add(new Sentence(parts[k], owner, format));
+                    lastOfBlock[b] = added.Count - 1;
+                }
+            }
+
+            if (pauses != null)
+            {
+                foreach (var spec in pauses)
+                {
+                    int block = blocks.Count == 0 ? -1 : blocks.ToList().FindLastIndex(x => x.SourceStart <= spec.At);
+                    if (block < 0 && blocks.Count > 0)
+                    {
+                        block = 0;
+                    }
+                    int target = -1;
+                    for (int j = block; j >= 0 && target < 0; j--)
+                    {
+                        target = lastOfBlock[j];
+                    }
+                    for (int j = block + 1; j < blocks.Count && target < 0; j++)
+                    {
+                        target = lastOfBlock[j];
+                    }
+                    if (target >= 0 && added[target].Pause == null)
+                    {
+                        added[target].Pause = new PausePoint(spec.Id, spec.Label);
+                    }
+                }
+            }
+            return InsertSentences(index, added);
+        }
+
+        private int InsertSentences(int index, List<Sentence> added)
+        {
+            index = Math.Clamp(index, 0, sentences.Count);
             if (added.Count == 0)
             {
                 return 0;
@@ -95,6 +196,24 @@ namespace TextToSpeech.Core.Reading
             // When the reader was at the end, Position now points at the first new sentence.
             PositionChanged?.Invoke(this, EventArgs.Empty);
             return added.Count;
+        }
+
+        /// <summary>
+        /// The pause points not yet answered, in reading order, with the document index of the sentence each follows.
+        /// <paramref name="owner"/> limits them to one API session.
+        /// </summary>
+        public IReadOnlyList<(int Index, Sentence Sentence)> Pauses(string? owner = null, bool pendingOnly = true)
+        {
+            var result = new List<(int, Sentence)>();
+            for (int i = 0; i < sentences.Count; i++)
+            {
+                var s = sentences[i];
+                if (s.Pause != null && (owner == null || s.Owner == owner) && (!pendingOnly || !s.Pause.Answered))
+                {
+                    result.Add((i, s));
+                }
+            }
+            return result;
         }
 
         /// <summary>The full text of one owner's sentences, joined with single spaces.</summary>
@@ -209,7 +328,7 @@ namespace TextToSpeech.Core.Reading
                 else if (i == firstIndex && split.Word > 0)
                 {
                     string head = s.Text.Substring(0, s.Words[split.Word].Start).TrimEnd();
-                    kept.Add(new Sentence(head, owner));
+                    kept.Add(new Sentence(head, owner, s.Format));
                 }
             }
 
@@ -275,7 +394,7 @@ namespace TextToSpeech.Core.Reading
             var result = new List<string>();
             for (int i = Position.Sentence + 1; i < sentences.Count && result.Count < count; i++)
             {
-                result.Add(sentences[i].Text);
+                result.Add(sentences[i].SpokenText);
             }
             return result;
         }
@@ -327,8 +446,12 @@ namespace TextToSpeech.Core.Reading
             if (Position.Word > 0 && Position.Word < s.Words.Count)
             {
                 offset = s.Words[Position.Word].Start;
+                return s.Text.Substring(offset);
             }
-            return s.Text.Substring(offset);
+            // Whole sentence: any spoken prefix (a list number) comes first. The prefix is not part of the words, so the
+            // offset is negative and engine positions inside the prefix map to before the first word.
+            offset = -(s.SpokenText.Length - s.Text.Length);
+            return s.SpokenText;
         }
 
         /// <summary>Speech engine reached <paramref name="charIndexInSentence"/> of the current sentence.</summary>

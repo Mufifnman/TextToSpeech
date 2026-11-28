@@ -1,0 +1,7 @@
+{
+  "name": "tts",
+  "version": "0.1.0",
+  "description": "Have Claude Code read text and replies aloud through the Text to Speech app's local API (Windows app must be running with the local API enabled).",
+  "author": { "name": "Mufifnman" },
+  "license": "MIT"
+}

@@ -16,6 +16,8 @@ namespace TextToSpeech.Shell
         public required Func<WindowDto> GetWindow { get; init; }
         public required Action<string> Popup { get; init; }
         public required Func<string, string> Filter { get; init; }
+        public Func<bool> GetMarkdown { get; init; } = () => true;
+        public Func<bool> GetPlayAllDefault { get; init; } = () => false;
 
         public IReadOnlyList<VoiceDto> ListVoices() => Voices();
         public bool TrySetVoice(string voiceId) => SelectVoice(voiceId);
@@ -26,5 +28,7 @@ namespace TextToSpeech.Shell
         public WindowDto Window => GetWindow();
         public void ShowPopup(string source) => Popup(source);
         public string ApplyFilters(string text) => Filter(text);
+        public bool MarkdownEnabled => GetMarkdown();
+        public bool PlayAllByDefault => GetPlayAllDefault();
     }
 }

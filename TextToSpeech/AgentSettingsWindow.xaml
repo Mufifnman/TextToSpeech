@@ -1,0 +1,48 @@
+<Window x:Class="TextToSpeech.AgentSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Background="{DynamicResource ThemeBackground}" Foreground="{DynamicResource ThemeText}"
+        Title="Agent reading rules" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="16" MinWidth="420">
+        <TextBlock Text="For Claude Code and other programs that read through the local API and identify themselves as an agent. They take turns, so two windows never talk over each other. Changes apply at once."
+                   TextWrapping="Wrap" Foreground="{DynamicResource ThemeSubtle}" FontSize="12" Margin="0,0,0,10"/>
+
+        <TextBlock Text="Whether to read" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <CheckBox x:Name="enabledBox" Content="Allow agents to read aloud" Margin="0,0,0,6"/>
+        <CheckBox x:Name="headphonesBox" Content="Only when headphones or a headset are the audio output" Margin="0,0,0,6"
+                  ToolTip="Uses the default Windows output device type. If it cannot tell, agents stay quiet."/>
+        <DockPanel Margin="0,0,0,10">
+            <TextBlock Text="Quiet hours" VerticalAlignment="Center" Width="130"/>
+            <TextBox x:Name="quietFromBox" Width="56" ToolTip="Start, like 22:00. Leave empty for none."/>
+            <TextBlock Text=" to " VerticalAlignment="Center"/>
+            <TextBox x:Name="quietToBox" Width="56" ToolTip="End, like 07:00."/>
+        </DockPanel>
+
+        <TextBlock Text="What is read" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <DockPanel Margin="0,0,0,10">
+            <TextBlock Text="Auto-read replies" VerticalAlignment="Center" Width="130"/>
+            <ComboBox x:Name="autoReadBox" Width="220" ToolTip="What the Claude Code plugin reads when a reply finishes. Reply reads the whole reply as plain text."/>
+        </DockPanel>
+
+        <TextBlock Text="Waiting and switching windows" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <DockPanel Margin="0,0,0,6">
+            <TextBlock Text="Switch to window" VerticalAlignment="Center" Width="130"/>
+            <ComboBox x:Name="focusBox" Width="220" ToolTip="When you switch to a window with text waiting to be read."/>
+        </DockPanel>
+        <CheckBox x:Name="expireOnPromptBox" Content="Drop waiting text when I type in that window" Margin="0,0,0,6"
+                  ToolTip="Once you reply in a window, what was waiting for it is old news."/>
+        <CheckBox x:Name="expireBox" Content="Drop waiting text that has waited too long" Margin="0,0,0,4"/>
+        <DockPanel Margin="22,0,0,10">
+            <TextBlock Text="After" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="expiryHoursBox" Width="56" ToolTip="Hours, 0.1 to 168."/>
+            <TextBlock Text=" hours" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <TextBlock Text="Your screen" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <CheckBox x:Name="frontBox" Content="Bring the reading window to the front" Margin="0,0,0,2"
+                  ToolTip="Moves that window above others when its turn starts. Off by default because it changes what is on your screen."/>
+
+        <Button Content="Close" IsDefault="True" IsCancel="True" HorizontalAlignment="Right" Width="80" Height="28" Margin="0,14,0,0" Click="Close_Click"/>
+    </StackPanel>
+</Window>

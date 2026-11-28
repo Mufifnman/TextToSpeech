@@ -57,6 +57,11 @@ namespace TextToSpeech
                 GapMs = settings.SentenceGapMs,
             };
             reading.StateChanged += UpdatePauseButton;
+            reading.StateChanged += UpdatePlayAllButton;
+            document.ContentChanged += (_, _) => UpdatePlayAllButton();
+            reading.PlayAll = settings.PlayAllByDefault;
+            __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
+            __ReadListDisplay__.ZoomRequested += step => SetMainTextSize(settings.MainTextSize + step);
             reading.SentenceStarting += OnSentenceStarting;
             autoClearTimer.Tick += AutoClearTick;
             reading.Finished += OnReadingFinished;
@@ -134,7 +139,7 @@ namespace TextToSpeech
 
         private void SetupShell()
         {
-            api = new LocalApiService(reading, BuildAppControl(), Dispatcher);
+            api = new LocalApiService(reading, BuildAppControl(), Dispatcher, () => settings.ToReadPolicy());
             api.Host.Event += e => { if (e.Type.StartsWith("handoff")) RefreshPopup(); };
 
             tray = new TrayIcon(new TrayActions(
@@ -158,6 +163,9 @@ namespace TextToSpeech
             popupPolicy.Enabled = settings.ShowReadingPopup;
             popupPolicy.AutoHide = settings.PopupAutoHide;
             popupPolicy.KeepOpenWhenPaused = settings.PopupKeepOpenWhenPaused;
+            // The popup never goes before the text clears: it lingers for the longer of the auto-clear delay and "stay open".
+            int linger = Math.Max(settings.AutoClearAfterReading ? Math.Clamp(settings.AutoClearDelaySeconds, 1, 60) : 0, Math.Clamp(settings.PopupStayOpenSeconds, 0, 120));
+            popupPolicy.Linger = linger > 0 ? TimeSpan.FromSeconds(linger) : PopupPolicy.Grace;
             popupPolicy.ShowWhenWindowUnfocused = settings.ShowPopupWhenWindowUnfocused;
             StartupRegistration.Apply(settings.StartWithWindows);
             tray?.SetChecks(settings.ShowReadingPopup, settings.StartWithWindows);
@@ -205,6 +213,8 @@ namespace TextToSpeech
             GetWindow = CurrentWindowDto,
             Popup = _ => RefreshPopup(),
             Filter = text => { Filters.ApplyClipboardFilters(ref text, filterSettings); return text; },
+            GetMarkdown = () => settings.FormatMarkdown,
+            GetPlayAllDefault = () => settings.PlayAllByDefault,
         };
 
         private WindowDto CurrentWindowDto()
@@ -240,14 +250,14 @@ namespace TextToSpeech
 
         private void OnReadingStateForShell()
         {
-            popupPolicy.ReadingChanged(reading.IsPlaying, !document.IsAtEnd);
+            popupPolicy.ReadingChanged(reading.IsPlaying, !document.IsAtEnd || reading.PausedAt != null);
             RefreshPopup();
         }
 
         private void RefreshPopup()
         {
             bool playing = reading.IsPlaying;
-            bool unread = !document.IsAtEnd;
+            bool unread = !document.IsAtEnd || reading.PausedAt != null;   // waiting at the last question counts as unread
             var handoffs = api?.Host.OpenHandoffSources ?? Array.Empty<string>();
             popupPolicy.HandoffOpen = handoffs.Count > 0;
 
@@ -266,6 +276,7 @@ namespace TextToSpeech
                     p.SetInfo(active != null && active.Id != "ui" ? "From " + active.Source : null, canTakeBack: false);
                 }
                 p.SetPlaying(playing);
+                p.SetPlayAll(HasPausePoints(), reading.PlayAll);
                 p.SetPreview(previewingPopup);
                 p.ShowPopup();
             }
@@ -305,7 +316,8 @@ namespace TextToSpeech
                 JumpTo: (sentence, word) => reading.JumpTo(sentence, word),
                 OpenFullWindow: ShowFullWindow,
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
-                TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); }));
+                TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); },
+                TogglePlayAll: TogglePlayAll));
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
             p.SetTextSize(settings.PopupTextSize);
             p.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
@@ -683,9 +695,17 @@ namespace TextToSpeech
             if (this.textbox.Text != "")
             {
                 string temp = textbox.Text;
-                Filters.CombineLines(ref temp);
                 // cut out "read more at"
-                document.Append(temp, s => !s.ToLower().Contains("read more at"));
+                if (settings.FormatMarkdown && MarkdownReader.LooksLikeMarkdown(temp))
+                {
+                    // Headings, lists and code keep their line structure: no flattening of the lines.
+                    document.AppendMarkdown(temp, keepSentence: s => !s.ToLower().Contains("read more at"));
+                }
+                else
+                {
+                    Filters.CombineLines(ref temp);
+                    document.Append(temp, s => !s.ToLower().Contains("read more at"));
+                }
                 textbox.Text = "";
                 SetInputExpanded(false); // the text moved over: back to the small one-line box
             }
@@ -718,7 +738,7 @@ namespace TextToSpeech
         {
             autoClearTimer.Stop();
             // New text or a new read in the meantime cancels the clear.
-            if (settings.AutoClearAfterReading && !reading.IsPlaying && document.IsAtEnd) reading.Clear();
+            if (settings.AutoClearAfterReading && !reading.IsPlaying && document.IsAtEnd && reading.PausedAt == null) reading.Clear();
         }
 
         private void OnReadingFinished()
@@ -765,6 +785,44 @@ namespace TextToSpeech
         }
 
         private void ClearList(object? sender = null, RoutedEventArgs? e = null) => reading.Clear();
+
+        private bool HasPausePoints() => document.Pauses(null, pendingOnly: false).Count > 0;
+
+        /// <summary>The Play all button: read through the marked questions without stopping (and carry on if waiting at one).</summary>
+        private void TogglePlayAll()
+        {
+            reading.PlayAll = !reading.PlayAll;
+            if (reading.PlayAll && reading.PausedAt != null)
+            {
+                reading.Play();
+            }
+            UpdatePlayAllButton();
+            RefreshPopup();
+        }
+
+        private void PlayAll_Click(object sender, RoutedEventArgs e) => TogglePlayAll();
+
+        /// <summary>The Play all button shows only while the text has marked questions; it is lit while play-all is on.</summary>
+        private void UpdatePlayAllButton()
+        {
+            bool has = HasPausePoints();
+            playAllButton.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+            playAllButton.Background = reading.PlayAll && has
+                ? (System.Windows.Media.Brush?)TryFindResource("ReadWordBrush") ?? System.Windows.Media.Brushes.Orange
+                : System.Windows.SystemColors.ControlBrush;
+            playAllLabel.Text = reading.PlayAll && has ? "Play all: on" : "Play all";
+            playAllButton.ToolTip = reading.PlayAll
+                ? "Play all is on: reading does not stop at questions. Click to stop at each question again."
+                : "Stops after each question. Click to read straight through without stopping.";
+            popup?.SetPlayAll(has, reading.PlayAll);
+        }
+
+        private void SetMainTextSize(double size)
+        {
+            settings.MainTextSize = Math.Clamp(size, 10, 40);
+            settings.Save();
+            __ReadListDisplay__.TextSize = settings.MainTextSize;
+        }
 
         /// <summary>Stops speaking. The position is kept, so Pause/Play (or clicking a word) continues from here.</summary>
         private void StopRead(object? sender = null, RoutedEventArgs? e = null) => reading.Pause();
@@ -908,6 +966,7 @@ namespace TextToSpeech
         {
             reading.GapMs = settings.SentenceGapMs;
             catalog.Neural.ChunkLongSentences = settings.ChunkLongSentences;
+            __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
