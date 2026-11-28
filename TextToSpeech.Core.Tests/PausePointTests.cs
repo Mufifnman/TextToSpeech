@@ -163,6 +163,24 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void PlayRange_FromAQuestionWait_ThenAnswered_CarriesOnAfterTheLine()
+        {
+            var rig = new Rig(Text, Both());
+            rig.Controller.Play();
+            rig.Engine.Finish(0);
+            rig.Engine.Finish(1);
+            var point = rig.Controller.PausedAt!.Point;
+
+            rig.Controller.PlayRange(0, 0);
+            rig.Controller.MarkAnswered(point);                       // the answer arrives while the line plays
+            rig.Engine.Finish(rig.Engine.Calls.Count - 1);
+
+            Assert.Null(rig.Controller.PausedAt);
+            Assert.True(rig.Controller.IsPlaying);
+            Assert.Contains("Add tests?", rig.Engine.Calls[^1].Text);
+        }
+
+        [Fact]
         public void PlayRange_WithAnIndexPastTheEnd_DoesNothing()
         {
             var rig = new Rig("Only.");

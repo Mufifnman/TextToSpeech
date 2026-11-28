@@ -368,7 +368,17 @@ namespace TextToSpeech.Core.Reading
                 {
                     resumeAfterLine = null;
                     document.MoveToPosition(back.Position.Sentence, back.Position.Word);
-                    PausedAt = back.At;
+                    if (!back.At.Point.Answered)
+                    {
+                        PausedAt = back.At;
+                    }
+                    else
+                    {
+                        // The question was answered while the line played: carry on from where the wait was.
+                        paused = false;
+                        SpeakCurrent();
+                        return;
+                    }
                 }
                 StateChanged?.Invoke();
                 return;
