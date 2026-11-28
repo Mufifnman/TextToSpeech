@@ -14,10 +14,7 @@ namespace TextToSpeech.Api
         public void Write(string? path = null)
         {
             path ??= DefaultPath;
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            string temp = path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(this, ApiJson.Options));
-            File.Move(temp, path, overwrite: true);
+            TextToSpeech.Core.IO.AtomicFile.WriteAllText(path, JsonSerializer.Serialize(this, ApiJson.Options));
         }
 
         public static ConnectionInfo? Read(string? path = null)

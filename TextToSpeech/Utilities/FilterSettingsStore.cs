@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 
 namespace TextToSpeech
 {
@@ -14,27 +13,15 @@ namespace TextToSpeech
             "TextToSpeech",
             "filters.json");
 
-        internal static FilterSettings Load()
-        {
-            try
-            {
-                if (File.Exists(SettingsPath))
-                {
-                    return JsonSerializer.Deserialize<FilterSettings>(File.ReadAllText(SettingsPath)) ?? new FilterSettings();
-                }
-            }
-            catch (Exception)
-            {
-                // Fall back to defaults.
-            }
-            return new FilterSettings();
-        }
+        private static readonly global::TextToSpeech.Core.IO.JsonFileStore<FilterSettings> Store = new(SettingsPath);
+
+        internal static FilterSettings Load() => Store.Load(); // a corrupt file is kept as filters.json.bad
 
         internal static void Save(FilterSettings settings)
         {
             try
             {
-                global::TextToSpeech.Core.IO.AtomicFile.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+                Store.Save(settings);
             }
             catch (Exception)
             {
