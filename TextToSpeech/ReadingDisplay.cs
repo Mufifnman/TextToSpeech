@@ -4,6 +4,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using TextToSpeech.Core.Reading;
+using TextToSpeech.Core.Shell;
 
 namespace TextToSpeech
 {
@@ -26,12 +27,135 @@ namespace TextToSpeech
         private readonly Dictionary<int, Run> pauseMarks = new();   // sentence index -> the small marker after a pause point
         private ReadingDocument? document;
         private int styledSentence = -1;
+        private bool following = true;
+        private bool scrollQueued;
+        private FollowButtonAdorner? followButton;
 
         public ReadingDisplay()
         {
             Content = textBlock;
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             SetResourceReference(BackgroundProperty, "ThemeSurface");
+            Loaded += (_, _) => UpdateFollowButton();
+            Unloaded += (_, _) => RemoveFollowButton();
+        }
+
+        /// <summary>
+        /// Whether the view follows the text being read. Scrolling by hand (wheel, scroll bar, touch) turns it off and a
+        /// "Follow" button appears to turn it back on; a new reading, a click on a word or that button turn it on again.
+        /// </summary>
+        public bool Following
+        {
+            get => following;
+            private set
+            {
+                if (following == value)
+                {
+                    return;
+                }
+                following = value;
+                UpdateFollowButton();
+                if (following)
+                {
+                    QueueFollow();
+                }
+            }
+        }
+
+        protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+        {
+            // Dragging or clicking the scroll bar is a manual scroll.
+            if (e.OriginalSource is DependencyObject source && IsInScrollBar(source))
+            {
+                Following = false;
+            }
+            base.OnPreviewMouseDown(e);
+        }
+
+        protected override void OnManipulationStarting(ManipulationStartingEventArgs e)
+        {
+            Following = false;
+            base.OnManipulationStarting(e);
+        }
+
+        private static bool IsInScrollBar(DependencyObject node)
+        {
+            for (var d = node; d != null; d = VisualTreeHelper.GetParent(d))
+            {
+                if (d is System.Windows.Controls.Primitives.ScrollBar)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void UpdateFollowButton()
+        {
+            if (!IsLoaded)
+            {
+                return;
+            }
+            if (following)
+            {
+                RemoveFollowButton();
+                return;
+            }
+            var layer = AdornerLayer.GetAdornerLayer(this);
+            if (layer == null || followButton != null)
+            {
+                return;
+            }
+            followButton = new FollowButtonAdorner(this, () => Following = true);
+            layer.Add(followButton);
+        }
+
+        private void RemoveFollowButton()
+        {
+            if (followButton != null)
+            {
+                AdornerLayer.GetAdornerLayer(this)?.Remove(followButton);
+                followButton = null;
+            }
+        }
+
+        /// <summary>The small "Follow" button shown at the bottom right of the view while following is off.</summary>
+        private sealed class FollowButtonAdorner : Adorner
+        {
+            private readonly Button button;
+
+            public FollowButtonAdorner(UIElement host, Action relock) : base(host)
+            {
+                button = new Button
+                {
+                    Content = "\u2193 Follow reading",
+                    Padding = new Thickness(10, 3, 10, 3),
+                    Focusable = false,
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Scroll back to the text being read and keep following it",
+                };
+                System.Windows.Automation.AutomationProperties.SetName(button, "Follow the text being read");
+                button.Click += (_, _) => relock();
+                AddVisualChild(button);
+            }
+
+            protected override int VisualChildrenCount => 1;
+
+            protected override Visual GetVisualChild(int index) => button;
+
+            protected override Size MeasureOverride(Size constraint)
+            {
+                button.Measure(constraint);
+                return constraint;
+            }
+
+            protected override Size ArrangeOverride(Size finalSize)
+            {
+                var size = button.DesiredSize;
+                // Left of the scroll bar and clear of the text's edge.
+                button.Arrange(new Rect(Math.Max(0, finalSize.Width - size.Width - 24), Math.Max(0, finalSize.Height - size.Height - 12), size.Width, size.Height));
+                return finalSize;
+            }
         }
 
         /// <summary>Font size of the reading text.</summary>
@@ -62,6 +186,10 @@ namespace TextToSpeech
                 ZoomRequested(e.Delta > 0 ? 1 : -1);
                 e.Handled = true;
                 return;
+            }
+            if (ScrollableHeight > 0)
+            {
+                Following = false;   // scrolling by hand: stop following until the Follow button is pressed
             }
             base.OnPreviewMouseWheel(e);
         }
@@ -102,11 +230,50 @@ namespace TextToSpeech
 
         private void OnPositionChanged(object? sender, EventArgs e) => RestyleChanged();
 
+        /// <summary>One line of the formatted view (a paragraph, heading, list item or code line): its sentences and the little handle beside it.</summary>
+        private sealed class Block
+        {
+            public int First, Last;
+            public Run? Gutter;
+            public bool GutterIsMarker;     // a list marker is always visible; the handle of other blocks shows on hover
+            public readonly List<Run> Words = new();
+            public Run? RawRun;
+        }
+
+        private readonly List<Block> blocks = new();
+        private bool showRaw;
+
+        /// <summary>Show each block as it was written, with its markup symbols, instead of laid out. Words are not clickable then; a click on a block jumps to its start.</summary>
+        public bool ShowRaw
+        {
+            get => showRaw;
+            set
+            {
+                if (showRaw == value)
+                {
+                    return;
+                }
+                showRaw = value;
+                if (document != null)
+                {
+                    Rebuild();
+                }
+            }
+        }
+
+        /// <summary>Raised when the handle beside a line (or a list marker) is clicked: play just the sentences from first to last (document indexes).</summary>
+        public event Action<int, int>? LineClicked;
+
         private void Rebuild()
         {
+            if (runs.Count == 0 && document is { Count: > 0 })
+            {
+                Following = true;   // a new reading starts out following
+            }
             textBlock.Inlines.Clear();
             runs.Clear();
             pauseMarks.Clear();
+            blocks.Clear();
             styledSentence = -1;
             if (document == null)
             {
@@ -116,16 +283,55 @@ namespace TextToSpeech
             // GUESS: rebuilding all runs on content change is fine for typical pages.
             // Position changes (every spoken word) only restyle two sentences, see RestyleChanged.
             SentenceFormat? previous = null;
+            Block? current = null;
             for (int s = 0; s < document.Count; s++)
             {
                 var sentence = document.Sentences[s];
                 var format = sentence.Format;
+
+                if (showRaw && format != null)
+                {
+                    // Raw view: the block's original text in one run (at its first sentence); nothing else per sentence.
+                    if (format.StartsBlock)
+                    {
+                        if (textBlock.Inlines.Count > 0)
+                        {
+                            textBlock.Inlines.Add(new LineBreak());
+                        }
+                        current = new Block { First = s, Last = s };
+                        blocks.Add(current);
+                        var rawRun = new Run(format.Raw ?? sentence.Text) { Tag = (s, 0), Cursor = Cursors.Hand, FontFamily = CodeFont };
+                        rawRun.MouseLeftButtonUp += OnRunClicked;
+                        current.RawRun = rawRun;
+                        textBlock.Inlines.Add(rawRun);
+                    }
+                    if (current != null)
+                    {
+                        current.Last = s;
+                    }
+                    runs.Add(new List<Run>());
+                    AddPauseMark(s, sentence);
+                    continue;
+                }
+
                 if (format is { StartsBlock: true })
                 {
-                    StartBlock(format, previous);
+                    var gutter = StartBlock(format, previous);
+                    current = new Block { First = s, Last = s, Gutter = gutter, GutterIsMarker = format.Kind == BlockKind.ListItem };
+                    blocks.Add(current);
+                    WireGutter(current);
+                }
+                else if (format == null)
+                {
+                    current = null;
+                }
+                if (current != null)
+                {
+                    current.Last = s;
                 }
                 previous = format ?? previous;
 
+                var block = current;
                 double size = SizeFor(format);
                 var list = new List<Run>(sentence.Words.Count);
                 for (int w = 0; w < sentence.Words.Count; w++)
@@ -140,28 +346,42 @@ namespace TextToSpeech
                         run.FontFamily = CodeFont;
                     }
                     run.MouseLeftButtonUp += OnRunClicked;
-                    run.MouseEnter += (_, _) => run.Background = HoverBrush;
+                    run.MouseEnter += (_, _) =>
+                    {
+                        run.Background = HoverBrush;
+                        ShowHandle(block, true);
+                    };
                     int sIdx = s, wIdx = w;
-                    run.MouseLeave += (_, _) => ApplyStyle(run, sIdx, wIdx);
+                    run.MouseLeave += (_, _) =>
+                    {
+                        ApplyStyle(run, sIdx, wIdx);
+                        ShowHandle(block, false);
+                    };
                     list.Add(run);
+                    block?.Words.Add(run);
                     textBlock.Inlines.Add(run);
                     textBlock.Inlines.Add(new Run(" "));
                 }
                 runs.Add(list);
-                if (sentence.Pause != null)
-                {
-                    var mark = new Run("\u23F8 ") { ToolTip = sentence.Pause.Label == null ? "Reading waits here" : "Reading waits here for your answer" };
-                    pauseMarks[s] = mark;
-                    textBlock.Inlines.Add(mark);
-                }
+                AddPauseMark(s, sentence);
             }
             RestyleAll();
         }
 
+        private void AddPauseMark(int s, Sentence sentence)
+        {
+            if (sentence.Pause != null)
+            {
+                var mark = new Run("\u23F8 ") { ToolTip = sentence.Pause.Label == null ? "Reading waits here" : "Reading waits here for your answer" };
+                pauseMarks[s] = mark;
+                textBlock.Inlines.Add(mark);
+            }
+        }
+
         private static readonly FontFamily CodeFont = new("Consolas");
 
-        /// <summary>Starts a new line for a markdown block: a line break (two between different kinds of block), then the indent and marker of a list item.</summary>
-        private void StartBlock(SentenceFormat format, SentenceFormat? previous)
+        /// <summary>Starts a new line for a markdown block: a line break (two between different kinds of block), then the handle (the list marker with its indent, or a hidden arrow). Returns the handle.</summary>
+        private Run StartBlock(SentenceFormat format, SentenceFormat? previous)
         {
             if (textBlock.Inlines.Count > 0)
             {
@@ -172,10 +392,76 @@ namespace TextToSpeech
                     textBlock.Inlines.Add(new LineBreak());
                 }
             }
+            Run gutter;
             if (format.Kind == BlockKind.ListItem)
             {
                 string indent = new string('\u00A0', Math.Clamp(format.Level, 0, 8) * 4);
-                textBlock.Inlines.Add(new Run(indent + (format.Marker ?? "\u2022") + "\u00A0") { Foreground = SubtleBrush });
+                gutter = new Run(indent + (format.Marker ?? "\u2022") + "\u00A0") { Foreground = SubtleBrush };
+            }
+            else
+            {
+                gutter = new Run("\u25B8\u00A0") { Foreground = Brushes.Transparent };   // shows on hover
+            }
+            gutter.Cursor = Cursors.Hand;
+            gutter.ToolTip = "Play just this line";
+            textBlock.Inlines.Add(gutter);
+            return gutter;
+        }
+
+        private void WireGutter(Block block)
+        {
+            var gutter = block.Gutter!;
+            gutter.MouseEnter += (_, _) => HoverBlock(block, true);
+            gutter.MouseLeave += (_, _) => HoverBlock(block, false);
+            gutter.MouseLeftButtonUp += (_, e) =>
+            {
+                LineClicked?.Invoke(block.First, block.Last);
+                e.Handled = true;
+            };
+        }
+
+        /// <summary>Shows or hides the arrow handle of a block that is not a list item (word hover reveals it too).</summary>
+        private void ShowHandle(Block? block, bool on)
+        {
+            if (block?.Gutter != null && !block.GutterIsMarker)
+            {
+                block.Gutter.Foreground = on ? SubtleBrush : Brushes.Transparent;
+            }
+        }
+
+        /// <summary>Hovering the handle tints the whole line, which is what a click will play.</summary>
+        private void HoverBlock(Block block, bool on)
+        {
+            foreach (var run in block.Words)
+            {
+                if (on)
+                {
+                    run.Background = HoverBrush;
+                }
+                else if (run.Tag is ValueTuple<int, int> pos)
+                {
+                    ApplyStyle(run, pos.Item1, pos.Item2);
+                }
+            }
+            ShowHandle(block, on);
+        }
+
+        /// <summary>Raw view: tints the block being read and greys the ones already read.</summary>
+        private void StyleRawBlocks()
+        {
+            if (document == null)
+            {
+                return;
+            }
+            int current = document.Position.Sentence;
+            foreach (var block in blocks)
+            {
+                if (block.RawRun == null)
+                {
+                    continue;
+                }
+                block.RawRun.Background = current >= block.First && current <= block.Last ? SentenceBrush : null;
+                block.RawRun.Foreground = block.Last < current ? ReadBrush : TextBrush;
             }
         }
 
@@ -196,6 +482,7 @@ namespace TextToSpeech
         {
             if (sender is Run { Tag: ValueTuple<int, int> pos })
             {
+                Following = true;   // choosing where to read from means following again
                 WordClicked?.Invoke(pos.Item1, pos.Item2);
                 e.Handled = true;
             }
@@ -207,6 +494,7 @@ namespace TextToSpeech
             {
                 StyleSentence(s);
             }
+            StyleRawBlocks();
             RememberStyled();
             ScrollCurrentIntoView();
         }
@@ -226,6 +514,7 @@ namespace TextToSpeech
             {
                 StyleSentence(s);
             }
+            StyleRawBlocks();
             bool sentenceChanged = styledSentence != document.Position.Sentence;
             RememberStyled();
             if (sentenceChanged)
@@ -270,13 +559,70 @@ namespace TextToSpeech
 
         private void ScrollCurrentIntoView()
         {
-            if (document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count || runs[document.Position.Sentence].Count == 0)
+            if (following)
+            {
+                QueueFollow();
+            }
+        }
+
+        /// <summary>Scrolls once layout is up to date (several changes in a row cost one scroll).</summary>
+        private void QueueFollow()
+        {
+            if (scrollQueued)
             {
                 return;
             }
-            // GUESS: bring the sentence start into view as reading advances. Scrolling by hand
-            // while reading is still overridden at the next sentence; revisit if that annoys.
-            runs[document.Position.Sentence][0].BringIntoView();
+            scrollQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                scrollQueued = false;
+                FollowCurrent();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void FollowCurrent()
+        {
+            if (!following || document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count)
+            {
+                return;
+            }
+            // Raw view has one run per block (its sentences have no word runs); formatted view has the sentence's words.
+            TextPointer? from, to;
+            if (showRaw)
+            {
+                int cur = document.Position.Sentence;
+                var raw = blocks.Find(b => cur >= b.First && cur <= b.Last)?.RawRun;
+                (from, to) = raw == null ? (null, null) : (raw.ContentStart, raw.ContentEnd);
+            }
+            else
+            {
+                var words = runs[document.Position.Sentence];
+                (from, to) = words.Count == 0 ? (null, null) : (words[0].ContentStart, words[^1].ContentEnd);
+            }
+            if (from == null || to == null)
+            {
+                return;
+            }
+            try
+            {
+                UpdateLayout();
+                var first = from.GetCharacterRect(LogicalDirection.Forward);
+                var last = to.GetCharacterRect(LogicalDirection.Backward);
+                if (first.IsEmpty || last.IsEmpty)
+                {
+                    return;
+                }
+                // The text block is the scrolled content, so its coordinates are content coordinates.
+                var target = FollowScroll.TargetOffset(first.Top, Math.Max(first.Bottom, last.Bottom), VerticalOffset, ViewportHeight);
+                if (target is double y)
+                {
+                    ScrollToVerticalOffset(y);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The runs were replaced while this waited; the next change scrolls again.
+            }
         }
     }
 }

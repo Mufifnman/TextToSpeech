@@ -98,6 +98,8 @@
 
         <CheckBox x:Name="markdownBox" Content="Show markdown laid out (lists, headings, code) and never read the markup" Margin="0,0,0,6"
                   ToolTip="Applies to text from the API and plugin, and to pasted text that has headings, lists or code blocks."/>
+        <CheckBox x:Name="rawBox" Content="Show the original text with its symbols instead (raw view)" Margin="22,0,0,6"
+                  ToolTip="The popup's &lt;/&gt; button flips between the laid-out and the original text and remembers the choice here."/>
         <CheckBox x:Name="playAllBox" Content="Read through questions without stopping (play all by default)" Margin="0,0,0,10"
                   ToolTip="Off: reading stops after each question that a program marked, until you press play. The Play all button in the window and popup switches it for the current text."/>
         <TextBlock Text="Text size in the window" FontWeight="SemiBold"/>
