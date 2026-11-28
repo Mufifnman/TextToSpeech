@@ -19,6 +19,11 @@ namespace TextToSpeech.Api.Arbitration
         private string? lastFocusSeen;
         private string? frontedFor;
 
+        // Hints do not take part in turn taking: they only prepare audio.
+        public Task<PrewarmResponse> PrewarmAsync(PrewarmRequest request) => inner.PrewarmAsync(request);
+        public Task<PrewarmResponse> CancelPrewarmAsync(CancelPrewarmRequest request) => inner.CancelPrewarmAsync(request);
+        public Task<PrewarmResponse> GetPrewarmAsync() => inner.GetPrewarmAsync();
+
         public ArbitratedHost(IReadingHost inner, IEnvironmentProbe probe, Func<ReadPolicy> policy, Func<bool>? isBusy = null)
         {
             this.inner = inner;
@@ -47,7 +52,7 @@ namespace TextToSpeech.Api.Arbitration
             }
             var extras = extra as SpeakExtras;
             lastSpoken = inner.SpeakAsync(new SpeakRequest(text, agent.Label, mode, null, null, null, null, null,
-                Pauses: extras?.Pauses, Questions: extras?.Questions, PlayAll: extras?.PlayAll)).GetAwaiter().GetResult();
+                Agent: new AgentRef(agent.Id, agent.Label, null, null, null), Pauses: extras?.Pauses, Questions: extras?.Questions, PlayAll: extras?.PlayAll)).GetAwaiter().GetResult();
             if (frontedFor != agent.Id)
             {
                 frontedFor = agent.Id;

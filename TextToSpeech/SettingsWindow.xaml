@@ -88,6 +88,9 @@
                     SmallChange="50" LargeChange="200" VerticalAlignment="Center"/>
         </DockPanel>
 
+        <CheckBox x:Name="chunkBox" Content="Split long sentences at commas (neural voices)" Margin="0,0,0,14"
+                  ToolTip="Long sentences are generated in pieces, so speech starts sooner and there is no gap before a long sentence. Turn off if the joins at commas sound wrong."/>
+
         <CheckBox x:Name="autoClearBox" Content="Auto clear" Margin="0,0,0,6"
                   ToolTip="Clears the text a few seconds after reading finishes, like the Clear button. A new read or new text in the meantime cancels it. Off: use the Clear button."/>
         <DockPanel Margin="22,0,0,14">

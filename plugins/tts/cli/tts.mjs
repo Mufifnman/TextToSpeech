@@ -13,6 +13,8 @@ const USAGE = `Usage: tts <command> [options]
                         --question <text>                a question to wait on after the text (repeat for several);
                                                          reading stops after each until you press play or run "next"
                         --play-all                       read through the questions without stopping
+  prewarm <text|-> [--agent <id>] [--filters]   Tell the app text that will probably be read soon, so it makes the audio now.
+  prewarm-cancel [--agent <id>]                 Withdraw the hint.   prewarm-stats   Hints and how often audio was ready.
   next                Continue after a question the app is waiting at (marks it answered).
   answered <id> [--session <id>]   Mark a question answered (q1, q2, ...); continues if reading waits at it.
   pause | resume | toggle | skip | back | stop | clear
@@ -60,6 +62,13 @@ export async function run(argv, { stdin = () => readFileSync(0, 'utf8'), out = c
     case 'pause': case 'resume': case 'toggle': case 'skip': case 'back': case 'stop': case 'clear':
       return print(await api.control(command));
     case 'next': return print(await api.next());
+    case 'prewarm': {
+      const text = arg === '-' ? stdin() : positional.slice(1).join(' ');
+      if (!text.trim()) throw new TtsError('Nothing to prewarm.', { code: 'usage' });
+      return print(await api.prewarm({ text, agent: flags.agent ? { id: flags.agent } : undefined, applyFilters: flags.filters ? true : undefined }));
+    }
+    case 'prewarm-cancel': return print(await api.cancelPrewarm(flags.agent ? { id: flags.agent } : undefined));
+    case 'prewarm-stats': return print(await api.prewarmStats());
     case 'answered':
       if (!arg) throw new TtsError('answered needs a pause id such as q1.', { code: 'usage' });
       return print(await api.answered(arg, flags.session));

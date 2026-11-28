@@ -135,7 +135,7 @@ namespace TextToSpeech.Speech
                     lookAhead.Take(keys[0]);
                     return;
                 }
-                lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a guess for this spot, if any, is no longer needed
+                lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a pause guess for this spot, if any, is no longer needed
 
                 IReadOnlyList<TimedWord> WordsFor(int i, float[] samples)
                 {
@@ -196,7 +196,32 @@ namespace TextToSpeech.Speech
             return result.ToArray();
         }
 
-        public void ClearUpcoming() => lookAhead.Clear();
+        private readonly object hintGate = new();
+        private readonly Dictionary<string, (string[] Texts, string Dir, int Sid, float Speed)> hints = new();
+
+        /// <summary>An API caller's hint: made while idle, after the sentences the reading itself needs. Same key replaces, empty withdraws.</summary>
+        public void PrepareHint(string key, IReadOnlyList<string> texts, VoiceInfo? voice, int rate)
+        {
+            lock (hintGate)
+            {
+                if (texts.Count == 0 || voice == null || !TryParseId(voice.Id, out string dir, out int sid))
+                {
+                    hints.Remove(key);
+                }
+                else
+                {
+                    hints[key] = (texts.ToArray(), dir, sid, RateToSpeed(rate));
+                }
+                var wanted = hints.Values.SelectMany(h => Wanted(h.Texts, h.Dir, h.Sid, h.Speed, eager: false)).ToArray();
+                lookAhead.SetWanted(3, wanted);
+            }
+        }
+
+        public void ClearUpcoming()
+        {
+            lock (hintGate) { hints.Clear(); }
+            lookAhead.Clear();
+        }
 
         /// <summary>Hits and misses of look-ahead since start (or <see cref="ResetLookAheadStats"/>).</summary>
         public SynthesisStats LookAheadStats => lookAhead.Stats;

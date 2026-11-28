@@ -91,6 +91,11 @@ export const api = {
     playAll: args.playAll,
   }, o),
   next: (o) => call('POST', '/v1/next', undefined, o),
+  // Prewarm: tell the app text you are about to ask it to read, so the audio is made in advance. One hint per agent id;
+  // a newer hint replaces it, `speak` with the final text confirms or replaces it, cancelPrewarm withdraws it.
+  prewarm: (args, o) => call('POST', '/v1/prewarm', { text: args.text, agent: args.agent, applyFilters: args.applyFilters }, o),
+  cancelPrewarm: (agent, o) => call('POST', '/v1/prewarm/cancel', agent ? { agent } : {}, o),
+  prewarmStats: (o) => call('GET', '/v1/prewarm', undefined, o),
   answered: (id, sessionId, o) => call('POST', `/v1/pauses/${encodeURIComponent(id)}/answered`, sessionId ? { sessionId } : {}, o),
   policy: (o) => call('GET', '/v1/policy', undefined, o),
   mute: (minutes, o) => call('POST', '/v1/policy/mute', { minutes }, o),

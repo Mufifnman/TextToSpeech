@@ -51,6 +51,12 @@ namespace TextToSpeech.Core.Reading
         /// <summary>How many following sentences the engine is told about (it decides how many it prepares, by seconds of audio).</summary>
         public const int UpcomingSentences = 6;
 
+        /// <summary>An API caller's hint that this text will be read soon (an empty list withdraws it). The engine may prepare the audio.</summary>
+        public void PrewarmHint(string key, IReadOnlyList<string> texts) => engineFor(Voice).PrepareHint(key, texts, Voice, Rate);
+
+        /// <summary>Look-ahead hits and misses of the engine for the current voice (null where the engine has none).</summary>
+        public SynthesisStats? LookAheadStats => engineFor(Voice).LookAheadStats;
+
         public ReadingDocument Document => document;
 
         /// <summary>The voice used for the next sentence. Changing it takes effect from the next sentence.</summary>

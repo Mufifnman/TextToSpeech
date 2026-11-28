@@ -54,6 +54,8 @@ namespace TextToSpeech
             gapSlider.Value = Math.Clamp(settings.SentenceGapMs, SentencePacing.MinGapMs, SentencePacing.MaxGapMs);
             gapText.Text = (int)gapSlider.Value + " ms";
             gapSlider.ValueChanged += (_, _) => Changed();
+            chunkBox.IsChecked = settings.ChunkLongSentences;
+            chunkBox.Click += (_, _) => Changed();
             popupOpacitySlider.Value = Math.Round(settings.PopupOpacity * 100);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";
             popupOpacitySlider.ValueChanged += (_, _) => Changed();
@@ -122,6 +124,7 @@ namespace TextToSpeech
             agentRulesButton.Visibility = settings.ApiEnabled ? Visibility.Visible : Visibility.Collapsed; // agents only exist through the local API
             popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
+            settings.ChunkLongSentences = chunkBox.IsChecked == true;
             gapText.Text = settings.SentenceGapMs + " ms";
             settings.PopupOpacity = Math.Clamp(popupOpacitySlider.Value / 100.0, 0.3, 1.0);
             popupOpacityText.Text = (int)popupOpacitySlider.Value + "%";

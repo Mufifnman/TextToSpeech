@@ -5,7 +5,7 @@ namespace TextToSpeech.Speech
     /// 1. <b>Demanded</b> work (the sentence about to be spoken) always goes first.
     /// 2. <b>Wanted</b> work at priority 1 (the next sentences, in reading order) goes next, but only while less
     ///    than <c>budgetSeconds</c> of finished audio is waiting, so it never builds up without bound.
-    /// 3. <b>Wanted</b> work at priority 2 (a guess, such as the rest of a sentence after a pause) runs only when
+    /// 3. <b>Wanted</b> work at priority 2 (a guess, such as the rest of a sentence after a pause) or 3 (a hint from an API caller) runs only when
     ///    nothing else needs doing, and is thrown away as soon as it is no longer wanted.
     /// Work that is no longer wanted and has not started is cancelled. Work already running cannot be stopped, but
     /// its result is discarded and nothing else starts until it ends.
@@ -16,8 +16,8 @@ namespace TextToSpeech.Speech
         int DemandsReady,        // asked for and already finished: no wait
         int DemandsRunning,      // asked for while queued or running: waited for the rest
         int DemandsFresh,        // not prepared at all: waited for all of it
-        int GuessesUsed,         // priority 2 guesses that were then demanded
-        int GuessesWasted,       // priority 2 guesses dropped without being used
+        int GuessesUsed,         // guesses and hints (priority 2 and 3) that were then demanded
+        int GuessesWasted,       // guesses and hints dropped without being used
         int NextWasted)          // priority 1 audio dropped without being used (a jump or clear)
     {
         public int Demands => DemandsReady + DemandsRunning + DemandsFresh;
@@ -96,7 +96,7 @@ namespace TextToSpeech.Speech
                 if (jobs.TryGetValue(key, out var existing))
                 {
                     if (existing.Tcs.Task.IsCompleted) demandsReady++; else demandsRunning++;
-                    if (existing.Origin == 2) guessesUsed++;
+                    if (existing.Origin >= 2) guessesUsed++;
                     existing.Demanded = true;
                     if (!existing.Running && pending.Contains(existing))
                     {
@@ -122,7 +122,7 @@ namespace TextToSpeech.Speech
         }
 
         /// <summary>
-        /// Replaces everything wanted at <paramref name="priority"/> (1 or 2) with <paramref name="items"/>, in order.
+        /// Replaces everything wanted at <paramref name="priority"/> (1, 2 or 3) with <paramref name="items"/>, in order.
         /// Items no longer listed are cancelled, or their finished audio dropped.
         /// </summary>
         public void SetWanted(int priority, IReadOnlyList<(string Key, Func<T> Work)> items)
@@ -206,7 +206,7 @@ namespace TextToSpeech.Speech
             pending.Remove(job);
             if (!job.Demanded && job.Tcs.Task.Status != TaskStatus.Canceled)
             {
-                if (job.Origin == 2) guessesWasted++;
+                if (job.Origin >= 2) guessesWasted++;
                 else if (job.Origin == 1) nextWasted++;
             }
             if (job.Counted)
