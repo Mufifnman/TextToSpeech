@@ -831,6 +831,7 @@ namespace TextToSpeech
                 ? "Play all is on: reading does not stop at questions. Click to stop at each question again."
                 : "Stops after each question. Click to read straight through without stopping.";
             popup?.SetPlayAll(has, reading.PlayAll);
+            popup?.SetRaw(HasFormatting(), rawView);
         }
 
         private void SetMainTextSize(double size)
