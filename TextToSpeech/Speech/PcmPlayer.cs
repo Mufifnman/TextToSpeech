@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace TextToSpeech.Speech
 {
