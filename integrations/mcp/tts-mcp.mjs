@@ -16,7 +16,7 @@ export const TOOLS = [
       mode: { type: 'string', enum: ['queue', 'interrupt', 'if-idle'], description: 'queue (default), interrupt (speak now, keep the rest for later) or if-idle (skip if anything is playing or waiting).' },
       source: str('Label shown in the popup. Defaults to "claude".'),
       quiet: { type: 'boolean', description: 'true reads without showing the reading popup.' },
-      questions: { type: 'array', items: { type: 'string' }, description: 'Questions for the user, in the order to ask them. They are added after the text as a numbered list and reading stops after each one so the user can answer before the next is read. The app never decides what is a question: pass them here. Markdown in text (headings, lists) is laid out in the popup and the markup is never spoken.' },
+      questions: { type: 'array', items: { type: 'string' }, description: 'Questions for the user, in the order to ask them. A question the text already says is not read again (reading waits there); the others are added after the text as a numbered list. Reading stops after each one so the user can answer before the next is read. The app never decides what is a question: pass them here. Markdown in text (headings, lists) is laid out in the popup and the markup is never spoken.' },
       playAll: { type: 'boolean', description: 'true reads through the questions without stopping (the user can also press Play all).' },
     } },
     run: (a) => api.speak({ text: a.text, source: a.source ?? 'claude', mode: a.mode, popup: a.quiet ? false : undefined, agent: agentFromContext(), questions: a.questions, playAll: a.playAll }) },

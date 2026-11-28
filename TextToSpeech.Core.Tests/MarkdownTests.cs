@@ -113,6 +113,39 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void QuestionList_DoesNotRepeatAQuestionTheTextAlreadySays()
+        {
+            var (text, pauses) = QuestionList.Append("Done. **Which branch** should I use?\n\nAlso, ok.", new[] { "Which branch should I use?", "Add tests?" });
+            Assert.Equal("Done. **Which branch** should I use?\n\nAlso, ok.\n\n1. Add tests?\n", text);   // only the new one is added
+            Assert.Equal(new[] { "q1", "q2" }, pauses.Select(p => p.Id));
+            Assert.Equal("Which branch", text.Substring(pauses[0].At, "Which branch".Length));   // q1 waits where it was said
+
+            var doc = new ReadingDocument();
+            doc.AppendMarkdown(text, pauses: pauses);
+            Assert.Equal(new[] { "q1", "q2" }, doc.Pauses().Select(p => p.Sentence.Pause!.Id));
+            Assert.Equal(1, doc.Sentences.Count(s => s.Text.Contains("Which branch")));
+        }
+
+        [Fact]
+        public void QuestionList_OnlyTakesAnActualQuestion_NotAStatementWithTheSameWords()
+        {
+            var (text, pauses) = QuestionList.Append("Here is why it fails. Tell me which branch you use.", new[] { "Why?", "Which branch?" });
+            Assert.Equal("Here is why it fails. Tell me which branch you use.\n\n1. Why?\n2. Which branch?\n", text);
+            Assert.All(pauses, p => Assert.True(p.At >= "Here is why it fails. Tell me which branch you use.".Length));
+        }
+
+        [Fact]
+        public void QuestionList_TwoQuestionsInOneParagraph_SecondIsAskedInTheList()
+        {
+            var (text, pauses) = QuestionList.Append("Which branch? And should I add tests?", new[] { "Which branch?", "Should I add tests?" });
+            Assert.Equal("Which branch? And should I add tests?\n\n1. Should I add tests?\n", text);
+            Assert.Equal(new[] { "q1", "q2" }, pauses.Select(p => p.Id));
+            var doc = new ReadingDocument();
+            doc.AppendMarkdown(text, pauses: pauses);
+            Assert.Equal(2, doc.Pauses().Count);   // both questions have a wait point
+        }
+
+        [Fact]
         public void QuestionList_AddsANumberedList_WithOnePausePerQuestion()
         {
             var (text, pauses) = QuestionList.Append("Done with the parser.", new[] { "Which branch?", "  ", "Add tests?" });
