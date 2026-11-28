@@ -134,6 +134,8 @@
             </StackPanel>
         </Expander>
 
+        <Button x:Name="agentRulesButton" Content="Agent reading rules..." HorizontalAlignment="Left" Height="28" Padding="10,0" Margin="0,10,0,0" Click="AgentRules_Click"
+                ToolTip="Rules for Claude Code and other agents that read aloud through the local API: headphones, quiet hours, turn taking, expiry."/>
         <Button Content="Close" IsDefault="True" IsCancel="True" HorizontalAlignment="Right" Width="80" Height="28" Margin="0,14,0,0" Click="Close_Click"/>
     </StackPanel>
 </Window>

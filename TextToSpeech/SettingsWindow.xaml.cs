@@ -44,6 +44,7 @@ namespace TextToSpeech
             popupAutoHideBox.IsChecked = settings.PopupAutoHide;
             popupKeepBox.IsChecked = settings.PopupKeepOpenWhenPaused;
             apiBox.IsChecked = settings.ApiEnabled;
+            agentRulesButton.Visibility = settings.ApiEnabled ? Visibility.Visible : Visibility.Collapsed;
             foreach (CheckBox box in new[] { startWithWindowsBox, closeToTrayBox, showPopupBox, popupAutoHideBox, popupKeepBox, apiBox })
             {
                 box.Click += (_, _) => Changed();
@@ -94,6 +95,8 @@ namespace TextToSpeech
             loading = false;
         }
 
+        private void AgentRules_Click(object sender, RoutedEventArgs e) => new AgentSettingsWindow(settings) { Owner = this }.ShowDialog();
+
         private void Changed()
         {
             if (loading) return;
@@ -105,6 +108,7 @@ namespace TextToSpeech
             settings.PopupAutoHide = popupAutoHideBox.IsChecked == true;
             settings.PopupKeepOpenWhenPaused = popupKeepBox.IsChecked == true;
             settings.ApiEnabled = apiBox.IsChecked == true;
+            agentRulesButton.Visibility = settings.ApiEnabled ? Visibility.Visible : Visibility.Collapsed; // agents only exist through the local API
             popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
             gapText.Text = settings.SentenceGapMs + " ms";

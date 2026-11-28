@@ -137,3 +137,18 @@ test('MCP tool call returns JSON text, and errors come back as isError', async (
   }
   assert.ok((await handle({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'zzz' } })).error);
 });
+
+test('mcp speak identifies the window as an agent; policy and mute tools exist', async () => {
+  seen = [];
+  await handle({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'speak', arguments: { text: 'hello' } } });
+  const spoke = seen.find((s) => s.url === '/v1/speak');
+  assert.match(spoke.body.agent.id, /^claude-[0-9a-f]{10}$/);
+  assert.ok(spoke.body.agent.label);
+
+  const pol = await handle({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'reading_policy', arguments: {} } });
+  assert.equal(pol.result.isError, undefined);
+  assert.ok(seen.some((s) => s.url === '/v1/policy') && seen.some((s) => s.url === '/v1/agents'));
+
+  await handle({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'mute_reading', arguments: { minutes: 30 } } });
+  assert.deepEqual(seen.find((s) => s.url === '/v1/policy/mute').body, { minutes: 30 });
+});

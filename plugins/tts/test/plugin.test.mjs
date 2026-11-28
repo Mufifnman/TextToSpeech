@@ -42,29 +42,62 @@ test('lastAssistantText finds the last assistant text block', () => {
   assert.equal(lastAssistantText(j), 'new');
 });
 
-async function withServer(fn) {
+const ALLOW = { mayRead: true, reasons: [], policy: { autoRead: 'off' } };
+
+// `seen` holds the bodies of requests other than the policy query; `urls` holds "METHOD /path" for every request.
+async function withServer(fn, policy = ALLOW) {
   const seen = [];
+  const urls = [];
   const server = http.createServer((req, res) => {
     let b = ''; req.on('data', (c) => (b += c));
-    req.on('end', () => { seen.push(JSON.parse(b || '{}')); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); });
+    req.on('end', () => {
+      urls.push(`${req.method} ${req.url}`);
+      const isPolicy = req.url === '/v1/policy';
+      if (!isPolicy) seen.push(JSON.parse(b || '{}'));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(isPolicy ? policy : {}));
+    });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  try { await fn(`http://127.0.0.1:${server.address().port}`, seen); } finally { server.close(); }
+  try { await fn(`http://127.0.0.1:${server.address().port}`, seen, urls); } finally { server.close(); }
 }
 
-function runHook(env, input) {
+function runScript(script, env, input) {
   return new Promise((resolve) => {
-    const p = spawn(process.execPath, [join(root, 'hooks/auto-read.mjs')], { env: { ...process.env, ...env } });
+    const p = spawn(process.execPath, [join(root, script)], { env: { ...process.env, ...env } });
     p.on('close', (code) => resolve(code));
     p.stdin.end(input);
   });
 }
+const runHook = (env, input) => runScript('hooks/auto-read.mjs', env, input);
+const E = (url, extra = {}) => ({ TTS_API_URL: url, TTS_API_TOKEN: 't', TTS_AUTO_READ: '', ...extra });
 
-test('hook is silent unless TTS_AUTO_READ is set', async () => {
+test('hook is silent when the app setting and the environment both say off', async () => {
   await withServer(async (url, seen) => {
-    const code = await runHook({ TTS_API_URL: url, TTS_API_TOKEN: 't', TTS_AUTO_READ: '' }, '{}');
+    const code = await runHook(E(url), '{}');
     assert.equal(code, 0); assert.equal(seen.length, 0);
   });
+});
+
+test('hook follows the app setting when the environment is unset', async () => {
+  await withServer(async (url, seen) => {
+    await runHook(E(url), JSON.stringify({ last_assistant_message: 'From the app setting.' }));
+    assert.equal(seen[0].text, 'From the app setting.');
+  }, { mayRead: true, reasons: [], policy: { autoRead: 'reply' } });
+});
+
+test('environment off beats the app setting', async () => {
+  await withServer(async (url, seen) => {
+    await runHook(E(url, { TTS_AUTO_READ: 'off' }), JSON.stringify({ last_assistant_message: 'x' }));
+    assert.equal(seen.length, 0);
+  }, { mayRead: true, reasons: [], policy: { autoRead: 'reply' } });
+});
+
+test('hook says nothing when the app says reading is not allowed now', async () => {
+  await withServer(async (url, seen) => {
+    await runHook(E(url, { TTS_AUTO_READ: 'reply' }), JSON.stringify({ last_assistant_message: 'x' }));
+    assert.equal(seen.length, 0);
+  }, { mayRead: false, reasons: ['Quiet hours (22:00 to 07:00).'], policy: { autoRead: 'reply' } });
 });
 
 test('hook reads the last reply when TTS_AUTO_READ=reply', async () => {
@@ -72,15 +105,46 @@ test('hook reads the last reply when TTS_AUTO_READ=reply', async () => {
   const tp = join(dir, 't.jsonl');
   writeFileSync(tp, JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'All **done**.' }] } }));
   await withServer(async (url, seen) => {
-    const code = await runHook({ TTS_API_URL: url, TTS_API_TOKEN: 't', TTS_AUTO_READ: 'reply' }, JSON.stringify({ transcript_path: tp }));
+    const code = await runHook(E(url, { TTS_AUTO_READ: 'reply' }), JSON.stringify({ transcript_path: tp }));
     assert.equal(code, 0);
     assert.equal(seen[0].text, 'All done.'); assert.equal(seen[0].popup, false);
+  });
+});
+
+test('hook identifies the window as an agent, stable per project folder', async () => {
+  await withServer(async (url, seen) => {
+    await runHook(E(url, { TTS_AUTO_READ: 'announce' }), JSON.stringify({ cwd: '/work/My Project' }));
+    await runHook(E(url, { TTS_AUTO_READ: 'announce' }), JSON.stringify({ cwd: '/work/My Project' }));
+    await runHook(E(url, { TTS_AUTO_READ: 'announce' }), JSON.stringify({ cwd: '/work/other' }));
+    assert.equal(seen[0].agent.id, seen[1].agent.id);
+    assert.notEqual(seen[0].agent.id, seen[2].agent.id);
+    assert.equal(seen[0].agent.label, 'My Project');
+    assert.equal(seen[0].agent.titleHint, 'My Project');
+    assert.ok(Number.isInteger(seen[0].agent.pid));
+    assert.equal(seen[0].mode, 'if-idle');
   });
 });
 
 test('hook exits 0 when the app is not running', async () => {
   const code = await runHook({ TTS_API_URL: 'http://127.0.0.1:1', TTS_API_TOKEN: 't', TTS_AUTO_READ: 'announce' }, '{}');
   assert.equal(code, 0);
+});
+
+test('prompt hook tells the app which window the user typed in', async () => {
+  await withServer(async (url, seen, urls) => {
+    const code = await runScript('hooks/focus.mjs', E(url), JSON.stringify({ cwd: '/work/proj' }));
+    assert.equal(code, 0);
+    assert.deepEqual(urls, ['POST /v1/agents/prompt']);
+    assert.equal(seen[0].label, 'proj');
+  });
+  const code = await runScript('hooks/focus.mjs', E('http://127.0.0.1:1'), '{}');
+  assert.equal(code, 0);
+});
+
+test('hooks.json wires Stop and UserPromptSubmit', () => {
+  const h = JSON.parse(readFileSync(join(root, 'hooks/hooks.json'), 'utf8')).hooks;
+  assert.match(h.Stop[0].hooks[0].command, /auto-read\.mjs/);
+  assert.match(h.UserPromptSubmit[0].hooks[0].command, /focus\.mjs/);
 });
 
 test('toSpeakable drops tilde, long and unclosed code fences', () => {
@@ -91,7 +155,7 @@ test('toSpeakable drops tilde, long and unclosed code fences', () => {
 
 test('hook prefers last_assistant_message over the transcript', async () => {
   await withServer(async (url, seen) => {
-    await runHook({ TTS_API_URL: url, TTS_API_TOKEN: 't', TTS_AUTO_READ: 'reply' },
+    await runHook(E(url, { TTS_AUTO_READ: 'reply' }),
       JSON.stringify({ last_assistant_message: 'Direct reply.', transcript_path: '/nonexistent' }));
     assert.equal(seen[0].text, 'Direct reply.');
   });

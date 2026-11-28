@@ -2,7 +2,7 @@
 // MCP server (stdio) for the Text to Speech local API, so Claude can read text aloud, control reading, and hand the
 // unread remainder back and forth. Newline-delimited JSON-RPC, no dependencies.
 import { createInterface } from 'node:readline';
-import { api, TtsError } from '../tts-client.mjs';
+import { api, agentFromContext, TtsError } from '../tts-client.mjs';
 
 const SERVER = { name: 'text-to-speech', version: '1.0.0' };
 
@@ -10,14 +10,19 @@ const str = (description) => ({ type: 'string', description });
 const num = (description) => ({ type: 'number', description });
 
 export const TOOLS = [
-  { name: 'speak', description: 'Read text aloud with the Text to Speech app. Use mode "if-idle" for short announcements that should not interrupt anything.',
+  { name: 'speak', description: 'Read text aloud with the Text to Speech app. Use mode "if-idle" for short announcements that should not interrupt anything. Several Claude windows take turns: the answer says decision "speaking", "waiting" (another window is reading; this text is read when it is done or when the user switches to this window), "skipped" or "denied" (the user\'s rules, such as headphones or quiet hours, say no: do not retry).',
     inputSchema: { type: 'object', required: ['text'], properties: {
       text: str('The text to read.'),
       mode: { type: 'string', enum: ['queue', 'interrupt', 'if-idle'], description: 'queue (default), interrupt (speak now, keep the rest for later) or if-idle (skip if anything is playing or waiting).' },
       source: str('Label shown in the popup. Defaults to "claude".'),
       quiet: { type: 'boolean', description: 'true reads without showing the reading popup.' },
     } },
-    run: (a) => api.speak({ text: a.text, source: a.source ?? 'claude', mode: a.mode, popup: a.quiet ? false : undefined }) },
+    run: (a) => api.speak({ text: a.text, source: a.source ?? 'claude', mode: a.mode, popup: a.quiet ? false : undefined, agent: agentFromContext() }) },
+  { name: 'reading_policy', description: 'Ask whether reading aloud is allowed right now and why not (headphones, quiet hours, switched off, muted), plus which Claude windows are reading or waiting. Check this before reading long text.',
+    inputSchema: { type: 'object', properties: {} },
+    run: async () => ({ policy: await api.policy(), agents: (await api.agents()).agents }) },
+  { name: 'mute_reading', description: 'Silence all reading for some minutes (1 to 720) when the user asks you to be quiet. You cannot switch reading back on or loosen the rules; the user does that in the app.',
+    inputSchema: { type: 'object', required: ['minutes'], properties: { minutes: num('Minutes to stay quiet.') } }, run: (a) => api.mute(a.minutes) },
   { name: 'pause', description: 'Pause reading (keeps the place).', inputSchema: { type: 'object', properties: {} }, run: () => api.control('pause') },
   { name: 'resume', description: 'Resume reading.', inputSchema: { type: 'object', properties: {} }, run: () => api.control('resume') },
   { name: 'skip', description: 'Skip to the next sentence.', inputSchema: { type: 'object', properties: {} }, run: () => api.control('skip') },

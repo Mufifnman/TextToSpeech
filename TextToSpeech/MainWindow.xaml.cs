@@ -134,7 +134,7 @@ namespace TextToSpeech
 
         private void SetupShell()
         {
-            api = new LocalApiService(reading, BuildAppControl(), Dispatcher);
+            api = new LocalApiService(reading, BuildAppControl(), Dispatcher, () => settings.ToReadPolicy());
             api.Host.Event += e => { if (e.Type.StartsWith("handoff")) RefreshPopup(); };
 
             tray = new TrayIcon(new TrayActions(
