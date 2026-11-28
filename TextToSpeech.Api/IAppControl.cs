@@ -26,5 +26,11 @@ namespace TextToSpeech.Api
 
         /// <summary>Runs the app's text filters (citations and so on) over API text when the client asked for it.</summary>
         string ApplyFilters(string text);
+
+        /// <summary>Show markdown as laid-out text (the "Format markdown" setting). On unless the app says otherwise.</summary>
+        bool MarkdownEnabled => true;
+
+        /// <summary>Read through pause points without stopping unless the request says otherwise (the "Play all by default" setting).</summary>
+        bool PlayAllByDefault => false;
     }
 }

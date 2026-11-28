@@ -27,6 +27,12 @@ namespace TextToSpeech.Core.Shell
         /// <summary>The "Hide popup when reading finishes" setting.</summary>
         public bool AutoHide { get; set; } = true;
 
+        /// <summary>
+        /// How long the popup stays after everything was read, when <see cref="AutoHide"/> is on. The app sets it to
+        /// the longer of the auto-clear delay and the "stay open" setting, so the popup never goes before the text clears.
+        /// </summary>
+        public TimeSpan Linger { get; set; } = Grace;
+
         /// <summary>The "Keep popup open when paused" setting.</summary>
         public bool KeepOpenWhenPaused { get; set; } = true;
 
@@ -66,7 +72,7 @@ namespace TextToSpeech.Core.Shell
             }
             else if (started && hideAt == null)
             {
-                hideAt = now() + Grace;  // everything read: linger a moment
+                hideAt = now() + Linger; // everything read: linger a while
             }
             wasPlaying = isPlaying;
         }

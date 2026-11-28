@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "timeout": 15, "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/auto-read.mjs\"" } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "timeout": 5, "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/focus.mjs\"" } ] }
+    ]
+  }
+}

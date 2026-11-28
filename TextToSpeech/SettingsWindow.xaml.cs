@@ -44,6 +44,7 @@ namespace TextToSpeech
             popupAutoHideBox.IsChecked = settings.PopupAutoHide;
             popupKeepBox.IsChecked = settings.PopupKeepOpenWhenPaused;
             apiBox.IsChecked = settings.ApiEnabled;
+            agentRulesButton.Visibility = settings.ApiEnabled ? Visibility.Visible : Visibility.Collapsed;
             foreach (CheckBox box in new[] { startWithWindowsBox, closeToTrayBox, showPopupBox, popupAutoHideBox, popupKeepBox, apiBox })
             {
                 box.Click += (_, _) => Changed();
@@ -74,6 +75,17 @@ namespace TextToSpeech
             autoClearSlider.IsEnabled = autoClearBox.IsChecked == true;
             autoClearBox.Click += (_, _) => Changed();
             autoClearSlider.ValueChanged += (_, _) => Changed();
+            popupStaySlider.Value = Math.Clamp(settings.PopupStayOpenSeconds, 0, 120);
+            popupStayText.Text = StayText((int)popupStaySlider.Value);
+            popupStaySlider.ValueChanged += (_, _) => Changed();
+            popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
+            markdownBox.IsChecked = settings.FormatMarkdown;
+            playAllBox.IsChecked = settings.PlayAllByDefault;
+            markdownBox.Click += (_, _) => Changed();
+            playAllBox.Click += (_, _) => Changed();
+            mainTextSizeSlider.Value = Math.Clamp(settings.MainTextSize, 10, 40);
+            mainTextSizeText.Text = (int)mainTextSizeSlider.Value + " pt";
+            mainTextSizeSlider.ValueChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -94,6 +106,8 @@ namespace TextToSpeech
             loading = false;
         }
 
+        private void AgentRules_Click(object sender, RoutedEventArgs e) => new AgentSettingsWindow(settings) { Owner = this }.ShowDialog();
+
         private void Changed()
         {
             if (loading) return;
@@ -105,6 +119,7 @@ namespace TextToSpeech
             settings.PopupAutoHide = popupAutoHideBox.IsChecked == true;
             settings.PopupKeepOpenWhenPaused = popupKeepBox.IsChecked == true;
             settings.ApiEnabled = apiBox.IsChecked == true;
+            agentRulesButton.Visibility = settings.ApiEnabled ? Visibility.Visible : Visibility.Collapsed; // agents only exist through the local API
             popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
             gapText.Text = settings.SentenceGapMs + " ms";
@@ -119,6 +134,13 @@ namespace TextToSpeech
             settings.PopupTextSize = popupTextSizeSlider.Value;
             popupPreviewText.FontSize = popupTextSizeSlider.Value;
             popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            settings.PopupStayOpenSeconds = (int)popupStaySlider.Value;
+            popupStayText.Text = StayText(settings.PopupStayOpenSeconds);
+            popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
+            settings.FormatMarkdown = markdownBox.IsChecked == true;
+            settings.PlayAllByDefault = playAllBox.IsChecked == true;
+            settings.MainTextSize = mainTextSizeSlider.Value;
+            mainTextSizeText.Text = (int)mainTextSizeSlider.Value + " pt";
             settings.AutoClearAfterReading = autoClearBox.IsChecked == true;
             settings.AutoClearDelaySeconds = (int)autoClearSlider.Value;
             autoClearText.Text = settings.AutoClearDelaySeconds + " s";
@@ -127,6 +149,8 @@ namespace TextToSpeech
             onChanged();
             ShowApiInfo();
         }
+
+        private static string StayText(int seconds) => seconds == 0 ? "with Auto clear" : seconds + " s";
 
         private void ShowApiInfo()
         {

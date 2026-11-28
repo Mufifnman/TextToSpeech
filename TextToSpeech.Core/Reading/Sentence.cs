@@ -13,19 +13,63 @@ namespace TextToSpeech.Core.Reading
     }
 
     /// <summary>
+    /// A place where reading stops and waits (a question to answer, or a plain marker). Set by the caller of the
+    /// API; the app never decides by itself where one goes. <see cref="Answered"/> flips when the user resumes
+    /// past it, skips it, or the API says it was answered.
+    /// </summary>
+    public sealed class PausePoint
+    {
+        public PausePoint(string id, string? label)
+        {
+            Id = id;
+            Label = label;
+        }
+
+        public string Id { get; }
+
+        /// <summary>The question (or a name) shown to whoever asks what reading is waiting on. Null for a plain marker.</summary>
+        public string? Label { get; }
+
+        public bool Answered { get; set; }
+    }
+
+    /// <summary>
+    /// How a sentence is laid out when its text came from markdown. Only the first sentence of a block has a
+    /// <see cref="Marker"/> and a <see cref="SpokenPrefix"/>.
+    /// </summary>
+    /// <param name="Kind">Paragraph, heading, list item or code.</param>
+    /// <param name="Level">Heading level (1 to 6) or list depth (0 is top level).</param>
+    /// <param name="Marker">Drawn in front of a list item ("•", "1.", a checkbox); not part of the words.</param>
+    /// <param name="StartsBlock">The sentence starts a new line in the popup.</param>
+    /// <param name="SpokenPrefix">Spoken before the sentence but not shown and not clickable ("One. " for item 1).</param>
+    /// <param name="GapFactor">Multiplies the pause after this sentence (2 after a list item, so items stand apart).</param>
+    public sealed record SentenceFormat(BlockKind Kind, int Level, string? Marker, bool StartsBlock, string SpokenPrefix, int GapFactor = 1);
+
+    /// <summary>
     /// One sentence of a <see cref="ReadingDocument"/>, with its words pre-tokenized
     /// so the UI and the speech engine agree on word boundaries.
     /// </summary>
     public sealed class Sentence
     {
-        public Sentence(string text, string? owner = null)
+        public Sentence(string text, string? owner = null, SentenceFormat? format = null, PausePoint? pause = null)
         {
             Text = text ?? throw new ArgumentNullException(nameof(text));
             Words = Tokenize(text);
             Owner = owner;
+            Format = format;
+            Pause = pause;
         }
 
         public string Text { get; }
+
+        /// <summary>Layout from markdown (null for plain text).</summary>
+        public SentenceFormat? Format { get; }
+
+        /// <summary>Reading stops after this sentence until the user (or the API) continues, unless play-all is on.</summary>
+        public PausePoint? Pause { get; internal set; }
+
+        /// <summary>What is handed to the speech engine when the whole sentence is read: the spoken prefix, then the text.</summary>
+        public string SpokenText => string.IsNullOrEmpty(Format?.SpokenPrefix) ? Text : Format!.SpokenPrefix + Text;
 
         /// <summary>
         /// Which API session added this sentence (null for text typed, pasted or captured in the window).

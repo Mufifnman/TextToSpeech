@@ -50,6 +50,22 @@ namespace TextToSpeech
         /// <summary>Seconds to wait after reading finishes before clearing, 1 to 60.</summary>
         public int AutoClearDelaySeconds { get; set; } = 3;
 
+        /// <summary>
+        /// Seconds the popup stays open after reading finishes (when "Hide popup when reading finishes" is on). It never
+        /// hides before Auto clear clears the text, so the effective time is the longer of this and the Auto clear delay.
+        /// 0 means just follow Auto clear. Range 0 to 120.
+        /// </summary>
+        public int PopupStayOpenSeconds { get; set; } = 0;
+
+        /// <summary>Show markdown (lists, headings, code) laid out, with the markup neither shown nor spoken.</summary>
+        public bool FormatMarkdown { get; set; } = true;
+
+        /// <summary>Read through question pauses without stopping, from the start. Off: reading stops after each marked question until you continue.</summary>
+        public bool PlayAllByDefault { get; set; } = false;
+
+        /// <summary>Font size of the reading text in the main window, 10 to 40.</summary>
+        public double MainTextSize { get; set; } = 14;
+
         /// <summary>Also show the popup while the full window is open but not the window being used.</summary>
         public bool ShowPopupWhenWindowUnfocused { get; set; } = false;
 
@@ -73,6 +89,46 @@ namespace TextToSpeech
 
         /// <summary>Preferred API port; a free one is used if it is taken (api.json always says which).</summary>
         public int ApiPort { get; set; } = 47821;
+
+        // ---- Agents (Claude Code and other programs that read through the local API) ----
+
+        /// <summary>Agents may read aloud at all. Off silences everything that comes through the API with an agent id.</summary>
+        public bool AgentReadingEnabled { get; set; } = true;
+
+        /// <summary>What the Claude Code plugin reads when a reply finishes: off, announce ("Claude Code finished") or reply.</summary>
+        public string AgentAutoRead { get; set; } = "off";
+
+        /// <summary>Agents read only while headphones or a headset are the audio output.</summary>
+        public bool AgentRequireHeadphones { get; set; } = false;
+
+        /// <summary>Quiet hours "HH:mm" to "HH:mm" (local time, may cross midnight); empty means none.</summary>
+        public string AgentQuietFrom { get; set; } = "";
+        public string AgentQuietTo { get; set; } = "";
+
+        /// <summary>Switching to an agent's window that has waiting text: off, next (read after the current one) or now (interrupt).</summary>
+        public string AgentFocusMode { get; set; } = "next";
+
+        /// <summary>Bring the reading agent's window to the front when its turn starts. Off: nothing on screen is moved.</summary>
+        public bool AgentBringToFront { get; set; } = false;
+
+        /// <summary>Waiting agent text older than this many minutes is dropped; 0 never. Default 4 hours.</summary>
+        public int AgentPendingExpiryMinutes { get; set; } = 240;
+
+        /// <summary>Typing a prompt in an agent's window drops the text that was waiting for it.</summary>
+        public bool AgentExpireOnPrompt { get; set; } = true;
+
+        public TextToSpeech.Api.Arbitration.ReadPolicy ToReadPolicy() => new()
+        {
+            Enabled = AgentReadingEnabled,
+            AutoRead = AgentAutoRead is "announce" or "reply" ? AgentAutoRead : "off",
+            RequireHeadphones = AgentRequireHeadphones,
+            QuietFrom = string.IsNullOrWhiteSpace(AgentQuietFrom) ? null : AgentQuietFrom,
+            QuietTo = string.IsNullOrWhiteSpace(AgentQuietTo) ? null : AgentQuietTo,
+            FocusMode = AgentFocusMode is "off" or "now" ? AgentFocusMode : "next",
+            BringToFront = AgentBringToFront,
+            PendingExpiryMinutes = Math.Clamp(AgentPendingExpiryMinutes, 0, 10080),
+            ExpireOnPrompt = AgentExpireOnPrompt,
+        };
 
         /// <summary>The one-time "still running in the tray" hint has been shown.</summary>
         public bool TrayHintShown { get; set; } = false;

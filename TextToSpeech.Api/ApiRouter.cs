@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TextToSpeech.Api.Arbitration;
 
 namespace TextToSpeech.Api
 {
@@ -13,7 +14,7 @@ namespace TextToSpeech.Api
         public const int ApiVersion = 1;
         public const int MaxBodyChars = 1_000_000;
 
-        private static readonly HashSet<string> ControlActions = new() { "pause", "resume", "toggle", "skip", "back", "stop", "clear" };
+        private static readonly HashSet<string> ControlActions = new() { "pause", "resume", "toggle", "skip", "back", "stop", "clear", "next" };
         private static readonly HashSet<string> SpeakModes = new() { "queue", "interrupt", "if-idle" };
 
         private readonly IReadingHost host;
@@ -96,6 +97,14 @@ namespace TextToSpeech.Api
                     Expect(method, "PUT");
                     return Ok(await host.SetVolumeAsync(InRange(Body<VolumeRequest>(request).Volume, "volume", 0, 120)));
 
+                case "agents":
+                case "policy":
+                    return await RouteArbitrationAsync(method, parts, request);
+
+                case "pauses" when parts.Length == 4 && parts[3] == "answered":
+                    Expect(method, "POST");
+                    return Ok(await host.AnsweredAsync(parts[2], BodyOrDefault(request, new AnsweredRequest(null)).SessionId));
+
                 case "sessions" when parts.Length == 3:
                     if (method == "GET")
                     {
@@ -128,7 +137,72 @@ namespace TextToSpeech.Api
             throw ApiException.NotFound("Unknown route.");
         }
 
+        private async Task<ApiResponse> RouteArbitrationAsync(string method, string[] parts, ApiRequest request)
+        {
+            if (host is not IArbiterHost arb)
+            {
+                throw ApiException.NotFound("Arbitration is not available.");
+            }
+            if (parts[1] == "policy")
+            {
+                if (parts.Length == 2)
+                {
+                    Expect(method, "GET");
+                    return Ok(await arb.GetPolicyAsync());
+                }
+                if (parts.Length == 3 && parts[2] == "mute")
+                {
+                    Expect(method, "POST");
+                    return Ok(await arb.MuteAsync(InRange(Body<MuteRequest>(request).Minutes, "minutes", 1, 720)));
+                }
+                throw ApiException.NotFound("Unknown route.");
+            }
+            if (parts.Length == 2)
+            {
+                if (method == "GET")
+                {
+                    return Ok(await arb.GetArbiterAsync());
+                }
+                Expect(method, "POST");
+                return Ok(await arb.RegisterAsync(ValidateAgent(Body<AgentRef>(request))));
+            }
+            if (parts.Length == 3 && parts[2] == "prompt")
+            {
+                Expect(method, "POST");
+                return Ok(await arb.PromptAsync(ValidateAgent(Body<AgentRef>(request))));
+            }
+            if (parts.Length == 3 && parts[2] == "focus")
+            {
+                Expect(method, "POST");
+                return Ok(await arb.FocusAsync(ValidateAgent(Body<AgentRef>(request))));
+            }
+            if (parts.Length == 3)
+            {
+                Expect(method, "DELETE");
+                return Ok(await arb.UnregisterAsync(parts[2]));
+            }
+            throw ApiException.NotFound("Unknown route.");
+        }
+
         // ---- Validation ----
+
+        public static AgentRef ValidateAgent(AgentRef a)
+        {
+            Required(a.Id, "agent.id");
+            if (a.Id!.Length > 128 || (a.Label?.Length ?? 0) > 80 || (a.TitleHint?.Length ?? 0) > 200)
+            {
+                throw ApiException.BadRequest("agent id, label or titleHint is too long.");
+            }
+            if (a.Pid.HasValue && a.Pid.Value <= 0)
+            {
+                throw ApiException.BadRequest("agent.pid must be positive.");
+            }
+            if (a.Priority.HasValue && (a.Priority.Value < -100 || a.Priority.Value > 100))
+            {
+                throw ApiException.BadRequest("agent.priority must be between -100 and 100.");
+            }
+            return a;
+        }
 
         private static SpeakRequest ValidateSpeak(SpeakRequest r)
         {
@@ -141,11 +215,32 @@ namespace TextToSpeech.Api
             {
                 throw ApiException.BadRequest("mode must be queue, interrupt or if-idle.");
             }
+            if (r.Pauses != null)
+            {
+                if (r.Pauses.Count > 50)
+                {
+                    throw ApiException.BadRequest("At most 50 pauses per request.", "too_many_pauses");
+                }
+                foreach (var p in r.Pauses)
+                {
+                    if (p == null || (p.At.HasValue && p.At.Value < 0) || (p.Id?.Length ?? 0) > 64 || (p.Label?.Length ?? 0) > 1000)
+                    {
+                        throw ApiException.BadRequest("A pause needs an id of at most 64 characters, a label of at most 1000, and an at of 0 or more.", "bad_pause");
+                    }
+                }
+            }
+            if (r.Questions != null)
+            {
+                if (r.Questions.Count > 50 || r.Questions.Any(q => q == null || q.Length > 1000))
+                {
+                    throw ApiException.BadRequest("At most 50 questions of at most 1000 characters each.", "bad_questions");
+                }
+            }
             if (r.Voice != null || r.Rate.HasValue || r.Volume.HasValue)
             {
                 throw ApiException.BadRequest("Per-request voice, rate and volume are not supported yet. Use PUT /v1/voice, /v1/rate and /v1/volume.", "unsupported_override");
             }
-            return r with { Mode = mode };
+            return r with { Mode = mode, Agent = r.Agent == null ? null : ValidateAgent(r.Agent) };
         }
 
         private static JumpRequest ValidateJump(JumpRequest r)
