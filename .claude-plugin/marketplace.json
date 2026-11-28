@@ -1,0 +1,11 @@
+{
+  "name": "text-to-speech",
+  "owner": { "name": "Mufifnman" },
+  "plugins": [
+    {
+      "name": "tts",
+      "source": "./plugins/tts",
+      "description": "Have Claude Code read text aloud through the Text to Speech app's local API."
+    }
+  ]
+}

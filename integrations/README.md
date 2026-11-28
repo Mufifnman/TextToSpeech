@@ -43,3 +43,7 @@ Tools: `speak`, `pause`, `resume`, `skip`, `back`, `stop`, `clear`, `status`, `l
 ## Tests
 
 `node --test "integrations/test/*.test.mjs"` (uses a fake local server; the app does not need to run).
+
+## Claude Code plugin
+
+`plugins/tts` packages the above (slash commands, a read-aloud skill, the MCP server and an optional auto-read hook) as an installable Claude Code plugin. See `plugins/tts/README.md`.
