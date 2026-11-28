@@ -274,13 +274,15 @@ namespace TextToSpeech.Core.Reading
 
             SentenceStarting?.Invoke();
 
-            // Tell the engine what comes next so it can prepare it while this sentence plays.
-            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(UpcomingSentences), Voice, Rate);
-
             int myGeneration = ++generation;
             var cts = new CancellationTokenSource();
             speechCts = cts;
             _ = SpeakSentenceAsync(text, offset, myGeneration, cts);
+
+            // Tell the engine what comes next so it can prepare it while this sentence plays. This comes after the
+            // speak call on purpose: the engine has then asked for this sentence's audio, so the new list cannot
+            // throw away the audio that was prepared for it (it is not part of "what comes next").
+            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(UpcomingSentences), Voice, Rate);
             StateChanged?.Invoke();
         }
 

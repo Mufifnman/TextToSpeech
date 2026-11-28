@@ -170,5 +170,22 @@ namespace TextToSpeech.Core.Tests
             Assert.Equal(1, stats.GuessesWasted);
             Assert.Equal(0, stats.GuessesUsed);
         }
+
+        [Fact]
+        public async Task ReplacingTheWantedList_DoesNotCancelAJobSomeoneIsWaitingFor()
+        {
+            var q = NewQueue();
+            var release = new ManualResetEventSlim();
+            var started = new ManualResetEventSlim();
+
+            q.SetWanted(1, new (string, Func<int>)[] { ("now", () => { started.Set(); release.Wait(); return 4; }) });
+            Assert.True(started.Wait(5000));                       // running as a prepared next sentence
+            var waiting = q.Demand("now", () => 0);                // the reader now needs it
+            q.SetWanted(1, new (string, Func<int>)[] { ("later", () => 1) });   // the list moves on without it
+            release.Set();
+
+            Assert.Equal(4, await waiting);                        // still delivered, not cancelled
+            q.Take("now");
+        }
     }
 }

@@ -131,7 +131,8 @@ namespace TextToSpeech.Speech
             lock (gate)
             {
                 var keep = new HashSet<string>(items.Select(i => i.Key));
-                foreach (var job in jobs.Values.Where(j => j.Priority == priority && !keep.Contains(j.Key)).ToList())
+                // A job someone is waiting for (Demanded) is never dropped here, or its waiter would be cancelled; Take releases it.
+                foreach (var job in jobs.Values.Where(j => j.Priority == priority && !j.Demanded && !keep.Contains(j.Key)).ToList())
                 {
                     Drop(job);
                 }
