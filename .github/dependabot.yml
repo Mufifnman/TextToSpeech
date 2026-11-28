@@ -1,0 +1,21 @@
+# Monthly, grouped update PRs so dependency churn stays a few PRs a month, not a stream.
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directories:
+      - "/"
+      - "/PlainRules"   # its own solution, not part of the app's TextToSpeech.sln
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      nuget-all:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      actions-all:
+        patterns: ["*"]
