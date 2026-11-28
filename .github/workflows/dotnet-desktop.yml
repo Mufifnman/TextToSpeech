@@ -40,12 +40,19 @@ jobs:
 
     # Run the unit tests. Core, filter and API tests need no UI; Windows.Tests skips the
     # LocalOnly ones (they speak aloud or need voices downloaded on a dev PC).
-    - name: Test
-      run: |
-        dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
-        dotnet test TextToSpeech.Tests/TextToSpeech.Tests.csproj --configuration Release
-        dotnet test TextToSpeech.Api.Tests/TextToSpeech.Api.Tests.csproj --configuration Release
-        dotnet test TextToSpeech.Windows.Tests/TextToSpeech.Windows.Tests.csproj --configuration Release --filter "Category!=LocalOnly"
+    # One command per step on purpose: in a PowerShell step only the LAST command's exit code
+    # decides whether the step fails, so several dotnet test lines in one step would hide failures.
+    - name: Test Core
+      run: dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
+
+    - name: Test filters and app logic
+      run: dotnet test TextToSpeech.Tests/TextToSpeech.Tests.csproj --configuration Release
+
+    - name: Test local API
+      run: dotnet test TextToSpeech.Api.Tests/TextToSpeech.Api.Tests.csproj --configuration Release
+
+    - name: Test Windows pieces
+      run: dotnet test TextToSpeech.Windows.Tests/TextToSpeech.Windows.Tests.csproj --configuration Release --filter "Category!=LocalOnly"
 
     # The standalone rule engine has its own tests
     - name: Test PlainRules
