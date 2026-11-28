@@ -150,13 +150,8 @@ namespace TextToSpeech
 
         internal static void CombineLines(ref string text)
         {
-            // Split after section titles by adding a period
-            string target = @"[^.]\n[A-Z]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Insert(match.Index + 1, ".");
-            }
+            // Split after section titles by adding a period (lookahead so back-to-back titles all match)
+            text = ReplaceUntilStable(text, @"[^.](?=\n[A-Z])", m => m.Value + ".");
 
             // get rid of breaks
             text = text.Replace("-\n\r", "");
@@ -164,42 +159,46 @@ namespace TextToSpeech
             text = text.Replace('\n', ' ');
 
             // stop splitting on things like "Section 3.3"
-            target = @"[0-9]\.[0-9]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index + 1, 1);
-                text = text.Insert(match.Index + 1, " point ");
-            }
+            text = ReplaceUntilStable(text, @"(?<=[0-9])\.(?=[0-9])", _ => " point ");
 
             // Don't break when not a new sentence (remove '.')
-            target = @"\.( )*[a-z]";
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index, 1);
-                text = text.Insert(match.Index, " ");
-            }
+            text = ReplaceUntilStable(text, @"\.(?=( )*[a-z])", _ => " ");
         }
 
         //Helper(s)
 
-        private static void RemoveTargets(ref string text, string target)
-        {
-            while (Regex.IsMatch(text, target))
-            {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index, match.Length);
-            }
-        }
+        /// <summary>A pattern that takes longer than this on one pass is abandoned and the text left as it was.</summary>
+        internal static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
 
-        private static void ReplaceTargets(ref string text, string target, string replacemnt)
+        // Each pass is linear in the text length. A filter used to remove one match at a time and
+        // rescan from the start, which is quadratic on long pastes. Repeating passes until nothing
+        // changes keeps the old result, because removing text can create a new match at the join.
+        private const int MaxPasses = 1000;
+
+        private static void RemoveTargets(ref string text, string target) =>
+            text = ReplaceUntilStable(text, target, _ => "");
+
+        private static void ReplaceTargets(ref string text, string target, string replacemnt) =>
+            text = ReplaceUntilStable(text, target, _ => replacemnt);
+
+        internal static string ReplaceUntilStable(string text, string pattern, MatchEvaluator replacement)
         {
-            while (Regex.IsMatch(text, target))
+            try
             {
-                var match = Regex.Match(text, target);
-                text = text.Remove(match.Index, match.Length);
-                text = text.Insert(match.Index, replacemnt);
+                var regex = new Regex(pattern, RegexOptions.None, RegexTimeout);
+                string current = text;
+                for (int pass = 0; pass < MaxPasses; pass++)
+                {
+                    string next = regex.Replace(current, replacement);
+                    if (ReferenceEquals(next, current) || next == current) return next;
+                    current = next;
+                }
+                return current;
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                // A pathological paste must not freeze the app: skip this filter step.
+                return text;
             }
         }
     }
