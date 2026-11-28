@@ -68,7 +68,12 @@ namespace TextToSpeech
 
         private void AddRow(RuleRow row)
         {
-            row.PropertyChanged += (_, _) => ScheduleRefresh();
+            row.PropertyChanged += (_, e) =>
+            {
+                // Showing the match count or opening the options panel must not re-run the preview.
+                if (e.PropertyName is nameof(RuleRow.MatchInfo) or nameof(RuleRow.IsExpanded)) return;
+                ScheduleRefresh();
+            };
             rows.Add(row);
         }
 
@@ -78,6 +83,101 @@ namespace TextToSpeech
         {
             AddRow(new RuleRow());
             ScheduleRefresh();
+        }
+
+        private void Templates_Click(object sender, RoutedEventArgs e)
+        {
+            var menu = new ContextMenu();
+            PopupMenus.AddHeading(menu, "Start from a template");
+            foreach (var template in Templates.All)
+            {
+                var item = new MenuItem { Header = template.Name, ToolTip = template.Description };
+                var chosen = template;
+                item.Click += (_, _) => ApplyTemplate(chosen);
+                menu.Items.Add(item);
+            }
+            PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
+        }
+
+        /// <summary>Adds a template's rules. A brand-new, untouched filter is filled (and named) by it; otherwise the rules are appended.</summary>
+        private void ApplyTemplate(RuleTemplate template)
+        {
+            bool untouched = rows.Count == 1 && rows[0].IsBlank;
+            if (untouched) rows.Clear();
+            foreach (var rule in template.CreateRules()) AddRow(RuleRow.FromRule(rule));
+            if (existing == null && FilterPath.Split(nameBox.Text).Name.Length == 0)
+                nameBox.Text = CustomFilterManager.DefaultGroup + "/" + template.Name;
+            ScheduleRefresh();
+        }
+
+        private void AddBlockRule_Click(object sender, RoutedEventArgs e)
+        {
+            var menu = new ContextMenu();
+            PopupMenus.AddHeading(menu, "Remove or replace a block");
+            foreach (var block in Blocks.All)
+            {
+                var item = new MenuItem { Header = block.Name, ToolTip = block.Description + "\n" + block.Example };
+                var id = block.Id;
+                item.Click += (_, _) =>
+                {
+                    AddRow(new RuleRow { Kind = RuleKind.RemoveBlock, Block = id });
+                    ScheduleRefresh();
+                };
+                menu.Items.Add(item);
+            }
+            PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
+        }
+
+        /// <summary>Built-in blocks plus any blocks the filter file defines itself ("my:name").</summary>
+        private IEnumerable<(string Id, string Name, string Tip)> BlockChoices()
+        {
+            foreach (var b in Blocks.All) yield return (b.Id, b.Name, b.Description + "\n" + b.Example);
+            foreach (var d in existing?.Set?.Blocks ?? new List<BlockDef>())
+                if (d != null && !string.IsNullOrWhiteSpace(d.Id))
+                    yield return (Blocks.CustomPrefix + d.Id.Trim(), d.Name ?? d.Id.Trim(), "Saved in this filter: " + d.Start + " ... " + d.End);
+        }
+
+        private void BlockButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (RowOf(sender) is not { } row) return;
+            var menu = new ContextMenu();
+            foreach (var block in BlockChoices())
+            {
+                var id = block.Id;
+                var item = new MenuItem { Header = block.Name, ToolTip = block.Tip, IsChecked = row.Block == id };
+                item.Click += (_, _) => row.Block = id;
+                menu.Items.Add(item);
+            }
+            PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
+        }
+
+        /// <summary>"Applies to": everywhere, only inside one kind of block, or everywhere except inside it.</summary>
+        private void ScopeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (RowOf(sender) is not { } row) return;
+            var menu = new ContextMenu();
+            var everywhere = new MenuItem { Header = "Everywhere", IsChecked = row.Scope == RuleScope.Everywhere };
+            everywhere.Click += (_, _) => row.Scope = RuleScope.Everywhere;
+            menu.Items.Add(everywhere);
+            foreach (var (scope, title) in new[] { (RuleScope.Inside, "Only inside..."), (RuleScope.Outside, "Everywhere except inside...") })
+            {
+                var parent = new MenuItem { Header = title, IsChecked = row.Scope == scope };
+                foreach (var block in BlockChoices())
+                {
+                    var chosenScope = scope;
+                    var id = block.Id;
+                    var item = new MenuItem
+                    {
+                        Header = block.Name,
+                        ToolTip = block.Tip,
+                        IsChecked = row.Scope == scope && row.Block == id,
+                    };
+                    item.Click += (_, _) => row.SetScope(chosenScope, id);
+                    parent.Items.Add(item);
+                }
+                menu.Items.Add(parent);
+            }
+            PopupMenus.Open(menu, (UIElement)sender, PlacementMode.Bottom);
         }
 
         private void AddPreset_Click(object sender, RoutedEventArgs e)
@@ -102,6 +202,7 @@ namespace TextToSpeech
             var menu = new ContextMenu();
             foreach (var (kind, label) in RuleRow.KindLabels)
             {
+                if (kind == RuleKind.Regex) menu.Items.Add(new Separator());
                 var item = new MenuItem { Header = label, IsChecked = row.Kind == kind };
                 var chosen = kind;
                 item.Click += (_, _) => row.SetKind(chosen);
@@ -172,6 +273,7 @@ namespace TextToSpeech
                 Name = name,
                 Group = group,
                 Description = existing?.Set?.Description,
+                Blocks = existing?.Set?.Blocks,   // saved blocks defined in the file by hand are kept
                 Rules = rows.Select(r => r.ToRule()).ToList(),
             };
         }
@@ -187,6 +289,7 @@ namespace TextToSpeech
         {
             int version = ++refreshVersion;
             var set = BuildSet();
+            var snapshot = rows.ToList();   // the rows this preview belongs to, even if the list changes meanwhile
             string sample = sampleBox.Text;
             var names = otherNames;
             var (issues, preview) = await Task.Run(() =>
@@ -194,6 +297,14 @@ namespace TextToSpeech
             if (version != refreshVersion) return;   // a newer edit superseded this one
             ShowLint(issues);
             resultBox.Text = preview.Output;
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                var step = preview.Steps.FirstOrDefault(s => s.RuleIndex == i);
+                snapshot[i].MatchInfo = step == null || step.Skipped ? "" :
+                    step.Error != null ? "problem" :
+                    step.Matches == 0 ? "no matches" :
+                    step.Matches == 1 ? "1 match" : step.Matches + " matches";
+            }
             saveButton.IsEnabled = RuleLinter.IsValid(issues);
         }
 
@@ -205,6 +316,7 @@ namespace TextToSpeech
                 lintText.Inlines.Add(new Run("No problems found.") { Foreground = (Brush)FindResource("ThemeSubtle") });
                 return;
             }
+            bool first = true;
             foreach (var issue in issues.OrderByDescending(i => i.Severity))
             {
                 (string mark, Brush brush) = issue.Severity switch
@@ -213,7 +325,8 @@ namespace TextToSpeech
                     LintSeverity.Warning => ("⚠ ", Brushes.DarkOrange),
                     _ => ("ℹ ", (Brush)FindResource("ThemeSubtle")),
                 };
-                lintText.Inlines.Add(new Run(mark + issue + "\n") { Foreground = brush });
+                lintText.Inlines.Add(new Run((first ? "" : "\n") + mark + issue) { Foreground = brush });
+                first = false;
             }
         }
 
@@ -273,13 +386,16 @@ namespace TextToSpeech
                 (RuleKind.RemoveLinesContaining, "Remove lines containing"),
                 (RuleKind.RemoveBetween, "Remove from ... to ..."),
                 (RuleKind.RemoveWords, "Remove words"),
+                (RuleKind.RemoveBlock, "Remove a block (code, quote, list...)"),
                 (RuleKind.Preset, "Common cleanup"),
                 (RuleKind.Regex, "Advanced: regex"),
             };
 
             private RuleKind kind = RuleKind.RemoveText;
             private string value = "", extra = "", presetId = "";
-            private bool ignoreCase, wholeWords, disabled;   // disabled is kept from hand-edited files, not editable here
+            private bool ignoreCase, wholeWords, disabled, isExpanded;
+            private RuleScope scope;
+            private string block = "", blockStart = "", blockEnd = "", matchInfo = "";
 
             public event PropertyChangedEventHandler? PropertyChanged;
             private void Raise(string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -290,6 +406,27 @@ namespace TextToSpeech
             public string PresetId { get => presetId; set { presetId = value; Raise(); } }
             public bool IgnoreCase { get => ignoreCase; set { ignoreCase = value; Raise(); } }
             public bool WholeWords { get => wholeWords; set { wholeWords = value; Raise(); } }
+            public bool Disabled { get => disabled; set { disabled = value; Raise(string.Empty); } }
+            public string Block { get => block; set { block = value; Raise(string.Empty); } }
+            public string BlockStart { get => blockStart; set { blockStart = value; Raise(); } }
+            public string BlockEnd { get => blockEnd; set { blockEnd = value; Raise(); } }
+            public RuleScope Scope { get => scope; set { scope = value; Raise(string.Empty); } }
+            public bool IsExpanded { get => isExpanded; set { isExpanded = value; Raise(nameof(IsExpanded)); } }
+
+            /// <summary>"3 matches" in the sample text, shown beside the rule. Display only.</summary>
+            public string MatchInfo { get => matchInfo; set { matchInfo = value; Raise(nameof(MatchInfo)); } }
+
+            /// <summary>Choose a scope together with its block in one change (one preview refresh).</summary>
+            public void SetScope(RuleScope newScope, string blockId)
+            {
+                scope = newScope;
+                block = blockId;
+                Raise(string.Empty);
+            }
+
+            /// <summary>True for a rule the person has not filled in yet.</summary>
+            public bool IsBlank => kind == RuleKind.RemoveText && value.Length == 0 && extra.Length == 0 && scope == RuleScope.Everywhere
+                                   && !ignoreCase && !wholeWords && !disabled;
 
             /// <summary>Switch kind and refresh everything that depends on it.</summary>
             public void SetKind(RuleKind newKind)
@@ -297,14 +434,44 @@ namespace TextToSpeech
                 kind = newKind;
                 if (newKind == RuleKind.Preset && Presets.Find(presetId) == null)
                     presetId = Presets.All[0].Id;
+                if (newKind == RuleKind.RemoveBlock && Blocks.Find(block) == null)
+                    block = Blocks.All[0].Id;
                 Raise(string.Empty);   // all properties changed
             }
 
             public string KindLabel => KindLabels.First(k => k.Kind == kind).Label;
             public bool IsPreset => kind == RuleKind.Preset;
-            public bool ShowValueBox => kind != RuleKind.Preset;
-            public bool ShowExtra => kind is RuleKind.Replace or RuleKind.RemoveBetween or RuleKind.Regex;
-            public bool ShowCaseOptions => kind != RuleKind.Preset;
+            public bool ShowBlockPicker => kind == RuleKind.RemoveBlock;
+            public bool ShowValueBox => kind is not (RuleKind.Preset or RuleKind.RemoveBlock);
+            public bool ShowExtra => kind is RuleKind.Replace or RuleKind.RemoveBetween or RuleKind.Regex or RuleKind.RemoveBlock;
+            public bool ShowCaseOptions => kind is not (RuleKind.Preset or RuleKind.RemoveBlock);
+            /// <summary>"Applies to" makes sense for every rule except the one that removes whole blocks.</summary>
+            public bool ShowScope => kind != RuleKind.RemoveBlock;
+            private bool UsesBlock => kind == RuleKind.RemoveBlock || (ShowScope && scope != RuleScope.Everywhere);
+            public bool ShowMarkers => UsesBlock && block == Blocks.Between;
+            public bool HasAdvanced => (ShowCaseOptions && (ignoreCase || wholeWords)) || (ShowScope && scope != RuleScope.Everywhere) || disabled;
+            public string MoreLabel => HasAdvanced ? "More •" : "More";
+            private string BlockName =>
+                Blocks.Find(block)?.Name
+                ?? (block.StartsWith(Blocks.CustomPrefix, StringComparison.OrdinalIgnoreCase) ? block.Substring(Blocks.CustomPrefix.Length) : null)
+                ?? "a block";
+            public string BlockLabel => block.Length == 0 ? "Choose a block..." : BlockName;
+
+            /// <summary>One plain sentence saying what the rule does, shown under it.</summary>
+            public string Summary => ToRule().Describe();
+            public string ScopeLabel
+            {
+                get
+                {
+                    string name = BlockName;
+                    return scope switch
+                    {
+                        RuleScope.Inside => "Only inside " + name,
+                        RuleScope.Outside => "Everywhere except inside " + name,
+                        _ => "Everywhere",
+                    };
+                }
+            }
             public bool ShowWholeWords => kind is RuleKind.RemoveText or RuleKind.Replace or RuleKind.RemoveLinesContaining;
             public string PresetLabel => Presets.Find(presetId)?.Name ?? "Choose a cleanup...";
 
@@ -325,6 +492,7 @@ namespace TextToSpeech
                 RuleKind.Replace => "Replace with (empty removes it)",
                 RuleKind.RemoveBetween => "End marker",
                 RuleKind.Regex => "Replacement, $1 is the first group (empty removes)",
+                RuleKind.RemoveBlock => "Say this instead (empty removes the block)",
                 _ => "",
             };
 
@@ -332,14 +500,18 @@ namespace TextToSpeech
             {
                 Kind = kind,
                 Value = kind == RuleKind.Preset ? presetId : value,
-                With = kind is RuleKind.Replace or RuleKind.Regex ? extra : null,
+                With = kind is RuleKind.Replace or RuleKind.Regex or RuleKind.RemoveBlock ? extra : null,
                 To = kind == RuleKind.RemoveBetween ? extra : null,
                 IgnoreCase = ShowCaseOptions && ignoreCase,
                 WholeWords = ShowWholeWords && wholeWords,
+                Scope = ShowScope ? scope : RuleScope.Everywhere,
+                Block = UsesBlock ? block : null,
+                BlockStart = ShowMarkers ? blockStart : null,
+                BlockEnd = ShowMarkers ? blockEnd : null,
                 Disabled = disabled,
             };
 
-            public static RuleRow FromRule(Rule rule) => new()
+            public static RuleRow FromRule(Rule rule) => new RuleRow
             {
                 kind = rule.Kind,
                 value = rule.Kind == RuleKind.Preset ? "" : rule.Value,
@@ -348,7 +520,17 @@ namespace TextToSpeech
                 ignoreCase = rule.IgnoreCase,
                 wholeWords = rule.WholeWords,
                 disabled = rule.Disabled,
-            };
+                scope = rule.Scope,
+                block = rule.Block ?? "",
+                blockStart = rule.BlockStart ?? "",
+                blockEnd = rule.BlockEnd ?? "",
+            }.WithExpandedIfAdvanced();
+
+            private RuleRow WithExpandedIfAdvanced()
+            {
+                isExpanded = HasAdvanced;
+                return this;
+            }
         }
     }
 }

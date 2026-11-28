@@ -41,19 +41,29 @@ public static class RuleLinter
             var r = set.Rules[i];
             if (r.Disabled) { Add(i, LintSeverity.Info, "Disabled", "This rule is turned off."); continue; }
 
-            var key = $"{r.Kind}|{r.Value}|{r.With}|{r.To}|{r.IgnoreCase}|{r.WholeWords}";
+            var key = $"{r.Kind}|{r.Value}|{r.With}|{r.To}|{r.IgnoreCase}|{r.WholeWords}|{r.Scope}|{r.Block}|{r.BlockStart}|{r.BlockEnd}";
             if (!seen.Add(key)) Add(i, LintSeverity.Warning, "DuplicateRule", "Same as an earlier rule.");
 
             List<RuleCompiler.Part> parts;
-            try { parts = RuleCompiler.Expand(r); }
+            try { parts = RuleCompiler.Expand(r, set.Blocks); }
             catch (ArgumentException ex)
             {
                 var code = r.Kind == RuleKind.Preset ? "UnknownPreset"
+                         : r.Kind == RuleKind.RemoveBlock ? "BadBlock"
                          : r.Kind == RuleKind.Regex && r.Value.Length > 0 ? "InvalidRegex"
                          : "EmptyValue";
                 Add(i, LintSeverity.Error, code, ex.Message);
                 continue;
             }
+
+            try { _ = RuleCompiler.ExpandScope(r, set.Blocks); }
+            catch (ArgumentException ex)
+            {
+                Add(i, LintSeverity.Error, "BadScope", ex.Message);
+                continue;
+            }
+            if (r.Kind == RuleKind.RemoveBlock && r.Scope != RuleScope.Everywhere)
+                Add(i, LintSeverity.Info, "ScopeIgnored", "“Where” does not apply to a rule that removes blocks.");
 
             if (r.Kind == RuleKind.Regex)
             {

@@ -8,7 +8,7 @@ internal static class RuleCompiler
     internal readonly record struct Part(string Pattern, string Replacement, RegexOptions Options);
 
     /// <summary>Throws ArgumentException (or a regex parse exception) for rules that cannot run.</summary>
-    internal static List<Part> Expand(Rule rule)
+    internal static List<Part> Expand(Rule rule, IReadOnlyList<BlockDef>? custom = null)
     {
         var opts = rule.IgnoreCase ? RegexOptions.IgnoreCase : RegexOptions.None;
         string value = rule.Value ?? "";
@@ -65,10 +65,28 @@ internal static class RuleCompiler
                 _ = new Regex(value, opts);
                 break;
 
+            case RuleKind.RemoveBlock:
+            {
+                var (pattern, blockOptions) = Blocks.PatternFor(rule.Block, rule.BlockStart, rule.BlockEnd, custom);
+                parts.Add(new Part(pattern, (rule.With ?? "").Replace("$", "$$"), blockOptions));
+                break;
+            }
+
             default:
                 throw new ArgumentException("Unknown rule kind.");
         }
         return parts;
+    }
+
+    /// <summary>
+    /// The blocks a rule is limited to, or null when it applies everywhere. Throws ArgumentException when the
+    /// scope is set but the block is missing or unknown. A <see cref="RuleKind.RemoveBlock"/> rule has no scope.
+    /// </summary>
+    internal static (string Pattern, RegexOptions Options, bool Inside)? ExpandScope(Rule rule, IReadOnlyList<BlockDef>? custom = null)
+    {
+        if (rule.Kind == RuleKind.RemoveBlock || rule.Scope == RuleScope.Everywhere) return null;
+        var (pattern, options) = Blocks.PatternFor(rule.Block, rule.BlockStart, rule.BlockEnd, custom);
+        return (pattern, options | RegexOptions.CultureInvariant, rule.Scope == RuleScope.Inside);
     }
 
     internal static List<string> SplitWords(string value) =>
