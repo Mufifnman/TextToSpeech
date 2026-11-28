@@ -24,6 +24,7 @@ public sealed class JsonFileStore<T> where T : class, new()
     private readonly JsonSerializerOptions options;
     private int loadedVersion;
     private bool newerBackupDone;
+    private bool readFailed;   // the file exists but could not be read: do not overwrite it without keeping a copy
 
     public JsonFileStore(string path, int currentVersion = 1, JsonSerializerOptions? options = null)
     {
@@ -44,6 +45,7 @@ public sealed class JsonFileStore<T> where T : class, new()
     {
         LastProblem = null;
         loadedVersion = 0;
+        readFailed = false;
         string text;
         try
         {
@@ -53,6 +55,7 @@ public sealed class JsonFileStore<T> where T : class, new()
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             LastProblem = "Could not read " + path + ": " + ex.Message;
+            readFailed = true;
             return new T();
         }
 
@@ -78,6 +81,13 @@ public sealed class JsonFileStore<T> where T : class, new()
     /// <summary>Writes the value atomically. Exceptions are not swallowed; callers decide what a failed save means.</summary>
     public void Save(T value)
     {
+        if (readFailed && File.Exists(path))
+        {
+            // The last Load could not read this file, so what is about to be written is built from defaults.
+            // Keep the real file first; if it is still unreadable this throws and the file is left untouched.
+            File.Copy(path, path + ".unread.bak", overwrite: true);
+            readFailed = false;
+        }
         if (loadedVersion > currentVersion && !newerBackupDone && File.Exists(path))
         {
             File.Copy(path, path + ".v" + loadedVersion + ".bak", overwrite: true);
