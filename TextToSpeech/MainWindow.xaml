@@ -197,7 +197,7 @@
                         <TextBlock Text="Clear" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="playAllButton" Margin="2,0" Padding="10,0" Grid.Column="5" Click="PlayAll_Click" Focusable="False" Visibility="Collapsed"
+                <Button x:Name="playAllButton" AutomationProperties.Name="Play all without stopping at questions" Margin="2,0" Padding="10,0" Grid.Column="5" Click="PlayAll_Click" Focusable="False" Visibility="Collapsed"
                         ToolTip="Stops after each question. Click to read straight through without stopping.">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#x25B6;&#x25B6;" Foreground="#2E9E4F" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>

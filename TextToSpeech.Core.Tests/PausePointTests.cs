@@ -145,6 +145,24 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void PlayRange_FromAQuestionWait_RestoresTheWaitAfterTheLine()
+        {
+            var rig = new Rig(Text, Both());
+            rig.Controller.Play();
+            rig.Engine.Finish(0);
+            rig.Engine.Finish(1);
+            var before = rig.Document.Position;
+            Assert.NotNull(rig.Controller.PausedAt);
+
+            rig.Controller.PlayRange(0, 0);
+            rig.Engine.Finish(rig.Engine.Calls.Count - 1);
+
+            Assert.NotNull(rig.Controller.PausedAt);
+            Assert.Equal("q1", rig.Controller.PausedAt!.Point.Id);
+            Assert.Equal(before, rig.Document.Position);
+        }
+
+        [Fact]
         public void PlayRange_WithAnIndexPastTheEnd_DoesNothing()
         {
             var rig = new Rig("Only.");

@@ -557,6 +557,8 @@ namespace TextToSpeech.Core.Reading
             return text;
         }
 
+        public void MoveToPosition(int sentence, int word = 0) => MoveTo(sentence, word);
+
         private void MoveTo(int sentence, int word)
         {
             sentence = Math.Clamp(sentence, 0, sentences.Count);
