@@ -250,7 +250,7 @@ namespace TextToSpeech.Core.Tests
             var rig = new Rig("One. Two. Three. Four.");
             rig.Controller.Play();
 
-            Assert.Equal(new[] { "Two.", "Three." }, rig.Engine.LastUpcoming);
+            Assert.Equal(new[] { "Two.", "Three.", "Four." }, rig.Engine.LastUpcoming);   // up to UpcomingSentences, fewer at the end
         }
 
         [Fact]
