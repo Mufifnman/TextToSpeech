@@ -50,7 +50,7 @@ app (Handy stays separate); syntax highlighting and themes (later, if cheap).
   "playAll": false }
 ```
 
-- `questions`: appended after the text as a numbered list, each followed by a pause. Ids `q1`, `q2`, ...
+- `questions`: a question the text already says (same words, ignoring case, punctuation and markup) is not added again; reading waits there. The rest go after the text as a numbered list, each followed by a pause. Ids `q1`, `q2`, ... (in the order given). A question is shown and read once.
 - `pauses`: reading stops after the paragraph or list item containing character offset `at` of `text` (default: the end).
   Not allowed together with `applyFilters` (the filters change the offsets); `questions` is.
 - `playAll`: default is the "Play all by default" setting. Applies to this text; the next request with pauses resets it.
