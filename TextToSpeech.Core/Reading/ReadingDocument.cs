@@ -140,7 +140,10 @@ namespace TextToSpeech.Core.Reading
                     {
                         string prefix = first && block.Ordinal is int n ? NumberWords.Spoken(n) + ". " : "";
                         int factor = last && block.Kind == BlockKind.ListItem ? 2 : 1;
-                        format = new SentenceFormat(block.Kind, block.Level, first ? block.Marker : null, first, prefix, factor);
+                        string? rawText = first && text != null && block.SourceEnd <= text.Length
+                            ? text.Substring(block.SourceStart, block.SourceEnd - block.SourceStart)
+                            : null;
+                        format = new SentenceFormat(block.Kind, block.Level, first ? block.Marker : null, first, prefix, factor, rawText);
                     }
                     added.Add(new Sentence(parts[k], owner, format));
                     lastOfBlock[b] = added.Count - 1;
@@ -553,6 +556,8 @@ namespace TextToSpeech.Core.Reading
             PositionChanged?.Invoke(this, EventArgs.Empty);
             return text;
         }
+
+        public void MoveToPosition(int sentence, int word = 0) => MoveTo(sentence, word);
 
         private void MoveTo(int sentence, int word)
         {

@@ -61,6 +61,8 @@ namespace TextToSpeech
             document.ContentChanged += (_, _) => UpdatePlayAllButton();
             reading.PlayAll = settings.PlayAllByDefault;
             __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
+            __ReadListDisplay__.LineClicked += (first, last) => reading.PlayRange(first, last);
             __ReadListDisplay__.ZoomRequested += step => SetMainTextSize(settings.MainTextSize + step);
             reading.SentenceStarting += OnSentenceStarting;
             autoClearTimer.Tick += AutoClearTick;
@@ -277,6 +279,7 @@ namespace TextToSpeech
                 }
                 p.SetPlaying(playing);
                 p.SetPlayAll(HasPausePoints(), reading.PlayAll);
+                p.SetRaw(HasFormatting(), rawView);
                 p.SetPreview(previewingPopup);
                 p.ShowPopup();
             }
@@ -317,7 +320,9 @@ namespace TextToSpeech
                 OpenFullWindow: ShowFullWindow,
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
                 TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); },
-                TogglePlayAll: TogglePlayAll));
+                TogglePlayAll: TogglePlayAll,
+                PlayLine: (first, last) => reading.PlayRange(first, last),
+                ToggleRaw: ToggleRawView));
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
             p.SetTextSize(settings.PopupTextSize);
             p.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
@@ -786,6 +791,19 @@ namespace TextToSpeech
 
         private void ClearList(object? sender = null, RoutedEventArgs? e = null) => reading.Clear();
 
+        private bool rawView => settings.ShowRawText;
+
+        private bool HasFormatting() => document.Sentences.Any(s => s.Format != null);
+
+        /// <summary>The popup's raw text button: flips between the laid-out view and the original text with its symbols.</summary>
+        private void ToggleRawView()
+        {
+            settings.ShowRawText = !settings.ShowRawText;   // remembered between runs
+            settings.Save();
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
+            RefreshPopup();
+        }
+
         private bool HasPausePoints() => document.Pauses(null, pendingOnly: false).Count > 0;
 
         /// <summary>The Play all button: read through the marked questions without stopping (and carry on if waiting at one).</summary>
@@ -815,6 +833,7 @@ namespace TextToSpeech
                 ? "Play all is on: reading does not stop at questions. Click to stop at each question again."
                 : "Stops after each question. Click to read straight through without stopping.";
             popup?.SetPlayAll(has, reading.PlayAll);
+            popup?.SetRaw(HasFormatting(), rawView);
         }
 
         private void SetMainTextSize(double size)
@@ -967,6 +986,7 @@ namespace TextToSpeech
             reading.GapMs = settings.SentenceGapMs;
             catalog.Neural.ChunkLongSentences = settings.ChunkLongSentences;
             __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;

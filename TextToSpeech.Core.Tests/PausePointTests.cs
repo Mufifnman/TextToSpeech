@@ -116,6 +116,102 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void PlayRange_PlaysJustThoseSentences_ThenStops()
+        {
+            var rig = new Rig("- One.\n- Two. Two b.\n- Three.");
+            rig.Controller.PlayRange(1, 2);
+
+            Assert.Equal("Two.", rig.Engine.Calls[0].Text);
+            rig.Engine.Finish(0);
+            Assert.Equal("Two b.", rig.Engine.Calls[1].Text);
+            rig.Engine.Finish(1);
+
+            Assert.Equal(2, rig.Engine.Calls.Count);            // "Three." was not started
+            Assert.False(rig.Controller.IsPlaying);
+            Assert.Equal(3, rig.Document.Position.Sentence);    // Play would continue after the line
+            Assert.Equal(0, rig.Finished);
+        }
+
+        [Fact]
+        public void PlayRange_IsEndedBySkip_SoReadingCarriesOnNormally()
+        {
+            var rig = new Rig("One.\n\nTwo.\n\nThree.\n\nFour.");
+            rig.Controller.PlayRange(0, 0);
+            rig.Controller.Skip();                 // the user moved on by hand
+            rig.Engine.Finish(1);                  // "Two." done: no longer a one-line request, so Three follows
+
+            Assert.Equal("Three.", rig.Engine.Calls[2].Text);
+            Assert.True(rig.Controller.IsPlaying);
+        }
+
+        [Fact]
+        public void PlayRange_FromAQuestionWait_RestoresTheWaitAfterTheLine()
+        {
+            var rig = new Rig(Text, Both());
+            rig.Controller.Play();
+            rig.Engine.Finish(0);
+            rig.Engine.Finish(1);
+            var before = rig.Document.Position;
+            Assert.NotNull(rig.Controller.PausedAt);
+
+            rig.Controller.PlayRange(0, 0);
+            rig.Engine.Finish(rig.Engine.Calls.Count - 1);
+
+            Assert.NotNull(rig.Controller.PausedAt);
+            Assert.Equal("q1", rig.Controller.PausedAt!.Point.Id);
+            Assert.Equal(before, rig.Document.Position);
+        }
+
+        [Fact]
+        public void PlayRange_FromAQuestionWait_ThenAnswered_CarriesOnAfterTheLine()
+        {
+            var rig = new Rig(Text, Both());
+            rig.Controller.Play();
+            rig.Engine.Finish(0);
+            rig.Engine.Finish(1);
+            var point = rig.Controller.PausedAt!.Point;
+
+            rig.Controller.PlayRange(0, 0);
+            rig.Controller.MarkAnswered(point);                       // the answer arrives while the line plays
+            rig.Engine.Finish(rig.Engine.Calls.Count - 1);
+
+            Assert.Null(rig.Controller.PausedAt);
+            Assert.True(rig.Controller.IsPlaying);
+            Assert.Contains("Add tests?", rig.Engine.Calls[^1].Text);
+        }
+
+        [Fact]
+        public void PlayRange_WithAnIndexPastTheEnd_DoesNothing()
+        {
+            var rig = new Rig("Only.");
+            rig.Controller.PlayRange(5, 6);
+
+            Assert.Empty(rig.Engine.Calls);
+        }
+
+        [Fact]
+        public void PlayRange_StopsAfterTheLine_AndNormalPlayContinues()
+        {
+            var rig = new Rig("First.\n\nSecond.\n\nThird.");
+            rig.Controller.PlayRange(1, 1);
+            rig.Engine.Finish(0);
+            Assert.False(rig.Controller.IsPlaying);
+
+            rig.Controller.Play();
+            Assert.Equal("Third.", rig.Engine.Calls[1].Text);
+        }
+
+        [Fact]
+        public void BlocksKeepTheirOriginalText_ForTheRawView()
+        {
+            var doc = new ReadingDocument();
+            doc.AppendMarkdown("## Title\n- **bold** item. More.");
+            Assert.Equal("## Title", doc.Sentences[0].Format!.Raw);
+            Assert.Equal("- **bold** item. More.", doc.Sentences[1].Format!.Raw);
+            Assert.Null(doc.Sentences[2].Format!.Raw);   // only the first sentence of a block carries it
+        }
+
+        [Fact]
         public void ContinueFromPause_WhenNotWaiting_ReturnsFalse()
         {
             var rig = new Rig("Plain text.");

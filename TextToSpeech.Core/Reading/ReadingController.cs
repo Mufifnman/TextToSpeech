@@ -23,6 +23,13 @@ namespace TextToSpeech.Core.Reading
         private readonly Action<Action> post;
         private readonly Func<TimeSpan, CancellationToken, Task> delay;
 
+        // The last sentence of a "play just this line" request. Held as the sentence itself, not an index, so text inserted
+        // or removed while the line plays cannot move the stop to the wrong place.
+        private Sentence? stopAfter;
+
+        // Set when a line was played while waiting at a question: the wait (and the place in the text) comes back after the line.
+        private (PausedAtInfo At, ReadingPosition Position)? resumeAfterLine;
+
         private CancellationTokenSource? speechCts;
         private int generation;      // bumped for every utterance and every cancel; late events from old ones are ignored
         private bool paused;         // true after the user paused or stopped: nothing speaks until they resume or jump
@@ -151,6 +158,8 @@ namespace TextToSpeech.Core.Reading
         public void Rewind()
         {
             ClearPausedAt(markAnswered: false);
+            stopAfter = null;
+            resumeAfterLine = null;
             document.Rewind();
             AfterMove();
         }
@@ -159,6 +168,8 @@ namespace TextToSpeech.Core.Reading
         {
             // Skipping while waiting at a question counts as moving past it.
             ClearPausedAt(markAnswered: true);
+            stopAfter = null;
+            resumeAfterLine = null;
             if (document.Skip())
             {
                 AfterMove();
@@ -198,7 +209,31 @@ namespace TextToSpeech.Core.Reading
         public void JumpTo(int sentence, int word)
         {
             ClearPausedAt(markAnswered: false);
+            stopAfter = null;
+            resumeAfterLine = null;
             document.JumpTo(sentence, word);
+            paused = false;
+            SpeakCurrent();
+        }
+
+        /// <summary>
+        /// Plays the sentences <paramref name="first"/> to <paramref name="last"/> (document indexes) and then stops,
+        /// even when paused or stopped. For "play just this line".
+        /// </summary>
+        public void PlayRange(int first, int last)
+        {
+            if (first < 0 || first >= document.Count)
+            {
+                return;   // the text changed since the click: nothing to play
+            }
+            if (PausedAt != null)
+            {
+                // Waiting at a question: remember it, and come back to it when the line is done.
+                resumeAfterLine = (PausedAt, document.Position);
+            }
+            ClearPausedAt(markAnswered: false);
+            document.JumpTo(first, 0);
+            stopAfter = document.Sentences[Math.Clamp(last, first, document.Count - 1)];
             paused = false;
             SpeakCurrent();
         }
@@ -206,6 +241,8 @@ namespace TextToSpeech.Core.Reading
         /// <summary>Stops everything and empties the document.</summary>
         public void Clear()
         {
+            stopAfter = null;
+            resumeAfterLine = null;
             CancelSpeech();
             clearPreparedAudio();
             document.Clear();
@@ -220,6 +257,8 @@ namespace TextToSpeech.Core.Reading
         {
             CancelSpeech();
             ClearPausedAt(markAnswered: false);
+            stopAfter = null;
+            resumeAfterLine = null;
             paused = true;
             StateChanged?.Invoke();
         }
@@ -336,6 +375,32 @@ namespace TextToSpeech.Core.Reading
             // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
             var finished = document.CurrentSentence;
             document.CompleteSentence();
+
+            // "Play just this line": the line is done, stop here and wait.
+            if (stopAfter != null && ReferenceEquals(finished, stopAfter))
+            {
+                stopAfter = null;
+                CancelSpeech();
+                paused = true;
+                if (resumeAfterLine is { } back)
+                {
+                    resumeAfterLine = null;
+                    document.MoveToPosition(back.Position.Sentence, back.Position.Word);
+                    if (!back.At.Point.Answered)
+                    {
+                        PausedAt = back.At;
+                    }
+                    else
+                    {
+                        // The question was answered while the line played: carry on from where the wait was.
+                        paused = false;
+                        SpeakCurrent();
+                        return;
+                    }
+                }
+                StateChanged?.Invoke();
+                return;
+            }
 
             // A pause point the caller asked for: stop here and wait (the next sentences are already being prepared).
             if (finished?.Pause is { Answered: false } point && !PlayAll)
