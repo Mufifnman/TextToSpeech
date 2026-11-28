@@ -23,6 +23,8 @@ namespace TextToSpeech.Core.Reading
         private readonly Action<Action> post;
         private readonly Func<TimeSpan, CancellationToken, Task> delay;
 
+        private int stopAfterSentence = -1;   // document index of the last sentence of a "play just this line" request
+
         private CancellationTokenSource? speechCts;
         private int generation;      // bumped for every utterance and every cancel; late events from old ones are ignored
         private bool paused;         // true after the user paused or stopped: nothing speaks until they resume or jump
@@ -182,7 +184,21 @@ namespace TextToSpeech.Core.Reading
         public void JumpTo(int sentence, int word)
         {
             ClearPausedAt(markAnswered: false);
+            stopAfterSentence = -1;
             document.JumpTo(sentence, word);
+            paused = false;
+            SpeakCurrent();
+        }
+
+        /// <summary>
+        /// Plays the sentences <paramref name="first"/> to <paramref name="last"/> (document indexes) and then stops,
+        /// even when paused or stopped. For "play just this line".
+        /// </summary>
+        public void PlayRange(int first, int last)
+        {
+            ClearPausedAt(markAnswered: false);
+            document.JumpTo(first, 0);
+            stopAfterSentence = Math.Clamp(last, first, document.Count - 1);
             paused = false;
             SpeakCurrent();
         }
@@ -190,6 +206,7 @@ namespace TextToSpeech.Core.Reading
         /// <summary>Stops everything and empties the document.</summary>
         public void Clear()
         {
+            stopAfterSentence = -1;
             CancelSpeech();
             clearPreparedAudio();
             document.Clear();
@@ -204,6 +221,7 @@ namespace TextToSpeech.Core.Reading
         {
             CancelSpeech();
             ClearPausedAt(markAnswered: false);
+            stopAfterSentence = -1;
             paused = true;
             StateChanged?.Invoke();
         }
@@ -317,7 +335,18 @@ namespace TextToSpeech.Core.Reading
 
             // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
             var finished = document.CurrentSentence;
+            int finishedIndex = document.Position.Sentence;
             document.CompleteSentence();
+
+            // "Play just this line": the line is done, stop here and wait.
+            if (stopAfterSentence >= 0 && finishedIndex >= stopAfterSentence)
+            {
+                stopAfterSentence = -1;
+                CancelSpeech();
+                paused = true;
+                StateChanged?.Invoke();
+                return;
+            }
 
             // A pause point the caller asked for: stop here and wait (the next sentences are already being prepared).
             if (finished?.Pause is { Answered: false } point && !PlayAll)
