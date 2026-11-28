@@ -230,6 +230,40 @@ namespace TextToSpeech
 
         private void OnPositionChanged(object? sender, EventArgs e) => RestyleChanged();
 
+        /// <summary>One line of the formatted view (a paragraph, heading, list item or code line): its sentences and the little handle beside it.</summary>
+        private sealed class Block
+        {
+            public int First, Last;
+            public Run? Gutter;
+            public bool GutterIsMarker;     // a list marker is always visible; the handle of other blocks shows on hover
+            public readonly List<Run> Words = new();
+            public Run? RawRun;
+        }
+
+        private readonly List<Block> blocks = new();
+        private bool showRaw;
+
+        /// <summary>Show each block as it was written, with its markup symbols, instead of laid out. Words are not clickable then; a click on a block jumps to its start.</summary>
+        public bool ShowRaw
+        {
+            get => showRaw;
+            set
+            {
+                if (showRaw == value)
+                {
+                    return;
+                }
+                showRaw = value;
+                if (document != null)
+                {
+                    Rebuild();
+                }
+            }
+        }
+
+        /// <summary>Raised when the handle beside a line (or a list marker) is clicked: play just the sentences from first to last (document indexes).</summary>
+        public event Action<int, int>? LineClicked;
+
         private void Rebuild()
         {
             if (runs.Count == 0 && document is { Count: > 0 })
@@ -239,6 +273,7 @@ namespace TextToSpeech
             textBlock.Inlines.Clear();
             runs.Clear();
             pauseMarks.Clear();
+            blocks.Clear();
             styledSentence = -1;
             if (document == null)
             {
@@ -248,16 +283,55 @@ namespace TextToSpeech
             // GUESS: rebuilding all runs on content change is fine for typical pages.
             // Position changes (every spoken word) only restyle two sentences, see RestyleChanged.
             SentenceFormat? previous = null;
+            Block? current = null;
             for (int s = 0; s < document.Count; s++)
             {
                 var sentence = document.Sentences[s];
                 var format = sentence.Format;
+
+                if (showRaw && format != null)
+                {
+                    // Raw view: the block's original text in one run (at its first sentence); nothing else per sentence.
+                    if (format.StartsBlock)
+                    {
+                        if (textBlock.Inlines.Count > 0)
+                        {
+                            textBlock.Inlines.Add(new LineBreak());
+                        }
+                        current = new Block { First = s, Last = s };
+                        blocks.Add(current);
+                        var rawRun = new Run(format.Raw ?? sentence.Text) { Tag = (s, 0), Cursor = Cursors.Hand, FontFamily = CodeFont };
+                        rawRun.MouseLeftButtonUp += OnRunClicked;
+                        current.RawRun = rawRun;
+                        textBlock.Inlines.Add(rawRun);
+                    }
+                    if (current != null)
+                    {
+                        current.Last = s;
+                    }
+                    runs.Add(new List<Run>());
+                    AddPauseMark(s, sentence);
+                    continue;
+                }
+
                 if (format is { StartsBlock: true })
                 {
-                    StartBlock(format, previous);
+                    var gutter = StartBlock(format, previous);
+                    current = new Block { First = s, Last = s, Gutter = gutter, GutterIsMarker = format.Kind == BlockKind.ListItem };
+                    blocks.Add(current);
+                    WireGutter(current);
+                }
+                else if (format == null)
+                {
+                    current = null;
+                }
+                if (current != null)
+                {
+                    current.Last = s;
                 }
                 previous = format ?? previous;
 
+                var block = current;
                 double size = SizeFor(format);
                 var list = new List<Run>(sentence.Words.Count);
                 for (int w = 0; w < sentence.Words.Count; w++)
@@ -272,28 +346,42 @@ namespace TextToSpeech
                         run.FontFamily = CodeFont;
                     }
                     run.MouseLeftButtonUp += OnRunClicked;
-                    run.MouseEnter += (_, _) => run.Background = HoverBrush;
+                    run.MouseEnter += (_, _) =>
+                    {
+                        run.Background = HoverBrush;
+                        ShowHandle(block, true);
+                    };
                     int sIdx = s, wIdx = w;
-                    run.MouseLeave += (_, _) => ApplyStyle(run, sIdx, wIdx);
+                    run.MouseLeave += (_, _) =>
+                    {
+                        ApplyStyle(run, sIdx, wIdx);
+                        ShowHandle(block, false);
+                    };
                     list.Add(run);
+                    block?.Words.Add(run);
                     textBlock.Inlines.Add(run);
                     textBlock.Inlines.Add(new Run(" "));
                 }
                 runs.Add(list);
-                if (sentence.Pause != null)
-                {
-                    var mark = new Run("\u23F8 ") { ToolTip = sentence.Pause.Label == null ? "Reading waits here" : "Reading waits here for your answer" };
-                    pauseMarks[s] = mark;
-                    textBlock.Inlines.Add(mark);
-                }
+                AddPauseMark(s, sentence);
             }
             RestyleAll();
         }
 
+        private void AddPauseMark(int s, Sentence sentence)
+        {
+            if (sentence.Pause != null)
+            {
+                var mark = new Run("\u23F8 ") { ToolTip = sentence.Pause.Label == null ? "Reading waits here" : "Reading waits here for your answer" };
+                pauseMarks[s] = mark;
+                textBlock.Inlines.Add(mark);
+            }
+        }
+
         private static readonly FontFamily CodeFont = new("Consolas");
 
-        /// <summary>Starts a new line for a markdown block: a line break (two between different kinds of block), then the indent and marker of a list item.</summary>
-        private void StartBlock(SentenceFormat format, SentenceFormat? previous)
+        /// <summary>Starts a new line for a markdown block: a line break (two between different kinds of block), then the handle (the list marker with its indent, or a hidden arrow). Returns the handle.</summary>
+        private Run StartBlock(SentenceFormat format, SentenceFormat? previous)
         {
             if (textBlock.Inlines.Count > 0)
             {
@@ -304,10 +392,76 @@ namespace TextToSpeech
                     textBlock.Inlines.Add(new LineBreak());
                 }
             }
+            Run gutter;
             if (format.Kind == BlockKind.ListItem)
             {
                 string indent = new string('\u00A0', Math.Clamp(format.Level, 0, 8) * 4);
-                textBlock.Inlines.Add(new Run(indent + (format.Marker ?? "\u2022") + "\u00A0") { Foreground = SubtleBrush });
+                gutter = new Run(indent + (format.Marker ?? "\u2022") + "\u00A0") { Foreground = SubtleBrush };
+            }
+            else
+            {
+                gutter = new Run("\u25B8\u00A0") { Foreground = Brushes.Transparent };   // shows on hover
+            }
+            gutter.Cursor = Cursors.Hand;
+            gutter.ToolTip = "Play just this line";
+            textBlock.Inlines.Add(gutter);
+            return gutter;
+        }
+
+        private void WireGutter(Block block)
+        {
+            var gutter = block.Gutter!;
+            gutter.MouseEnter += (_, _) => HoverBlock(block, true);
+            gutter.MouseLeave += (_, _) => HoverBlock(block, false);
+            gutter.MouseLeftButtonUp += (_, e) =>
+            {
+                LineClicked?.Invoke(block.First, block.Last);
+                e.Handled = true;
+            };
+        }
+
+        /// <summary>Shows or hides the arrow handle of a block that is not a list item (word hover reveals it too).</summary>
+        private void ShowHandle(Block? block, bool on)
+        {
+            if (block?.Gutter != null && !block.GutterIsMarker)
+            {
+                block.Gutter.Foreground = on ? SubtleBrush : Brushes.Transparent;
+            }
+        }
+
+        /// <summary>Hovering the handle tints the whole line, which is what a click will play.</summary>
+        private void HoverBlock(Block block, bool on)
+        {
+            foreach (var run in block.Words)
+            {
+                if (on)
+                {
+                    run.Background = HoverBrush;
+                }
+                else if (run.Tag is ValueTuple<int, int> pos)
+                {
+                    ApplyStyle(run, pos.Item1, pos.Item2);
+                }
+            }
+            ShowHandle(block, on);
+        }
+
+        /// <summary>Raw view: tints the block being read and greys the ones already read.</summary>
+        private void StyleRawBlocks()
+        {
+            if (document == null)
+            {
+                return;
+            }
+            int current = document.Position.Sentence;
+            foreach (var block in blocks)
+            {
+                if (block.RawRun == null)
+                {
+                    continue;
+                }
+                block.RawRun.Background = current >= block.First && current <= block.Last ? SentenceBrush : null;
+                block.RawRun.Foreground = block.Last < current ? ReadBrush : TextBrush;
             }
         }
 
@@ -340,6 +494,7 @@ namespace TextToSpeech
             {
                 StyleSentence(s);
             }
+            StyleRawBlocks();
             RememberStyled();
             ScrollCurrentIntoView();
         }
@@ -359,6 +514,7 @@ namespace TextToSpeech
             {
                 StyleSentence(s);
             }
+            StyleRawBlocks();
             bool sentenceChanged = styledSentence != document.Position.Sentence;
             RememberStyled();
             if (sentenceChanged)
@@ -426,16 +582,32 @@ namespace TextToSpeech
 
         private void FollowCurrent()
         {
-            if (!following || document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count || runs[document.Position.Sentence].Count == 0)
+            if (!following || document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count)
             {
                 return;
             }
-            var words = runs[document.Position.Sentence];
+            // Raw view has one run per block (its sentences have no word runs); formatted view has the sentence's words.
+            TextPointer? from, to;
+            if (showRaw)
+            {
+                int cur = document.Position.Sentence;
+                var raw = blocks.Find(b => cur >= b.First && cur <= b.Last)?.RawRun;
+                (from, to) = raw == null ? (null, null) : (raw.ContentStart, raw.ContentEnd);
+            }
+            else
+            {
+                var words = runs[document.Position.Sentence];
+                (from, to) = words.Count == 0 ? (null, null) : (words[0].ContentStart, words[^1].ContentEnd);
+            }
+            if (from == null || to == null)
+            {
+                return;
+            }
             try
             {
                 UpdateLayout();
-                var first = words[0].ContentStart.GetCharacterRect(LogicalDirection.Forward);
-                var last = words[^1].ContentEnd.GetCharacterRect(LogicalDirection.Backward);
+                var first = from.GetCharacterRect(LogicalDirection.Forward);
+                var last = to.GetCharacterRect(LogicalDirection.Backward);
                 if (first.IsEmpty || last.IsEmpty)
                 {
                     return;

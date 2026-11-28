@@ -43,7 +43,8 @@ namespace TextToSpeech.Core.Reading
     /// <param name="StartsBlock">The sentence starts a new line in the popup.</param>
     /// <param name="SpokenPrefix">Spoken before the sentence but not shown and not clickable ("One. " for item 1).</param>
     /// <param name="GapFactor">Multiplies the pause after this sentence (2 after a list item, so items stand apart).</param>
-    public sealed record SentenceFormat(BlockKind Kind, int Level, string? Marker, bool StartsBlock, string SpokenPrefix, int GapFactor = 1);
+    /// <param name="Raw">On the first sentence of a block: the block as it was written, with its markup (for the raw text view).</param>
+    public sealed record SentenceFormat(BlockKind Kind, int Level, string? Marker, bool StartsBlock, string SpokenPrefix, int GapFactor = 1, string? Raw = null);
 
     /// <summary>
     /// One sentence of a <see cref="ReadingDocument"/>, with its words pre-tokenized

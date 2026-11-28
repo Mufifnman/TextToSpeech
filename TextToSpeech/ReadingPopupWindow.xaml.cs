@@ -17,7 +17,9 @@ namespace TextToSpeech
         Action OpenFullWindow,
         Action Dismiss,
         Action TakeBack,
-        Action TogglePlayAll);
+        Action TogglePlayAll,
+        Action<int, int> PlayLine,
+        Action ToggleRaw);
 
     /// <summary>
     /// A small always-on-top window in the bottom right corner (above the tray) that shows the reading text with the
@@ -42,6 +44,7 @@ namespace TextToSpeech
             this.actions = actions;
             display.Document = document;
             display.WordClicked += actions.JumpTo;
+            display.LineClicked += actions.PlayLine;
             SizeChanged += (_, _) => Anchor();
         }
 
@@ -70,6 +73,17 @@ namespace TextToSpeech
                 ? (System.Windows.Media.Brush?)TryFindResource("ReadWordBrush") ?? System.Windows.Media.Brushes.Orange
                 : (System.Windows.Media.Brush?)TryFindResource("ThemeSubtle") ?? System.Windows.Media.Brushes.Gray;
             playAllButton.ToolTip = on ? "Play all is on: no stopping at questions. Click to stop at each question." : "Stops after each question. Click to read straight through.";
+        }
+
+        /// <summary>The raw text button: shown only when the text has formatting; lit while the original text is shown.</summary>
+        public void SetRaw(bool visible, bool on)
+        {
+            rawButton.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            display.ShowRaw = on;
+            rawGlyph.Foreground = on
+                ? (System.Windows.Media.Brush?)TryFindResource("ReadWordBrush") ?? System.Windows.Media.Brushes.Orange
+                : (System.Windows.Media.Brush?)TryFindResource("ThemeSubtle") ?? System.Windows.Media.Brushes.Gray;
+            rawButton.ToolTip = on ? "Showing the original text with its symbols. Click for the formatted view." : "Show the original text with its symbols.";
         }
 
         public void SetPlaying(bool playing) => playGlyph.Text = playing ? "" : "";   // pause / play
@@ -179,6 +193,7 @@ namespace TextToSpeech
         private void Clear_Click(object sender, RoutedEventArgs e) => actions.Clear();
         private void Skip_Click(object sender, RoutedEventArgs e) => actions.Skip();
         private void PlayAll_Click(object sender, RoutedEventArgs e) => actions.TogglePlayAll();
+        private void Raw_Click(object sender, RoutedEventArgs e) => actions.ToggleRaw();
         private void Open_Click(object sender, RoutedEventArgs e) => actions.OpenFullWindow();
         private void Close_Click(object sender, RoutedEventArgs e) => actions.Dismiss();
         private void TakeBack_Click(object sender, RoutedEventArgs e) => actions.TakeBack();

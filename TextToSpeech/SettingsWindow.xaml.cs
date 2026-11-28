@@ -81,6 +81,8 @@ namespace TextToSpeech
             popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
             markdownBox.IsChecked = settings.FormatMarkdown;
             playAllBox.IsChecked = settings.PlayAllByDefault;
+            rawBox.IsChecked = settings.ShowRawText;
+            rawBox.Click += (_, _) => Changed();
             markdownBox.Click += (_, _) => Changed();
             playAllBox.Click += (_, _) => Changed();
             mainTextSizeSlider.Value = Math.Clamp(settings.MainTextSize, 10, 40);
@@ -138,6 +140,7 @@ namespace TextToSpeech
             popupStayText.Text = StayText(settings.PopupStayOpenSeconds);
             popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
             settings.FormatMarkdown = markdownBox.IsChecked == true;
+            settings.ShowRawText = rawBox.IsChecked == true;
             settings.PlayAllByDefault = playAllBox.IsChecked == true;
             settings.MainTextSize = mainTextSizeSlider.Value;
             mainTextSizeText.Text = (int)mainTextSizeSlider.Value + " pt";
