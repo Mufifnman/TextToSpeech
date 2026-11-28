@@ -41,16 +41,17 @@ namespace TextToSpeech.Core.Tests
         {
             var q = NewQueue();
             var release = new ManualResetEventSlim();
+            var started = new ManualResetEventSlim();
             var order = new List<string>();
             Func<string, Func<int>> work = name => () => { lock (order) { order.Add(name); } return 1; };
 
             q.SetWanted(1, new (string, Func<int>)[]
             {
-                ("first", () => { release.Wait(); lock (order) { order.Add("first"); } return 1; }),
+                ("first", () => { started.Set(); release.Wait(); lock (order) { order.Add("first"); } return 1; }),
                 ("second", work("second")),
                 ("third", work("third")),
             });
-            Assert.True(await Eventually(() => q.Contains("first")));
+            Assert.True(started.Wait(5000));   // "first" is running now, so it cannot be overtaken
             var wanted = q.Demand("urgent", work("urgent"));
             release.Set();
             await wanted;
@@ -64,14 +65,15 @@ namespace TextToSpeech.Core.Tests
         {
             var q = NewQueue();
             var release = new ManualResetEventSlim();
+            var started = new ManualResetEventSlim();
             int ranStale = 0;
 
             q.SetWanted(1, new (string, Func<int>)[]
             {
-                ("blocker", () => { release.Wait(); return 1; }),
+                ("blocker", () => { started.Set(); release.Wait(); return 1; }),
                 ("stale", () => { Interlocked.Increment(ref ranStale); return 1; }),
             });
-            Assert.True(await Eventually(() => q.Contains("blocker")));
+            Assert.True(started.Wait(5000));
             var stale = q.Demand("stale", () => 7);   // same key: shares the queued job (promoted)
             q.SetWanted(1, Array.Empty<(string, Func<int>)>());   // not wanted any more
             q.Clear();
@@ -105,11 +107,12 @@ namespace TextToSpeech.Core.Tests
         {
             var q = NewQueue();
             var release = new ManualResetEventSlim();
+            var started = new ManualResetEventSlim();
             var order = new List<string>();
             Func<string, Func<int>> work = name => () => { lock (order) { order.Add(name); } return 1; };
 
-            q.SetWanted(1, new (string, Func<int>)[] { ("hold", () => { release.Wait(); return 1; }) });
-            Assert.True(await Eventually(() => q.Contains("hold")));
+            q.SetWanted(1, new (string, Func<int>)[] { ("hold", () => { started.Set(); release.Wait(); return 1; }) });
+            Assert.True(started.Wait(5000));
             q.SetWanted(2, new[] { ("guess1", work("guess1")) });
             q.SetWanted(1, new (string, Func<int>)[] { ("hold", () => 1), ("real", work("real")) });
             q.SetWanted(2, new[] { ("guess2", work("guess2")) });   // replaces guess1, which never started

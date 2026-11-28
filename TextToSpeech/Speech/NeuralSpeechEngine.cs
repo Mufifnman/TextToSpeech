@@ -122,7 +122,9 @@ namespace TextToSpeech.Speech
                     }
                     sampleRate = rateOfClip;
                     lookAhead.Take(keys[i]);   // used up; frees room for the next sentence
-                    return samples;
+                    // Inside one sentence the pause at a join should be the short one the comma asks for.
+                    return keys.Length == 1 ? samples
+                        : SilenceTrimmer.Trim(samples, rateOfClip, leading: i > 0, trailing: i < keys.Length - 1);
                 }
 
                 // The rate is only known once the first piece exists.
