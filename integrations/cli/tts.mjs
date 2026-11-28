@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // tts: command line for the Text to Speech local API.   node tts.mjs <command> [options]
 import { readFileSync } from 'node:fs';
-import { api, TtsError } from '../tts-client.mjs';
+import { api, agentFromContext, TtsError } from '../tts-client.mjs';
 
 const USAGE = `Usage: tts <command> [options]
 
@@ -15,7 +15,7 @@ const USAGE = `Usage: tts <command> [options]
                         --play-all                       read through the questions without stopping
                         --expects-reply                  ask for the user's spoken answer to each question (see "replies")
   reply <text>        Give an answer to the question reading is waiting at (what the app's reply box does).
-  replies [--source <label>] [--wait <seconds>]   Take the answers nobody has taken yet (waits up to 120 s for one).
+  replies [--source <label>] [--wait <seconds>]   Take the answers for a source (default: this folder's name) that nobody has taken yet (waits up to 120 s).
   next                Continue after a question the app is waiting at (marks it answered).
   answered <id> [--session <id>]   Mark a question answered (q1, q2, ...); continues if reading waits at it.
   pause | resume | toggle | skip | back | stop | clear
@@ -69,7 +69,7 @@ export async function run(argv, { stdin = () => readFileSync(0, 'utf8'), out = c
       if (!text.trim()) throw new TtsError('reply needs the answer text.', { code: 'usage' });
       return print(await api.reply(text));
     }
-    case 'replies': return print(await api.takeReplies({ source: flags.source, waitSeconds: num(flags.wait) }));
+    case 'replies': return print(await api.takeReplies({ source: flags.source ?? agentFromContext().label, waitSeconds: num(flags.wait) }));
     case 'answered':
       if (!arg) throw new TtsError('answered needs a pause id such as q1.', { code: 'usage' });
       return print(await api.answered(arg, flags.session));

@@ -71,6 +71,27 @@ namespace TextToSpeech.Api.Tests
         }
 
         [Fact]
+        public async Task Has_replies_looks_without_removing()
+        {
+            await Ask();
+            ReachFirstQuestion();
+            Assert.False(rig.Host.HasReplies("claude-code", null));
+            await rig.Host.SubmitReplyAsync(new ReplyRequest("master", null, null));
+            Assert.True(rig.Host.HasReplies("claude-code", null));
+            Assert.True(rig.Host.HasReplies("claude-code", null));
+            Assert.False(rig.Host.HasReplies("someone-else", null));
+        }
+
+        [Fact]
+        public async Task A_question_id_two_sessions_share_needs_a_session_id()
+        {
+            await Ask(source: "window-a");
+            await Ask(source: "window-b");
+            var e = await Assert.ThrowsAsync<ApiException>(() => rig.Host.SubmitReplyAsync(new ReplyRequest("yes", null, "q1")));
+            Assert.Equal("ambiguous_pause", e.Code);
+        }
+
+        [Fact]
         public async Task A_reply_when_nobody_is_waiting_is_a_conflict()
         {
             await rig.Speak("Nothing to answer here.");

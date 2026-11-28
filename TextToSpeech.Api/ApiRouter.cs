@@ -115,7 +115,7 @@ namespace TextToSpeech.Api
 
                 case "replies" when parts.Length == 3 && parts[2] == "take":
                     Expect(method, "POST");
-                    return Ok(await host.TakeRepliesAsync(ValidateTakeReplies(BodyOrDefault(request, new TakeRepliesRequest(null, null, null)))));
+                    return Ok(await host.TakeRepliesAsync(ValidateTakeReplies(Body<TakeRepliesRequest>(request))));
 
                 case "sessions" when parts.Length == 3:
                     if (method == "GET")
@@ -277,6 +277,10 @@ namespace TextToSpeech.Api
 
         private static TakeRepliesRequest ValidateTakeReplies(TakeRepliesRequest r)
         {
+            if (string.IsNullOrWhiteSpace(r.Source) && string.IsNullOrWhiteSpace(r.SessionId))
+            {
+                throw ApiException.BadRequest("source or sessionId is required: taking replies removes them, so say whose.", "reply_filter_required");
+            }
             if (r.WaitSeconds.HasValue && (r.WaitSeconds.Value < 0 || r.WaitSeconds.Value > MaxWaitSeconds))
             {
                 throw ApiException.BadRequest($"waitSeconds must be between 0 and {MaxWaitSeconds}.");

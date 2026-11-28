@@ -140,9 +140,19 @@ namespace TextToSpeech
             else if (e.Key == System.Windows.Input.Key.Escape) { actions.CancelReply(); e.Handled = true; }
         }
 
+        // Typing never starts the auto-send countdown; only text that arrives without typing (Handy's paste) does.
+        private bool typed;
+
+        private void ReplyBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e) => typed = true;
+
         private void ReplyBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             autoSendTimer.Stop();
+            if (typed)
+            {
+                typed = false;
+                return;
+            }
             if (autoSend && replyBox.Text.Trim().Length > 0)
             {
                 autoSendTimer.Tick -= AutoSendElapsed;

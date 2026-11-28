@@ -283,9 +283,10 @@ namespace TextToSpeech
                 if (p.IsReplyOpen)
                 {
                     // The question moved on, or was answered another way (Play, Clear): follow it, or close the box.
+                    // Between two questions reading is speaking and nothing waits: keep the box (and what was dictated) then.
                     var waiting = api?.Host.Snapshot().ReplyWaiting;
-                    if (waiting == null) EndReply(p);
-                    else p.SetReplyPrompt(ReplyPrompt(waiting));
+                    if (waiting != null) p.SetReplyPrompt(ReplyPrompt(waiting));
+                    else if (!playing) EndReply(p);
                 }
             }
             else
@@ -357,7 +358,7 @@ namespace TextToSpeech
         {
             if (handyRecording)
             {
-                ToggleHandy();   // still recording: stop it so it does not paste into the next window
+                RunHandy("--cancel");   // still recording: throw the recording away, so nothing is pasted into another window
                 handyRecording = false;
             }
             p.CloseReply();
@@ -366,7 +367,9 @@ namespace TextToSpeech
         }
 
         /// <summary>Starts or stops Handy's recording with its own command line. False when Handy could not be found or started.</summary>
-        private bool ToggleHandy()
+        private bool ToggleHandy() => RunHandy("--toggle-transcription");
+
+        private bool RunHandy(string argument)
         {
             string? exe = FindHandy();
             if (exe == null)
@@ -376,7 +379,7 @@ namespace TextToSpeech
             }
             try
             {
-                using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, "--toggle-transcription")
+                using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, argument)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,

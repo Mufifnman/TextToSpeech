@@ -66,8 +66,18 @@ namespace TextToSpeech.Api.Tests
         [Fact]
         public async Task Wait_seconds_out_of_range_is_rejected()
         {
-            var r = await Send("POST", "/v1/replies/take", "{\"waitSeconds\":9999}");
+            var r = await Send("POST", "/v1/replies/take", "{\"source\":\"claude-code\",\"waitSeconds\":9999}");
             Assert.Equal(400, r.Status);
+        }
+
+        [Theory]
+        [InlineData("{}")]
+        [InlineData("{\"waitSeconds\":5}")]
+        public async Task Taking_replies_without_saying_whose_is_rejected(string body)
+        {
+            var r = await Send("POST", "/v1/replies/take", body);
+            Assert.Equal(400, r.Status);
+            Assert.Equal("reply_filter_required", Req.ErrorCode(r));
         }
 
         [Fact]

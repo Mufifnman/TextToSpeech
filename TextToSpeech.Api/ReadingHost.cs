@@ -26,6 +26,7 @@ namespace TextToSpeech.Api
 
         // Sessions whose caller asked for the answers (expectsReply), and the answers nobody has taken yet.
         private const int MaxReplies = 50;
+        private static readonly TimeSpan ReplyLifetime = TimeSpan.FromHours(4);
         private readonly HashSet<string> replyExpecting = new();
         private readonly List<ReplyDto> replies = new();
         private long replySeq;
@@ -110,8 +111,8 @@ namespace TextToSpeech.Api
                 return null;
             }
             var all = doc.Pauses(at.Owner, pendingOnly: false);
-            int index = all.ToList().FindIndex(x => x.Sentence.Pause == at.Point);
-            return new ReplyWaitingDto(at.Owner, SourceOf(at.Owner), at.Point.Id, at.Point.Label, index + 1, all.Count);
+            int index = all.ToList().FindIndex(x => x.Sentence.Pause?.Id == at.Point.Id && x.Sentence.Owner == at.Owner);
+            return new ReplyWaitingDto(at.Owner, SourceOf(at.Owner), at.Point.Id, at.Point.Label, Math.Max(index, 0) + 1, all.Count);
         }
 
         private string SourceOf(string sessionId) => store.Sessions.FirstOrDefault(x => x.Id == sessionId)?.Source ?? "api";
@@ -394,21 +395,24 @@ namespace TextToSpeech.Api
             PausePoint point;
             if (!string.IsNullOrEmpty(request.PauseId))
             {
-                Sentence? found = null;
+                var matches = new List<Sentence>();
                 foreach (var (_, sentence) in doc.Pauses(request.SessionId, pendingOnly: true))
                 {
                     if (sentence.Pause!.Id == request.PauseId && sentence.Owner != null && replyExpecting.Contains(sentence.Owner))
                     {
-                        found = sentence;
-                        break;
+                        matches.Add(sentence);
                     }
                 }
-                if (found == null)
+                if (matches.Count == 0)
                 {
                     throw ApiException.NotFound($"No unanswered question '{request.PauseId}' whose caller expects a reply.", "no_such_pause");
                 }
-                owner = found.Owner!;
-                point = found.Pause!;
+                if (matches.Select(m => m.Owner).Distinct().Count() > 1)
+                {
+                    throw ApiException.Conflict("ambiguous_pause", $"Several sessions have an unanswered '{request.PauseId}'; give sessionId.");
+                }
+                owner = matches[0].Owner!;
+                point = matches[0].Pause!;
             }
             else
             {
@@ -433,12 +437,28 @@ namespace TextToSpeech.Api
             return Task.FromResult(reply);
         }
 
-        public Task<RepliesResponse> GetRepliesAsync() => Task.FromResult(new RepliesResponse(replies.ToList()));
+        private void DropOldReplies() => replies.RemoveAll(r => DateTimeOffset.UtcNow - r.At > ReplyLifetime);
+
+        private bool Matches(ReplyDto r, string? source, string? sessionId) =>
+            (source == null || r.Source == source) && (sessionId == null || r.SessionId == sessionId);
+
+        /// <summary>True when a reply for this source or session is waiting to be taken (does not remove it).</summary>
+        public bool HasReplies(string? source, string? sessionId)
+        {
+            DropOldReplies();
+            return replies.Any(r => Matches(r, source, sessionId));
+        }
+
+        public Task<RepliesResponse> GetRepliesAsync()
+        {
+            DropOldReplies();
+            return Task.FromResult(new RepliesResponse(replies.ToList()));
+        }
 
         public Task<RepliesResponse> TakeRepliesAsync(TakeRepliesRequest request)
         {
-            var taken = replies.Where(r => (request.Source == null || r.Source == request.Source)
-                                           && (request.SessionId == null || r.SessionId == request.SessionId)).ToList();
+            DropOldReplies();
+            var taken = replies.Where(r => Matches(r, request.Source, request.SessionId)).ToList();
             foreach (var r in taken)
             {
                 replies.Remove(r);
