@@ -18,6 +18,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        lfs: true   # tessdata/*.traineddata are Git LFS files; the build needs the real bytes
 
     # Install the .NET Core
     - name: Install .NET Core
@@ -37,15 +38,27 @@ jobs:
     - name: Build the application
       run: msbuild $env:Solution_Name /p:Configuration=Release
 
-    # Run the UI-free unit tests
+    # Run the unit tests. Core, filter and API tests need no UI; Windows.Tests skips the
+    # LocalOnly ones (they speak aloud or need voices downloaded on a dev PC).
     - name: Test
-      run: dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
+      run: |
+        dotnet test TextToSpeech.Core.Tests/TextToSpeech.Core.Tests.csproj --configuration Release
+        dotnet test TextToSpeech.Tests/TextToSpeech.Tests.csproj --configuration Release
+        dotnet test TextToSpeech.Api.Tests/TextToSpeech.Api.Tests.csproj --configuration Release
+        dotnet test TextToSpeech.Windows.Tests/TextToSpeech.Windows.Tests.csproj --configuration Release --filter "Category!=LocalOnly"
 
-    # Upload build artifacts (the built executable files)
+    # The standalone rule engine has its own tests
+    - name: Test PlainRules
+      run: dotnet test PlainRules/PlainRules.sln --configuration Release
+
+    # Node client, CLI, MCP server and the Claude Code plugin
+    - name: Test Node integrations
+      run: node --test integrations/test/integration.test.mjs plugins/tts/test/plugin.test.mjs
+
+    # Upload only the app (not every test and library output)
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: Executable Files
-        path: |
-          **\bin\Release\**\*.exe
-          **\bin\Release\**\*.dll
+        name: TextToSpeech-app
+        path: TextToSpeech/bin/Release/
+        if-no-files-found: error
