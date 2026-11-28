@@ -58,6 +58,37 @@ namespace TextToSpeech.Speech
             return voices;
         }
 
+        /// <summary>
+        /// Cut long sentences into clause-sized pieces so speech starts sooner and the next piece is made while
+        /// the first plays. Short sentences are never cut. Turn off to generate each sentence in one go.
+        /// </summary>
+        public bool ChunkLongSentences { get; set; } = true;
+
+        private long lastPlaybackEndTicks;   // Environment.TickCount64 when audio last stopped; 0 = never
+
+        /// <summary>True when nothing has played for a few seconds: a new reading, a jump, or a resume after a pause.</summary>
+        private bool IsStartingFresh() =>
+            lastPlaybackEndTicks == 0 || Environment.TickCount64 - Volatile.Read(ref lastPlaybackEndTicks) > 3000;
+
+        private IReadOnlyList<TextChunk> Plan(string text, bool eager) =>
+            ChunkLongSentences
+                ? ClauseChunker.Split(text, eager ? ChunkOptions.Eager : ChunkOptions.Normal)
+                : new[] { new TextChunk(0, text.Length) };
+
+        /// <summary>
+        /// Chooses how to cut a sentence about to be spoken: the cut a guess already prepared if there is one,
+        /// else the eager cut when starting fresh, else the normal cut (what the look-ahead prepared).
+        /// </summary>
+        private IReadOnlyList<TextChunk> ChoosePlan(string dir, int sid, float speed, string text)
+        {
+            var normal = Plan(text, eager: false);
+            var eager = Plan(text, eager: true);
+            string KeyOf(TextChunk c) => CacheKey(dir, sid, speed, text.Substring(c.Start, c.Length));
+            if (lookAhead.Contains(KeyOf(normal[0]))) return normal;
+            if (lookAhead.Contains(KeyOf(eager[0]))) return eager;
+            return IsStartingFresh() ? eager : normal;
+        }
+
         public async Task SpeakAsync(string text, VoiceInfo? voice, int rate, Action<WordBoundary>? onWord, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -66,28 +97,64 @@ namespace TextToSpeech.Speech
                 throw new ArgumentException("Not a neural voice.", nameof(voice));
 
             float speed = RateToSpeed(rate);
-            string key = CacheKey(dir, sid, speed, text);
-            float[] samples;
-            int sampleRate;
+            var plan = ChoosePlan(dir, sid, speed, text);
+            var chunkTexts = plan.Select(c => text.Substring(c.Start, c.Length)).ToArray();
+            var keys = chunkTexts.Select(t => CacheKey(dir, sid, speed, t)).ToArray();
+
+            // Ask for every piece now, in order: they run before anything prepared for later sentences.
+            var tasks = new Task<(float[] Samples, int SampleRate)>[keys.Length];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                string piece = chunkTexts[i];
+                tasks[i] = lookAhead.Demand(keys[i], () => Synthesize(dir, sid, piece, speed));
+            }
+
+            int sampleRate = 0;
             var waited = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                // Often already finished (or running): the queue shares the job and puts it first.
-                (samples, sampleRate) = await lookAhead.Demand(key, () => Synthesize(dir, sid, text, speed)).WaitAsync(cancellationToken);
+                async Task<float[]> GetChunk(int i)
+                {
+                    var (samples, rateOfClip) = await tasks[i].WaitAsync(cancellationToken).ConfigureAwait(false);
+                    if (i == 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[prewarm] first audio after {waited.ElapsedMilliseconds} ms ({keys.Length} piece(s)); {lookAhead.Stats}");
+                    }
+                    sampleRate = rateOfClip;
+                    lookAhead.Take(keys[i]);   // used up; frees room for the next sentence
+                    return samples;
+                }
+
+                // The rate is only known once the first piece exists.
+                var first = await tasks[0].WaitAsync(cancellationToken);
+                sampleRate = first.SampleRate;
+                if (first.Samples.Length == 0 && keys.Length == 1)
+                {
+                    lookAhead.Take(keys[0]);
+                    return;
+                }
+                lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a guess for this spot, if any, is no longer needed
+
+                IReadOnlyList<TimedWord> WordsFor(int i, float[] samples)
+                {
+                    var estimated = WordTimingEstimator.Estimate(chunkTexts[i], samples.Length / (double)sampleRate);
+                    if (plan[i].Start == 0) return estimated;
+                    return estimated.Select(w => new TimedWord(w.StartSeconds, new WordBoundary(w.Boundary.CharOffset + plan[i].Start, w.Boundary.CharLength))).ToList();
+                }
+
+                await player.PlayAsync(sampleRate, keys.Length, GetChunk, WordsFor, onWord, cancellationToken);
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
-                lookAhead.Take(key);   // do not keep a failed attempt
+                foreach (var key in keys) lookAhead.Take(key);   // do not keep a failed attempt
                 throw;
             }
-            cancellationToken.ThrowIfCancellationRequested();
-            System.Diagnostics.Debug.WriteLine($"[prewarm] waited {waited.ElapsedMilliseconds} ms for {samples.Length / (double)Math.Max(1, sampleRate):F1} s of audio; {lookAhead.Stats}");
-            lookAhead.Take(key);       // used up; frees room for the next sentence
-            lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a guess for this spot, if any, is no longer needed
-            if (samples.Length == 0) return;
-
-            var words = WordTimingEstimator.Estimate(text, samples.Length / (double)sampleRate);
-            await player.PlayAsync(samples, sampleRate, words, onWord, cancellationToken);
+            finally
+            {
+                // Pieces not used (cancelled or failed) are dropped, so stale work never blocks the next sentence.
+                foreach (var key in keys) lookAhead.Take(key);
+                Volatile.Write(ref lastPlaybackEndTicks, Environment.TickCount64);
+            }
         }
 
         private static string CacheKey(string dir, int sid, float speed, string text) => $"{dir}|{sid}|{speed:F3}|{text}";
@@ -97,7 +164,7 @@ namespace TextToSpeech.Speech
         {
             if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
             float speed = RateToSpeed(rate);
-            lookAhead.SetWanted(1, Wanted(texts, dir, sid, speed));
+            lookAhead.SetWanted(1, Wanted(texts, dir, sid, speed, eager: false));
         }
 
         /// <summary>
@@ -108,14 +175,24 @@ namespace TextToSpeech.Speech
         {
             if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
             float speed = RateToSpeed(rate);
-            lookAhead.SetWanted(2, Wanted(new[] { text }, dir, sid, speed));
+            lookAhead.SetWanted(2, Wanted(new[] { text }, dir, sid, speed, eager: true));
         }
 
-        private (string Key, Func<(float[], int)> Work)[] Wanted(IReadOnlyList<string> texts, string dir, int sid, float speed) =>
-            texts.Where(t => !string.IsNullOrWhiteSpace(t))
-                 .Distinct()
-                 .Select(t => (CacheKey(dir, sid, speed, t), (Func<(float[], int)>)(() => Synthesize(dir, sid, t, speed))))
-                 .ToArray();
+        private (string Key, Func<(float[], int)> Work)[] Wanted(IReadOnlyList<string> texts, string dir, int sid, float speed, bool eager)
+        {
+            var result = new List<(string, Func<(float[], int)>)>();
+            var seen = new HashSet<string>();
+            foreach (string sentence in texts.Where(t => !string.IsNullOrWhiteSpace(t)))
+            {
+                foreach (var chunk in Plan(sentence, eager))
+                {
+                    string piece = sentence.Substring(chunk.Start, chunk.Length);
+                    string key = CacheKey(dir, sid, speed, piece);
+                    if (seen.Add(key)) result.Add((key, () => Synthesize(dir, sid, piece, speed)));
+                }
+            }
+            return result.ToArray();
+        }
 
         public void ClearUpcoming() => lookAhead.Clear();
 
@@ -216,6 +293,8 @@ namespace TextToSpeech.Speech
 
         public void Dispose()
         {
+            lookAhead.Clear();
+            player.Dispose();
             lock (modelGate)
             {
                 loaded?.Dispose();
