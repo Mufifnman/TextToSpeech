@@ -104,9 +104,7 @@ public sealed class CustomFilterLibrary
     {
         Directory.CreateDirectory(Folder);
         string path = existingPath != null ? Contain(existingPath) : NewPath(set.Name);
-        string temp = path + ".tmp";
-        File.WriteAllText(temp, RuleSerializer.ToJson(set), new UTF8Encoding(false));
-        File.Move(temp, path, overwrite: true);
+        global::TextToSpeech.Core.IO.AtomicFile.WriteAllText(path, RuleSerializer.ToJson(set), new UTF8Encoding(false));
         return path;
     }
 
