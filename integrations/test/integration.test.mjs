@@ -1,7 +1,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { findConnection, call, TtsError } from '../tts-client.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { findConnection, call, TtsError, pidAlive } from '../tts-client.mjs';
 import { run } from '../cli/tts.mjs';
 import { handle, TOOLS } from '../mcp/tts-mcp.mjs';
 
@@ -47,6 +50,43 @@ test('findConnection reads api.json', () => {
 test('findConnection reports a missing or incomplete file', () => {
   assert.throws(() => findConnection({ TTS_API_FILE: 'x' }, () => { throw new Error('nope'); }), { code: 'not_running' });
   assert.throws(() => findConnection({ TTS_API_FILE: 'x' }, () => '{}'), { code: 'not_running' });
+});
+
+test('findConnection reports a left-over api.json whose pid is gone', () => {
+  const file = () => JSON.stringify({ port: 1234, token: 'abc', pid: 4242 });
+  assert.throws(() => findConnection({ TTS_API_FILE: 'x' }, file, () => false), { code: 'not_running' });
+  assert.deepEqual(findConnection({ TTS_API_FILE: 'x' }, file, () => true), { baseUrl: 'http://127.0.0.1:1234', token: 'abc' });
+});
+
+test('findConnection ignores a missing or invalid pid, and the env override skips the check', () => {
+  const never = () => { throw new Error('should not be asked'); };
+  assert.ok(findConnection({ TTS_API_FILE: 'x' }, () => JSON.stringify({ port: 1, token: 't' }), never));
+  assert.ok(findConnection({ TTS_API_FILE: 'x' }, () => JSON.stringify({ port: 1, token: 't', pid: 'x' }), never));
+  assert.ok(findConnection({ TTS_API_URL: 'http://127.0.0.1:5', TTS_API_TOKEN: 't' }, never, never));
+});
+
+test('pidAlive: this process is alive, an impossible pid is not', () => {
+  assert.equal(pidAlive(process.pid), true);
+  assert.equal(pidAlive(2 ** 22 + 12345), false);
+});
+
+test('error codes in the C# code are documented', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const repo = join(here, '..', '..');
+  const docs = readFileSync(join(repo, 'docs', 'api', 'compatibility.md'), 'utf8');
+  const codes = new Set(['bad_request', 'not_found']);
+  const dirs = [join(repo, 'TextToSpeech.Api'), join(repo, 'TextToSpeech.Api', 'Arbitration')];
+  for (const dir of dirs) {
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.cs'))) {
+      const src = readFileSync(join(dir, f), 'utf8');
+      for (const m of src.matchAll(/ApiException\.(?:BadRequest|NotFound)\((?:[^;]*?),\s*"([a-z_]+)"\)/g)) codes.add(m[1]);
+      for (const m of src.matchAll(/ApiException\.Conflict\("([a-z_]+)"/g)) codes.add(m[1]);
+      for (const m of src.matchAll(/(?:ApiSecurity\.)?Error\(\d+,\s*"([a-z_]+)"/g)) codes.add(m[1]);
+      for (const m of src.matchAll(/new ApiException\(\d+,\s*"([a-z_]+)"/g)) codes.add(m[1]);
+    }
+  }
+  assert.ok(codes.size > 25, 'the scan found ' + codes.size + ' codes; the pattern probably broke');
+  for (const code of codes) assert.ok(docs.includes('`' + code + '`'), code + ' is not in docs/api/compatibility.md');
 });
 
 test('call sends the bearer token and JSON body', async () => {
