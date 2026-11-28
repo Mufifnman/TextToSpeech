@@ -22,8 +22,22 @@ export function connectionFilePath(env = process.env) {
   return join(local, 'TextToSpeech', 'api.json');
 }
 
-/** { baseUrl, token } from TTS_API_URL + TTS_API_TOKEN, or from api.json. */
-export function findConnection(env = process.env, readFile = readFileSync) {
+/** True unless the process is known to be gone (a process we may not signal still counts as running). */
+export function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e?.code === 'EPERM';
+  }
+}
+
+/**
+ * { baseUrl, token } from TTS_API_URL + TTS_API_TOKEN, or from api.json.
+ * api.json is deleted when the app stops cleanly but survives a crash; when it names a pid that is no longer
+ * running, the file is stale and we report "not running" instead of a confusing connection error.
+ */
+export function findConnection(env = process.env, readFile = readFileSync, isAlive = pidAlive) {
   if (env.TTS_API_URL && env.TTS_API_TOKEN) {
     return { baseUrl: env.TTS_API_URL.replace(/\/+$/, ''), token: env.TTS_API_TOKEN };
   }
@@ -38,6 +52,10 @@ export function findConnection(env = process.env, readFile = readFileSync) {
   const port = info.port ?? info.Port;
   const token = info.token ?? info.Token;
   if (!port || !token) throw new TtsError('api.json is incomplete.', { code: 'not_running' });
+  const pid = info.pid ?? info.Pid;
+  if (Number.isInteger(pid) && pid > 0 && !isAlive(pid)) {
+    throw new TtsError('Text to Speech is not running (api.json is left over from a closed app).', { code: 'not_running' });
+  }
   return { baseUrl: `http://127.0.0.1:${port}`, token };
 }
 
