@@ -29,9 +29,9 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
-            <TextBox x:Name="nameBox" Grid.Column="1" Height="28" VerticalContentAlignment="Center"
+            <TextBox x:Name="nameBox" Grid.Column="1" MinHeight="30" VerticalContentAlignment="Center"
                      ToolTip="The filter's name in the Filters menu. Put / or \ in it to place it in submenus."/>
-            <Button x:Name="groupPickButton" Grid.Column="2" Content="Pick folder" Height="28" Padding="10,0" Margin="6,0,0,0" Click="GroupPick_Click"
+            <Button x:Name="groupPickButton" Grid.Column="2" Content="Pick folder" MinHeight="30" Padding="10,0" Margin="6,0,0,0" Click="GroupPick_Click"
                     ToolTip="Start the name with an existing menu folder"/>
             <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,3,0,0" FontSize="12" Foreground="{DynamicResource ThemeSubtle}" TextWrapping="Wrap"
                        Text="Use / or \ for submenus, for example  Web/Clean links  puts “Clean links” in a Web submenu."/>
@@ -40,9 +40,13 @@
         <!-- rule list header -->
         <DockPanel Grid.Row="1" Margin="0,0,0,6">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button Content="+ Rule" Padding="12,3" Margin="0,0,6,0" Click="AddRule_Click"
+                <Button Content="Templates" MinHeight="30" Padding="12,3" Margin="0,0,6,0" Click="Templates_Click"
+                        ToolTip="Start from a ready-made filter, such as web page text or a chat answer"/>
+                <Button Content="+ Rule" MinHeight="30" Padding="12,3" Margin="0,0,6,0" Click="AddRule_Click"
                         ToolTip="Add a rule: remove text, replace, remove lines, ..."/>
-                <Button Content="+ Common cleanup" Padding="12,3" Click="AddPreset_Click"
+                <Button Content="+ Skip a block" MinHeight="30" Padding="12,3" Margin="0,0,6,0" Click="AddBlockRule_Click"
+                        ToolTip="Remove or replace code blocks, quotes, lists, text in brackets and more"/>
+                <Button Content="+ Common cleanup" MinHeight="30" Padding="12,3" Click="AddPreset_Click"
                         ToolTip="Add a ready-made cleanup such as web links, citation numbers or markdown symbols"/>
             </StackPanel>
             <TextBlock Text="Rules (run from top to bottom)" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -54,46 +58,87 @@
                 <ItemsControl x:Name="rulesList" Margin="4">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,3">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Height="26" Margin="0,0,6,0" HorizontalContentAlignment="Left" Padding="8,0"
-                                        Click="KindButton_Click" ToolTip="Kind of rule">
-                                    <TextBlock Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis"/>
-                                </Button>
-                                <Grid Grid.Column="1" Margin="0,0,6,0">
+                            <StackPanel Margin="0,3">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="200"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="26" VerticalContentAlignment="Center"
-                                             Visibility="{Binding ShowValueBox, Converter={StaticResource BoolToVis}}"
-                                             ToolTip="{Binding ValueHint}"/>
-                                    <Button Height="26" HorizontalContentAlignment="Left" Padding="8,0" Click="PresetButton_Click"
-                                            Visibility="{Binding IsPreset, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding PresetLabel}" TextTrimming="CharacterEllipsis"/>
+                                    <Button Grid.Column="0" MinHeight="30" Margin="0,0,6,0" HorizontalContentAlignment="Left" Padding="8,0"
+                                            Click="KindButton_Click" ToolTip="Kind of rule">
+                                        <TextBlock Text="{Binding KindLabel}" TextTrimming="CharacterEllipsis"/>
                                     </Button>
-                                    <TextBox Grid.Column="1" Width="170" Margin="6,0,0,0" Text="{Binding Extra, UpdateSourceTrigger=PropertyChanged}"
-                                             Height="26" VerticalContentAlignment="Center"
-                                             Visibility="{Binding ShowExtra, Converter={StaticResource BoolToVis}}"
-                                             ToolTip="{Binding ExtraHint}"/>
+                                    <Grid Grid.Column="1" Margin="0,0,6,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" MinHeight="30" VerticalContentAlignment="Center"
+                                                 Visibility="{Binding ShowValueBox, Converter={StaticResource BoolToVis}}"
+                                                 ToolTip="{Binding ValueHint}"/>
+                                        <Button MinHeight="30" HorizontalContentAlignment="Left" Padding="8,0" Click="PresetButton_Click"
+                                                Visibility="{Binding IsPreset, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding PresetLabel}" TextTrimming="CharacterEllipsis"/>
+                                        </Button>
+                                        <Button MinHeight="30" HorizontalContentAlignment="Left" Padding="8,0" Click="BlockButton_Click"
+                                                ToolTip="Which kind of block"
+                                                Visibility="{Binding ShowBlockPicker, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding BlockLabel}" TextTrimming="CharacterEllipsis"/>
+                                        </Button>
+                                        <TextBox Grid.Column="1" Width="170" Margin="6,0,0,0" Text="{Binding Extra, UpdateSourceTrigger=PropertyChanged}"
+                                                 MinHeight="30" VerticalContentAlignment="Center"
+                                                 Visibility="{Binding ShowExtra, Converter={StaticResource BoolToVis}}"
+                                                 ToolTip="{Binding ExtraHint}"/>
+                                    </Grid>
+                                    <TextBlock Grid.Column="2" Text="{Binding MatchInfo}" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="12"
+                                               Foreground="{DynamicResource ThemeSubtle}" ToolTip="How many places this rule changes in the sample text"/>
+                                    <ToggleButton Grid.Column="3" MinHeight="30" Padding="8,0" Margin="0,0,6,0" IsChecked="{Binding IsExpanded}"
+                                                  ToolTip="More options: ignore case, whole words, limit to part of the text, turn off">
+                                        <TextBlock Text="{Binding MoreLabel}"/>
+                                    </ToggleButton>
+                                    <StackPanel Grid.Column="4" Orientation="Horizontal">
+                                        <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="MoveUp_Click" ToolTip="Move up" AutomationProperties.Name="Move rule up"/>
+                                        <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down" AutomationProperties.Name="Move rule down"/>
+                                        <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="30" MinHeight="30" Click="RemoveRule_Click" ToolTip="Remove this rule" AutomationProperties.Name="Remove rule"/>
+                                    </StackPanel>
                                 </Grid>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0"
-                                            Visibility="{Binding ShowCaseOptions, Converter={StaticResource BoolToVis}}">
-                                    <CheckBox Content="Ignore case" IsChecked="{Binding IgnoreCase}" Margin="0,0,8,0"/>
-                                    <CheckBox Content="Whole words" IsChecked="{Binding WholeWords}"
-                                              Visibility="{Binding ShowWholeWords, Converter={StaticResource BoolToVis}}"/>
+
+                                <TextBlock Text="{Binding Summary}" Margin="206,2,0,0" FontSize="12" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource ThemeSubtle}"/>
+
+                                <!-- start and end markers of a block you define yourself -->
+                                <StackPanel Orientation="Horizontal" Margin="206,4,0,0"
+                                            Visibility="{Binding ShowMarkers, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="Block starts with" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBox Width="130" MinHeight="30" VerticalContentAlignment="Center" Text="{Binding BlockStart, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Text="and ends with" VerticalAlignment="Center" Margin="12,0,6,0"/>
+                                    <TextBox Width="130" MinHeight="30" VerticalContentAlignment="Center" Text="{Binding BlockEnd, UpdateSourceTrigger=PropertyChanged}"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="3" Orientation="Horizontal">
-                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="MoveUp_Click" ToolTip="Move up"/>
-                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Margin="2,0" Click="MoveDown_Click" ToolTip="Move down"/>
-                                    <Button Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="26" Height="26" Click="RemoveRule_Click" ToolTip="Remove this rule"/>
-                                </StackPanel>
-                            </Grid>
+
+                                <!-- the power options, hidden until asked for -->
+                                <Border Margin="206,4,0,0" Padding="8,6" BorderBrush="{DynamicResource ThemeBorder}" BorderThickness="1"
+                                        Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
+                                    <WrapPanel>
+                                        <CheckBox Content="Ignore case" IsChecked="{Binding IgnoreCase}" Margin="0,0,12,0" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowCaseOptions, Converter={StaticResource BoolToVis}}"/>
+                                        <CheckBox Content="Whole words" IsChecked="{Binding WholeWords}" Margin="0,0,12,0" VerticalAlignment="Center"
+                                                  Visibility="{Binding ShowWholeWords, Converter={StaticResource BoolToVis}}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,12,0"
+                                                    Visibility="{Binding ShowScope, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="Applies to" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            <Button MinHeight="30" Padding="8,0" Click="ScopeButton_Click"
+                                                    ToolTip="Limit this rule to part of the text, such as code blocks, quotes or lists">
+                                                <TextBlock Text="{Binding ScopeLabel}"/>
+                                            </Button>
+                                        </StackPanel>
+                                        <CheckBox Content="Turned off" IsChecked="{Binding Disabled}" VerticalAlignment="Center"
+                                                  ToolTip="Keep the rule but do not run it"/>
+                                    </WrapPanel>
+                                </Border>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -101,7 +146,7 @@
         </Border>
 
         <!-- lint -->
-        <ScrollViewer Grid.Row="3" MaxHeight="84" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" MaxHeight="84" Margin="2,8,0,0" VerticalScrollBarVisibility="Auto">
             <TextBlock x:Name="lintText" TextWrapping="Wrap"/>
         </ScrollViewer>
 
@@ -126,11 +171,11 @@
         <!-- buttons -->
         <DockPanel Grid.Row="5" Margin="0,12,0,0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <Button x:Name="saveButton" Content="Save" Padding="18,4" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>
-                <Button Content="Cancel" Padding="18,4" IsCancel="True" Click="Cancel_Click"/>
+                <Button x:Name="saveButton" Content="Save" MinHeight="32" Padding="18,4" Margin="0,0,8,0" IsDefault="True" Click="Save_Click"/>
+                <Button Content="Cancel" MinHeight="32" Padding="18,4" IsCancel="True" Click="Cancel_Click"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal">
-                <Button x:Name="deleteButton" Content="Delete filter" Padding="12,4" Click="Delete_Click" Visibility="Collapsed"
+                <Button x:Name="deleteButton" Content="Delete filter" MinHeight="32" Padding="12,4" Click="Delete_Click" Visibility="Collapsed"
                         ToolTip="Delete this filter and its file"/>
                 <TextBlock x:Name="fileText" Foreground="{DynamicResource ThemeSubtle}" VerticalAlignment="Center" Margin="12,0,0,0"
                            TextTrimming="CharacterEllipsis"/>

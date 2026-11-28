@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PlainRules;
 
 /// <summary>The kind of clean-up a rule performs. Written as a plain string in JSON.</summary>
@@ -19,6 +21,19 @@ public enum RuleKind
     Preset,
     /// <summary>Advanced: <see cref="Rule.Value"/> is a raw .NET regex, <see cref="Rule.With"/> its replacement.</summary>
     Regex,
+    /// <summary>Remove (or replace with <see cref="Rule.With"/>) every block of the kind named in <see cref="Rule.Block"/>, for example code blocks.</summary>
+    RemoveBlock,
+}
+
+/// <summary>Where in the text a rule applies.</summary>
+public enum RuleScope
+{
+    /// <summary>The whole text (the default).</summary>
+    Everywhere,
+    /// <summary>Only inside the blocks named in <see cref="Rule.Block"/>.</summary>
+    Inside,
+    /// <summary>Everywhere except inside the blocks named in <see cref="Rule.Block"/>.</summary>
+    Outside,
 }
 
 /// <summary>One plain-language rule. Which properties matter depends on <see cref="Kind"/>.</summary>
@@ -41,11 +56,38 @@ public sealed class Rule
     /// <summary>Only match whole words, not parts of longer words.</summary>
     public bool WholeWords { get; set; }
 
+    /// <summary>Limit the rule to the inside or the outside of blocks. Needs <see cref="Block"/>. Default: everywhere.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public RuleScope Scope { get; set; }
+
+    /// <summary>Block type id (see <see cref="Blocks"/>), for example "code-blocks". Used by <see cref="Scope"/> and <see cref="RuleKind.RemoveBlock"/>.</summary>
+    public string? Block { get; set; }
+
+    /// <summary>Start marker when <see cref="Block"/> is "between".</summary>
+    public string? BlockStart { get; set; }
+
+    /// <summary>End marker when <see cref="Block"/> is "between".</summary>
+    public string? BlockEnd { get; set; }
+
     /// <summary>Turn the rule off without deleting it.</summary>
     public bool Disabled { get; set; }
 
     /// <summary>A short human-readable summary, for lists in an editor.</summary>
     public string Describe()
+    {
+        string what = DescribeKind();
+        if (Kind == RuleKind.RemoveBlock || Scope == RuleScope.Everywhere) return what;
+        return what + (Scope == RuleScope.Inside ? ", only inside " : ", everywhere except ") + BlockName();
+    }
+
+    private string BlockName()
+    {
+        if (Block != null && Block.StartsWith(PlainRules.Blocks.CustomPrefix, StringComparison.OrdinalIgnoreCase)) return Block.Substring(PlainRules.Blocks.CustomPrefix.Length);
+        if (Block == PlainRules.Blocks.Between) return "text between " + (BlockStart ?? "") + " and " + (BlockEnd ?? "");
+        return PlainRules.Blocks.Find(Block)?.Name ?? "blocks";
+    }
+
+    private string DescribeKind()
     {
         string q(string? s) => "“" + (s ?? "") + "”";
         return Kind switch
@@ -58,6 +100,7 @@ public sealed class Rule
             RuleKind.RemoveWords => "Remove words: " + Value.Replace("\r", "").Replace("\n", ", "),
             RuleKind.Preset => Presets.Find(Value)?.Name ?? ("Unknown preset " + q(Value)),
             RuleKind.Regex => "Regex " + q(Value),
+            RuleKind.RemoveBlock => string.IsNullOrEmpty(With) ? "Remove " + BlockName() : "Replace " + BlockName() + " with " + q(With),
             _ => Kind.ToString(),
         };
     }
@@ -76,6 +119,9 @@ public sealed class RuleSet
     public string? Group { get; set; }
 
     public string? Description { get; set; }
+
+    /// <summary>Reusable blocks defined by this file, referred to by rules as "my:&lt;id&gt;". Null when there are none.</summary>
+    public List<BlockDef>? Blocks { get; set; }
 
     /// <summary>Rules, applied from first to last.</summary>
     public List<Rule> Rules { get; set; } = new();
