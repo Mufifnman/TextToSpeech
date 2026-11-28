@@ -2,6 +2,7 @@ using System.Configuration;
 using System.Data;
 using System.Windows;
 using System.Windows.Interop;
+using TextToSpeech.Core.Diagnostics;
 using TextToSpeech.Core.Shell;
 using TextToSpeech.Shell;
 
@@ -22,6 +23,14 @@ namespace TextToSpeech
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Record crashes and stray errors in the log (they do not change how the app reacts to them).
+            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+                AppLog.Error("Unhandled exception" + (args.IsTerminating ? " (app is closing)" : ""), args.ExceptionObject as Exception);
+            DispatcherUnhandledException += (_, args) => AppLog.Error("Unhandled UI exception", args.Exception);
+            TaskScheduler.UnobservedTaskException += (_, args) => AppLog.Warn("Unobserved task exception", args.Exception);
+            AppLog.Info("Started, version " + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "?")
+                        + (e.Args.Length > 0 ? ", args: " + string.Join(' ', e.Args) : ""));
+
             instance = SingleInstance.TryAcquire();
             if (instance == null)
             {
@@ -69,6 +78,7 @@ namespace TextToSpeech
 
         protected override void OnExit(ExitEventArgs e)
         {
+            AppLog.Info("Exited");
             instance?.Dispose();
             base.OnExit(e);
         }
