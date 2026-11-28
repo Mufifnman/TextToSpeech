@@ -13,8 +13,10 @@ namespace TextToSpeech.Speech
         private readonly PcmPlayer player = new();
         private readonly object modelGate = new();
 
-        // Audio for the next sentences, generated while the current one plays.
-        private readonly LookAheadCache<(float[] Samples, int SampleRate)> lookAhead = new(maxEntries: 4);
+        // Audio for the next sentences, generated one at a time in reading order while the current one plays.
+        // At most about 12 seconds of finished audio waits (memory and CPU stay bounded).
+        private readonly SynthesisQueue<(float[] Samples, int SampleRate)> lookAhead =
+            new(budgetSeconds: 12, measureSeconds: a => a.SampleRate > 0 ? a.Samples.Length / (double)a.SampleRate : 0);
         private readonly object upcomingGate = new();
         private IReadOnlyList<string> upcomingTexts = Array.Empty<string>();
         private VoiceInfo? upcomingVoice;
@@ -67,21 +69,22 @@ namespace TextToSpeech.Speech
             string key = CacheKey(dir, sid, speed, text);
             float[] samples;
             int sampleRate;
+            var waited = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                // Often already finished: the previous sentence's playback generated this one.
-                (samples, sampleRate) = await lookAhead.GetOrStart(key, () => Synthesize(dir, sid, text, speed)).WaitAsync(cancellationToken);
+                // Often already finished (or running): the queue shares the job and puts it first.
+                (samples, sampleRate) = await lookAhead.Demand(key, () => Synthesize(dir, sid, text, speed)).WaitAsync(cancellationToken);
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
-                lookAhead.Remove(key);   // do not keep a failed attempt
+                lookAhead.Take(key);   // do not keep a failed attempt
                 throw;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            lookAhead.Remove(key);       // used up
+            System.Diagnostics.Debug.WriteLine($"[prewarm] waited {waited.ElapsedMilliseconds} ms for {samples.Length / (double)Math.Max(1, sampleRate):F1} s of audio; {lookAhead.Stats}");
+            lookAhead.Take(key);       // used up; frees room for the next sentence
+            lookAhead.SetWanted(2, Array.Empty<(string, Func<(float[], int)>)>());   // a guess for this spot, if any, is no longer needed
             if (samples.Length == 0) return;
-
-            StartLookAhead();            // generate the next sentences while this one plays
 
             var words = WordTimingEstimator.Estimate(text, samples.Length / (double)sampleRate);
             await player.PlayAsync(samples, sampleRate, words, onWord, cancellationToken);
@@ -89,47 +92,37 @@ namespace TextToSpeech.Speech
 
         private static string CacheKey(string dir, int sid, float speed, string text) => $"{dir}|{sid}|{speed:F3}|{text}";
 
+        /// <summary>Queues the next sentences right away (they run after the sentence being spoken, in order).</summary>
         public void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate)
         {
-            lock (upcomingGate)
-            {
-                upcomingTexts = texts;
-                upcomingVoice = voice;
-                upcomingRate = rate;
-            }
-        }
-
-        public void ClearUpcoming()
-        {
-            lock (upcomingGate)
-            {
-                upcomingTexts = Array.Empty<string>();
-            }
-            lookAhead.Clear();
-        }
-
-        /// <summary>Starts generating the sentences handed to <see cref="SetUpcoming"/>. Called once the current sentence's audio exists, so it never competes with it.</summary>
-        private void StartLookAhead()
-        {
-            IReadOnlyList<string> texts;
-            VoiceInfo? voice;
-            int rate;
-            lock (upcomingGate)
-            {
-                texts = upcomingTexts;
-                voice = upcomingVoice;
-                rate = upcomingRate;
-            }
             if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
-
             float speed = RateToSpeed(rate);
-            foreach (string next in texts)
-            {
-                if (string.IsNullOrWhiteSpace(next)) continue;
-                string text = next;
-                lookAhead.GetOrStart(CacheKey(dir, sid, speed, text), () => Synthesize(dir, sid, text, speed));
-            }
+            lookAhead.SetWanted(1, Wanted(texts, dir, sid, speed));
         }
+
+        /// <summary>
+        /// A guess: the rest of the sentence after a pause is probably what is read next, so make it while idle.
+        /// Costs one sentence of CPU, once, and is dropped as soon as something else is read.
+        /// </summary>
+        public void PrepareResume(string text, VoiceInfo? voice, int rate)
+        {
+            if (voice == null || !TryParseId(voice.Id, out string dir, out int sid)) return;
+            float speed = RateToSpeed(rate);
+            lookAhead.SetWanted(2, Wanted(new[] { text }, dir, sid, speed));
+        }
+
+        private (string Key, Func<(float[], int)> Work)[] Wanted(IReadOnlyList<string> texts, string dir, int sid, float speed) =>
+            texts.Where(t => !string.IsNullOrWhiteSpace(t))
+                 .Distinct()
+                 .Select(t => (CacheKey(dir, sid, speed, t), (Func<(float[], int)>)(() => Synthesize(dir, sid, t, speed))))
+                 .ToArray();
+
+        public void ClearUpcoming() => lookAhead.Clear();
+
+        /// <summary>Hits and misses of look-ahead since start (or <see cref="ResetLookAheadStats"/>).</summary>
+        public SynthesisStats LookAheadStats => lookAhead.Stats;
+
+        public void ResetLookAheadStats() => lookAhead.ResetStats();
 
         /// <summary>Loads the model and runs a tiny synthesis in the background so the first real sentence is not slowed by loading.</summary>
         public void Prewarm(VoiceInfo? voice)

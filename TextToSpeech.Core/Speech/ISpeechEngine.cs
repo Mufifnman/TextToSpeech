@@ -52,6 +52,12 @@ namespace TextToSpeech.Speech
         /// </summary>
         void SetUpcoming(IReadOnlyList<string> texts, VoiceInfo? voice, int rate);
 
+        /// <summary>
+        /// A guess about what will be read next (the rest of a sentence after a pause). Engines that generate audio
+        /// may prepare it while idle and drop it when something else is read. No-op by default.
+        /// </summary>
+        void PrepareResume(string text, VoiceInfo? voice, int rate) { }
+
         /// <summary>Forget prepared audio (the reading list was cleared).</summary>
         void ClearUpcoming();
 

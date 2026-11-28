@@ -19,6 +19,8 @@ namespace TextToSpeech.Core.Tests
         public Exception? FailNext { get; set; }
         public IReadOnlyList<string> LastUpcoming { get; private set; } = Array.Empty<string>();
         public int ClearUpcomingCalls { get; private set; }
+        public List<string> ResumeGuesses { get; } = new();
+        public void PrepareResume(string text, VoiceInfo? voice, int rate) => ResumeGuesses.Add(text);
 
         public string Name => "Fake";
         public IReadOnlyList<VoiceInfo> GetVoices() => Array.Empty<VoiceInfo>();
@@ -138,6 +140,27 @@ namespace TextToSpeech.Core.Tests
             rig.Controller.TogglePlayPause();
             Assert.Equal("three four.", rig.Engine.Calls[1].Text);   // continues from that word
             Assert.True(rig.Controller.IsPlaying);
+        }
+
+        [Fact]
+        public void Pause_TellsTheEngineWhatWillProbablyBeReadNext_SoItCanPrepareIt()
+        {
+            var rig = new Rig("One two three four.");
+            rig.Controller.Play();
+            rig.Engine.Calls[0].OnWord!(new WordBoundary(8, 5));   // engine reached "three"
+
+            rig.Controller.Pause();
+
+            Assert.Equal(new[] { "three four." }, rig.Engine.ResumeGuesses);
+        }
+
+        [Fact]
+        public void TheEngineIsToldAboutSeveralUpcomingSentences()
+        {
+            var rig = new Rig("One. Two. Three. Four. Five. Six. Seven. Eight.");
+            rig.Controller.Play();
+
+            Assert.Equal(ReadingController.UpcomingSentences, rig.Engine.LastUpcoming.Count);
         }
 
         [Fact]

@@ -45,6 +45,9 @@ namespace TextToSpeech.Core.Reading
             this.delay = delay ?? Task.Delay;
         }
 
+        /// <summary>How many following sentences the engine is told about (it decides how many it prepares, by seconds of audio).</summary>
+        public const int UpcomingSentences = 6;
+
         public ReadingDocument Document => document;
 
         /// <summary>The voice used for the next sentence. Changing it takes effect from the next sentence.</summary>
@@ -99,6 +102,13 @@ namespace TextToSpeech.Core.Reading
             CancelSpeech();
             document.MarkStoppedAtSpokenWord();
             StateChanged?.Invoke();
+
+            // Guess that reading resumes from here: let the engine make that audio while idle.
+            string? rest = document.GetTextToSpeak(out _);
+            if (rest != null)
+            {
+                engineFor(Voice).PrepareResume(rest, Voice, Rate);
+            }
         }
 
         /// <summary>Pauses while playing, otherwise resumes from the saved position (if anything is left).</summary>
@@ -198,7 +208,7 @@ namespace TextToSpeech.Core.Reading
             SentenceStarting?.Invoke();
 
             // Tell the engine what comes next so it can prepare it while this sentence plays.
-            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(2), Voice, Rate);
+            engineFor(Voice).SetUpcoming(document.PeekUpcomingTexts(UpcomingSentences), Voice, Rate);
 
             int myGeneration = ++generation;
             var cts = new CancellationTokenSource();
