@@ -7,6 +7,14 @@ import { api, agentFromContext } from '../tts-client.mjs';
 
 try {
   const input = JSON.parse(readFileSync(0, 'utf8') || '{}');
-  await api.promptAgent(agentFromContext({ cwd: input.cwd ?? process.cwd() }));
+  const agent = agentFromContext({ cwd: input.cwd ?? process.cwd() });
+  await api.promptAgent(agent);
+  // Voice answers nobody collected (the turn had ended before the user answered): hand them over with this prompt.
+  const { replies } = await api.takeReplies({ source: agent.label, waitSeconds: 0 });
+  if (replies?.length) {
+    const lines = replies.map((r) => `- ${r.question ? `Question "${r.question}": ` : ''}${r.text}`);
+    console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit',
+      additionalContext: `The user also answered by voice (Text to Speech reply box, transcribed):\n${lines.join('\n')}` } }));
+  }
 } catch { /* ignore */ }
 process.exitCode = 0;

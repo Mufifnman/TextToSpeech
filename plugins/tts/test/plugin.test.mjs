@@ -134,7 +134,7 @@ test('prompt hook tells the app which window the user typed in', async () => {
   await withServer(async (url, seen, urls) => {
     const code = await runScript('hooks/focus.mjs', E(url), JSON.stringify({ cwd: '/work/proj' }));
     assert.equal(code, 0);
-    assert.deepEqual(urls, ['POST /v1/agents/prompt']);
+    assert.deepEqual(urls, ['POST /v1/agents/prompt', 'POST /v1/replies/take']);
     assert.equal(seen[0].label, 'proj');
   });
   const code = await runScript('hooks/focus.mjs', E('http://127.0.0.1:1'), '{}');
@@ -179,6 +179,7 @@ test('hook passes the questions and shows the popup when the reply has them', as
       JSON.stringify({ last_assistant_message: 'Parser fixed.\n\n```tts-questions\nWhich branch?\nAdd tests?\n```' }));
     assert.equal(seen[0].text, 'Parser fixed.');
     assert.deepEqual(seen[0].questions, ['Which branch?', 'Add tests?']);
+    assert.equal(seen[0].expectsReply, true);
     assert.equal(seen[0].popup, undefined);
   });
 });
@@ -198,5 +199,61 @@ test('cli say passes repeated --question and next/answered call the right routes
       });
     }
     assert.deepEqual(urls.slice(1), ['POST /v1/next', 'POST /v1/pauses/q1/answered']);
+  });
+});
+
+// ---- voice replies ----
+
+async function withReplyServer(fn) {
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    let b = ''; req.on('data', (c) => (b += c));
+    req.on('end', () => {
+      seen.push({ method: req.method, url: req.url, body: JSON.parse(b || '{}') });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(req.url === '/v1/replies/take'
+        ? { replies: [{ seq: 1, pauseId: 'q1', question: 'Which branch?', text: 'use master' }] } : {}));
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try { await fn(`http://127.0.0.1:${server.address().port}`, seen); } finally { server.close(); }
+}
+
+test('the prompt hook hands over voice answers nobody collected', async () => {
+  await withReplyServer(async (url, seen) => {
+    const out = await new Promise((resolve) => {
+      let text = '';
+      const p = spawn(process.execPath, [join(root, 'hooks/focus.mjs')], { env: { ...process.env, ...E(url) } });
+      p.stdout.on('data', (c) => (text += c));
+      p.on('close', () => resolve(text));
+      p.stdin.end(JSON.stringify({ cwd: '/work/my-project' }));
+    });
+    const take = seen.find((c) => c.url === '/v1/replies/take');
+    assert.equal(take.body.source, 'my-project');
+    assert.equal(take.body.waitSeconds, 0);
+    const context = JSON.parse(out).hookSpecificOutput.additionalContext;
+    assert.match(context, /Which branch\?.*use master/);
+  });
+});
+
+test('the MCP wait_for_reply tool waits for this window\'s answers', async () => {
+  const { handle } = await import('../mcp/tts-mcp.mjs');
+  await withReplyServer(async (url, seen) => {
+    Object.assign(process.env, E(url));
+    const res = await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'wait_for_reply', arguments: { timeoutSeconds: 5 } } });
+    const take = seen.find((c) => c.url === '/v1/replies/take');
+    assert.equal(take.body.waitSeconds, 5);
+    assert.ok(take.body.source);
+    assert.match(res.result.content[0].text, /use master/);
+  });
+});
+
+test('cli reply posts the answer', async () => {
+  await withReplyServer(async (url, seen) => {
+    await new Promise((resolve) => {
+      const p = spawn(process.execPath, [join(root, 'cli/tts.mjs'), 'reply', 'use', 'master'], { env: { ...process.env, ...E(url) } });
+      p.on('close', resolve);
+    });
+    assert.deepEqual(seen[0], { method: 'POST', url: '/v1/replies', body: { text: 'use master' } });
   });
 });

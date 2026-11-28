@@ -6,7 +6,7 @@ namespace TextToSpeech.Api.Arbitration
     /// and take turns through <see cref="ReadArbiter"/>. Call on the UI thread.
     /// </summary>
     /// <summary>What travels with waiting text through the arbiter: the pause points of the request.</summary>
-    internal sealed record SpeakExtras(IReadOnlyList<PauseRequest>? Pauses, IReadOnlyList<string>? Questions, bool? PlayAll);
+    internal sealed record SpeakExtras(IReadOnlyList<PauseRequest>? Pauses, IReadOnlyList<string>? Questions, bool? PlayAll, bool? ExpectsReply = null);
 
     public sealed class ArbitratedHost : IReadingHost, IArbiterHost
     {
@@ -47,7 +47,8 @@ namespace TextToSpeech.Api.Arbitration
             }
             var extras = extra as SpeakExtras;
             lastSpoken = inner.SpeakAsync(new SpeakRequest(text, agent.Label, mode, null, null, null, null, null,
-                Pauses: extras?.Pauses, Questions: extras?.Questions, PlayAll: extras?.PlayAll)).GetAwaiter().GetResult();
+                Pauses: extras?.Pauses, Questions: extras?.Questions, PlayAll: extras?.PlayAll,
+                ExpectsReply: extras?.ExpectsReply)).GetAwaiter().GetResult();
             if (frontedFor != agent.Id)
             {
                 frontedFor = agent.Id;
@@ -167,8 +168,8 @@ namespace TextToSpeech.Api.Arbitration
                 return Task.FromResult(new SpeakResponse("", 0, "idle", 0, true, "denied", string.Join(" ", decision.Reasons)));
             }
             lastSpoken = null;
-            var extras = request.Pauses != null || request.Questions != null || request.PlayAll != null
-                ? new SpeakExtras(request.Pauses, request.Questions, request.PlayAll)
+            var extras = request.Pauses != null || request.Questions != null || request.PlayAll != null || request.ExpectsReply != null
+                ? new SpeakExtras(request.Pauses, request.Questions, request.PlayAll, request.ExpectsReply)
                 : null;
             var result = arbiter.Submit(request.Agent, request.Text!, request.Mode ?? "queue", policy().MaxPendingPerAgent, extras);
             switch (result.Outcome)
@@ -198,6 +199,9 @@ namespace TextToSpeech.Api.Arbitration
 
         public Task<StatusDto> JumpAsync(JumpRequest request) => inner.JumpAsync(request);
         public Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId) => inner.AnsweredAsync(pauseId, sessionId);
+        public Task<ReplyDto> SubmitReplyAsync(ReplyRequest request) => inner.SubmitReplyAsync(request);
+        public Task<RepliesResponse> GetRepliesAsync() => inner.GetRepliesAsync();
+        public Task<RepliesResponse> TakeRepliesAsync(TakeRepliesRequest request) => inner.TakeRepliesAsync(request);
         public Task<IReadOnlyList<VoiceDto>> GetVoicesAsync() => inner.GetVoicesAsync();
         public Task<StatusDto> SetVoiceAsync(string voiceId) => inner.SetVoiceAsync(voiceId);
         public Task<StatusDto> SetRateAsync(int rate) => inner.SetRateAsync(rate);

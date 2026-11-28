@@ -29,5 +29,17 @@ namespace TextToSpeech.Api
         /// <summary>Marks a pause point answered; when reading is waiting at it, carries on.</summary>
         Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId) =>
             throw ApiException.NotFound("Pause points are not supported here.", "unsupported");
+
+        /// <summary>The user's answer to the question reading is waiting at (or a named one); hands it to the caller and continues reading.</summary>
+        Task<ReplyDto> SubmitReplyAsync(ReplyRequest request) =>
+            throw ApiException.NotFound("Replies are not supported here.", "unsupported");
+
+        /// <summary>Replies nobody has taken yet, without removing them.</summary>
+        Task<RepliesResponse> GetRepliesAsync() =>
+            throw ApiException.NotFound("Replies are not supported here.", "unsupported");
+
+        /// <summary>Returns the matching replies and removes them (a caller gets each reply once).</summary>
+        Task<RepliesResponse> TakeRepliesAsync(TakeRepliesRequest request) =>
+            throw ApiException.NotFound("Replies are not supported here.", "unsupported");
     }
 }

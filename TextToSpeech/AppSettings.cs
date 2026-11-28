@@ -63,6 +63,12 @@ namespace TextToSpeech
         /// <summary>Read through question pauses without stopping, from the start. Off: reading stops after each marked question until you continue.</summary>
         public bool PlayAllByDefault { get; set; } = false;
 
+        /// <summary>Send a voice reply 2 seconds after the text stops changing. Off: press Enter or Send.</summary>
+        public bool AutoSendReply { get; set; } = false;
+
+        /// <summary>Full path of Handy.exe, used to start and stop its recording for voice replies. Empty: look in the usual places.</summary>
+        public string HandyPath { get; set; } = "";
+
         /// <summary>Font size of the reading text in the main window, 10 to 40.</summary>
         public double MainTextSize { get; set; } = 14;
 

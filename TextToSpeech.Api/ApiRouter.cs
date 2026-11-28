@@ -105,6 +105,18 @@ namespace TextToSpeech.Api
                     Expect(method, "POST");
                     return Ok(await host.AnsweredAsync(parts[2], BodyOrDefault(request, new AnsweredRequest(null)).SessionId));
 
+                case "replies" when parts.Length == 2:
+                    if (method == "GET")
+                    {
+                        return Ok(await host.GetRepliesAsync());
+                    }
+                    Expect(method, "POST");
+                    return Accepted(await host.SubmitReplyAsync(ValidateReply(Body<ReplyRequest>(request))));
+
+                case "replies" when parts.Length == 3 && parts[2] == "take":
+                    Expect(method, "POST");
+                    return Ok(await host.TakeRepliesAsync(ValidateTakeReplies(Body<TakeRepliesRequest>(request))));
+
                 case "sessions" when parts.Length == 3:
                     if (method == "GET")
                     {
@@ -236,11 +248,44 @@ namespace TextToSpeech.Api
                     throw ApiException.BadRequest("At most 50 questions of at most 1000 characters each.", "bad_questions");
                 }
             }
+            if (r.ExpectsReply == true && (r.Questions?.Count ?? 0) == 0 && (r.Pauses?.Count ?? 0) == 0)
+            {
+                throw ApiException.BadRequest("expectsReply needs questions or pauses: the reply answers one of them.", "reply_needs_pause");
+            }
             if (r.Voice != null || r.Rate.HasValue || r.Volume.HasValue)
             {
                 throw ApiException.BadRequest("Per-request voice, rate and volume are not supported yet. Use PUT /v1/voice, /v1/rate and /v1/volume.", "unsupported_override");
             }
             return r with { Mode = mode, Agent = r.Agent == null ? null : ValidateAgent(r.Agent) };
+        }
+
+        public const int MaxReplyChars = 10_000;
+        public const int MaxWaitSeconds = 120;
+
+        private static ReplyRequest ValidateReply(ReplyRequest r)
+        {
+            if (string.IsNullOrWhiteSpace(r.Text) || r.Text.Length > MaxReplyChars)
+            {
+                throw ApiException.BadRequest($"text is required (at most {MaxReplyChars} characters).");
+            }
+            if ((r.SessionId != null || r.PauseId != null) && string.IsNullOrWhiteSpace(r.PauseId))
+            {
+                throw ApiException.BadRequest("pauseId is required when sessionId is given.");
+            }
+            return r;
+        }
+
+        private static TakeRepliesRequest ValidateTakeReplies(TakeRepliesRequest r)
+        {
+            if (string.IsNullOrWhiteSpace(r.Source) && string.IsNullOrWhiteSpace(r.SessionId))
+            {
+                throw ApiException.BadRequest("source or sessionId is required: taking replies removes them, so say whose.", "reply_filter_required");
+            }
+            if (r.WaitSeconds.HasValue && (r.WaitSeconds.Value < 0 || r.WaitSeconds.Value > MaxWaitSeconds))
+            {
+                throw ApiException.BadRequest($"waitSeconds must be between 0 and {MaxWaitSeconds}.");
+            }
+            return r;
         }
 
         private static JumpRequest ValidateJump(JumpRequest r)

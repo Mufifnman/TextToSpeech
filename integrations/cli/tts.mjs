@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // tts: command line for the Text to Speech local API.   node tts.mjs <command> [options]
 import { readFileSync } from 'node:fs';
-import { api, TtsError } from '../tts-client.mjs';
+import { api, agentFromContext, TtsError } from '../tts-client.mjs';
 
 const USAGE = `Usage: tts <command> [options]
 
@@ -13,6 +13,9 @@ const USAGE = `Usage: tts <command> [options]
                         --question <text>                a question to wait on after the text (repeat for several);
                                                          reading stops after each until you press play or run "next"
                         --play-all                       read through the questions without stopping
+                        --expects-reply                  ask for the user's spoken answer to each question (see "replies")
+  reply <text>        Give an answer to the question reading is waiting at (what the app's reply box does).
+  replies [--source <label>] [--wait <seconds>]   Take the answers for a source (default: this folder's name) that nobody has taken yet (waits up to 120 s).
   next                Continue after a question the app is waiting at (marks it answered).
   answered <id> [--session <id>]   Mark a question answered (q1, q2, ...); continues if reading waits at it.
   pause | resume | toggle | skip | back | stop | clear
@@ -32,7 +35,7 @@ function parse(argv) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const name = a.slice(2);
-      if (['quiet', 'filters', 'no-resume', 'play-all'].includes(name)) flags[name] = true;
+      if (['quiet', 'filters', 'no-resume', 'play-all', 'expects-reply'].includes(name)) flags[name] = true;
       else if (name === 'question') (flags.question ??= []).push(argv[++i]);
       else flags[name] = argv[++i];
     } else positional.push(a);
@@ -55,11 +58,18 @@ export async function run(argv, { stdin = () => readFileSync(0, 'utf8'), out = c
         text, source: flags.source ?? 'cli', mode: flags.mode,
         applyFilters: flags.filters ? true : undefined, popup: flags.quiet ? false : undefined,
         questions: flags.question, playAll: flags['play-all'] ? true : undefined,
+        expectsReply: flags['expects-reply'] ? true : undefined,
       }));
     }
     case 'pause': case 'resume': case 'toggle': case 'skip': case 'back': case 'stop': case 'clear':
       return print(await api.control(command));
     case 'next': return print(await api.next());
+    case 'reply': {
+      const text = positional.slice(1).join(' ');
+      if (!text.trim()) throw new TtsError('reply needs the answer text.', { code: 'usage' });
+      return print(await api.reply(text));
+    }
+    case 'replies': return print(await api.takeReplies({ source: flags.source ?? agentFromContext().label, waitSeconds: num(flags.wait) }));
     case 'answered':
       if (!arg) throw new TtsError('answered needs a pause id such as q1.', { code: 'usage' });
       return print(await api.answered(arg, flags.session));

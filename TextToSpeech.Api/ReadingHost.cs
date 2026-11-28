@@ -24,6 +24,13 @@ namespace TextToSpeech.Api
         // Taken while the reader was on this session's text and playing: Release should carry on reading it.
         private readonly HashSet<string> resumeOnRelease = new();
 
+        // Sessions whose caller asked for the answers (expectsReply), and the answers nobody has taken yet.
+        private const int MaxReplies = 50;
+        private static readonly TimeSpan ReplyLifetime = TimeSpan.FromHours(4);
+        private readonly HashSet<string> replyExpecting = new();
+        private readonly List<ReplyDto> replies = new();
+        private long replySeq;
+
         public ReadingHost(ReadingController reading, IAppControl app, SessionStore? store = null)
         {
             this.reading = reading;
@@ -56,6 +63,7 @@ namespace TextToSpeech.Api
             {
                 store.Remove(s.Id);
             }
+            replyExpecting.Clear();
         }
 
         /// <summary>Call every few seconds (and it runs before each API call): restores text whose lease ran out.</summary>
@@ -69,6 +77,7 @@ namespace TextToSpeech.Api
                 Raise("handoff-expired", expired.Session.Id, expired.Reason);
             }
             store.Prune(id => doc.OwnerSentenceCount(id) > 0);
+            replyExpecting.RemoveWhere(id => doc.OwnerSentenceCount(id) == 0);
         }
 
         /// <summary>Sources (client names) of sessions whose remainder is currently taken.</summary>
@@ -90,8 +99,23 @@ namespace TextToSpeech.Api
         {
             VoiceDto? voice = reading.Voice is { } v ? new VoiceDto(v.Id, v.DisplayName, v.EngineName, v.IsNeural) : null;
             return new StatusDto(State(), voice, app.Rate, app.Volume, ActiveSession(), QueuedSessions(), app.Window, ApiRouter.ApiVersion,
-                PausedAtStatus(), PauseList(), reading.PlayAll);
+                PausedAtStatus(), PauseList(), reading.PlayAll, ReplyWaitingStatus());
         }
+
+        /// <summary>Set while reading waits at a question whose caller asked for the answer: the app can offer a reply box.</summary>
+        private ReplyWaitingDto? ReplyWaitingStatus()
+        {
+            var at = reading.PausedAt;
+            if (at?.Owner == null || !replyExpecting.Contains(at.Owner))
+            {
+                return null;
+            }
+            var all = doc.Pauses(at.Owner, pendingOnly: false);
+            int index = all.ToList().FindIndex(x => x.Sentence.Pause?.Id == at.Point.Id && x.Sentence.Owner == at.Owner);
+            return new ReplyWaitingDto(at.Owner, SourceOf(at.Owner), at.Point.Id, at.Point.Label, Math.Max(index, 0) + 1, all.Count);
+        }
+
+        private string SourceOf(string sessionId) => store.Sessions.FirstOrDefault(x => x.Id == sessionId)?.Source ?? "api";
 
         private PausedAtDto? PausedAtStatus()
         {
@@ -224,6 +248,10 @@ namespace TextToSpeech.Api
                 text = withQuestions.Text;
                 specs.AddRange(withQuestions.Pauses);
             }
+            if (request.ExpectsReply == true && specs.Count == 0)
+            {
+                throw ApiException.BadRequest("expectsReply needs questions or pauses: the reply answers one of them.", "reply_needs_pause");
+            }
             var session = store.Create(request.Source ?? "api", text);
 
             bool wasPlaying = reading.IsPlaying;
@@ -250,6 +278,10 @@ namespace TextToSpeech.Api
                 throw ApiException.BadRequest("There is no speakable text in the request.", "no_speakable_text");
             }
             store.SyncText(session.Id, doc.OwnerText(session.Id), 0);
+            if (request.ExpectsReply == true)
+            {
+                replyExpecting.Add(session.Id);
+            }
             if (specs.Count > 0)
             {
                 // Each new set of questions starts with pausing on (unless the request or the setting says play all).
@@ -346,6 +378,92 @@ namespace TextToSpeech.Api
                 }
             }
             throw ApiException.NotFound($"No unanswered pause point '{pauseId}'.", "no_such_pause");
+        }
+
+        // ---------- replies ----------
+
+        public Task<ReplyDto> SubmitReplyAsync(ReplyRequest request)
+        {
+            Tick();
+            string text = request.Text?.Trim() ?? "";
+            if (text.Length == 0)
+            {
+                throw ApiException.BadRequest("text is required.");
+            }
+
+            string owner;
+            PausePoint point;
+            if (!string.IsNullOrEmpty(request.PauseId))
+            {
+                var matches = new List<Sentence>();
+                foreach (var (_, sentence) in doc.Pauses(request.SessionId, pendingOnly: true))
+                {
+                    if (sentence.Pause!.Id == request.PauseId && sentence.Owner != null && replyExpecting.Contains(sentence.Owner))
+                    {
+                        matches.Add(sentence);
+                    }
+                }
+                if (matches.Count == 0)
+                {
+                    throw ApiException.NotFound($"No unanswered question '{request.PauseId}' whose caller expects a reply.", "no_such_pause");
+                }
+                if (matches.Select(m => m.Owner).Distinct().Count() > 1)
+                {
+                    throw ApiException.Conflict("ambiguous_pause", $"Several sessions have an unanswered '{request.PauseId}'; give sessionId.");
+                }
+                owner = matches[0].Owner!;
+                point = matches[0].Pause!;
+            }
+            else
+            {
+                var at = reading.PausedAt;
+                if (at?.Owner == null || !replyExpecting.Contains(at.Owner))
+                {
+                    throw ApiException.Conflict("no_reply_expected", "No caller is waiting for a reply right now.");
+                }
+                owner = at.Owner;
+                point = at.Point;
+            }
+
+            var reply = new ReplyDto(++replySeq, owner, SourceOf(owner), point.Id, point.Label, text, DateTimeOffset.UtcNow);
+            replies.Add(reply);
+            if (replies.Count > MaxReplies)
+            {
+                replies.RemoveAt(0);
+            }
+            reading.MarkAnswered(point);   // the answer is given: reading carries on with the next question
+            Raise("reply", owner, point.Id);
+            Raise("pause-answered", owner, point.Id);
+            return Task.FromResult(reply);
+        }
+
+        private void DropOldReplies() => replies.RemoveAll(r => DateTimeOffset.UtcNow - r.At > ReplyLifetime);
+
+        private bool Matches(ReplyDto r, string? source, string? sessionId) =>
+            (source == null || r.Source == source) && (sessionId == null || r.SessionId == sessionId);
+
+        /// <summary>True when a reply for this source or session is waiting to be taken (does not remove it).</summary>
+        public bool HasReplies(string? source, string? sessionId)
+        {
+            DropOldReplies();
+            return replies.Any(r => Matches(r, source, sessionId));
+        }
+
+        public Task<RepliesResponse> GetRepliesAsync()
+        {
+            DropOldReplies();
+            return Task.FromResult(new RepliesResponse(replies.ToList()));
+        }
+
+        public Task<RepliesResponse> TakeRepliesAsync(TakeRepliesRequest request)
+        {
+            DropOldReplies();
+            var taken = replies.Where(r => Matches(r, request.Source, request.SessionId)).ToList();
+            foreach (var r in taken)
+            {
+                replies.Remove(r);
+            }
+            return Task.FromResult(new RepliesResponse(taken));
         }
 
         // ---------- voice, speed, volume ----------

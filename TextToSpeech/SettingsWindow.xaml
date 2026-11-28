@@ -100,6 +100,8 @@
                   ToolTip="Applies to text from the API and plugin, and to pasted text that has headings, lists or code blocks."/>
         <CheckBox x:Name="playAllBox" Content="Read through questions without stopping (play all by default)" Margin="0,0,0,10"
                   ToolTip="Off: reading stops after each question that a program marked, until you press play. The Play all button in the window and popup switches it for the current text."/>
+        <CheckBox x:Name="autoSendReplyBox" Content="Send voice replies automatically (2 seconds after the words stop arriving)" Margin="0,0,0,10"
+                  ToolTip="Voice reply (Ctrl+Alt+V by default) opens a reply box and starts Handy. Off: press Enter or Send to hand the reply to the program that asked."/>
         <TextBlock Text="Text size in the window" FontWeight="SemiBold"/>
         <DockPanel Margin="0,6,0,14">
             <TextBlock x:Name="mainTextSizeText" DockPanel.Dock="Right" Width="44" TextAlignment="Right" VerticalAlignment="Center"/>

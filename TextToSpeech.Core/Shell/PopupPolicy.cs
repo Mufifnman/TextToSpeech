@@ -51,6 +51,9 @@ namespace TextToSpeech.Core.Shell
         /// <summary>The popup is being resized (or just was): keep it up until the wait after the resize is over.</summary>
         public bool KeepForResize { get; set; }
 
+        /// <summary>The reply box is open: the popup stays up, even when the popup is switched off or the full window is showing.</summary>
+        public bool KeepForReply { get; set; }
+
         /// <summary>An API client has taken the remainder and not returned it yet.</summary>
         public bool HandoffOpen { get; set; }
 
@@ -91,6 +94,10 @@ namespace TextToSpeech.Core.Shell
 
         public bool IsVisible(bool isPlaying, bool hasUnread)
         {
+            if (KeepForReply)
+            {
+                return true;
+            }
             if (KeepForSettings || KeepForResize)
             {
                 return Enabled;

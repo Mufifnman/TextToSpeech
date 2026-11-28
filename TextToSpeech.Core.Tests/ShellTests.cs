@@ -63,6 +63,18 @@ namespace TextToSpeech.Core.Tests
         }
 
         [Fact]
+        public void The_reply_box_keeps_the_popup_up_even_when_it_is_switched_off_or_the_window_is_up()
+        {
+            policy.Enabled = false;
+            policy.FullWindowShown = true;
+            Assert.False(policy.IsVisible(false, true));
+            policy.KeepForReply = true;
+            Assert.True(policy.IsVisible(false, true));
+            policy.KeepForReply = false;
+            Assert.False(policy.IsVisible(false, true));
+        }
+
+        [Fact]
         public void With_the_unfocused_setting_the_popup_shows_beside_an_open_window_that_is_not_in_focus()
         {
             policy.ReadingChanged(true, true);

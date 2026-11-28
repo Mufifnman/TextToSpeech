@@ -115,6 +115,10 @@ namespace TextToSpeech.Api
                     await WriteAsync(context.Response, denied);
                     return;
                 }
+                if (request.Method == "POST" && request.Path.TrimEnd('/') == "/v1/replies/take" && request.Body is { Length: <= ApiRouter.MaxBodyChars })
+                {
+                    await WaitForRepliesAsync(request);
+                }
                 var response = request.Body is { Length: > ApiRouter.MaxBodyChars }
                     ? ApiSecurity.Error(413, "too_large", "Request body is too large.")
                     : await runOnUi(() => router!.HandleAsync(request));
@@ -123,6 +127,55 @@ namespace TextToSpeech.Api
             catch (Exception)
             {
                 try { context.Response.Abort(); } catch (Exception) { /* connection already gone */ }
+            }
+        }
+
+        /// <summary>
+        /// Long poll for <c>POST /v1/replies/take</c> with <c>waitSeconds</c>: waits (without taking anything) until a reply
+        /// for the caller is there, the time is up or the app stops. The router then takes it once, so a reply is never
+        /// removed for a caller that has already gone.
+        /// </summary>
+        private async Task WaitForRepliesAsync(ApiRequest request)
+        {
+            string? source = null, sessionId = null;
+            int wait = 0;
+            try
+            {
+                using var body = JsonDocument.Parse(request.Body ?? "{}");
+                var root = body.RootElement;
+                if (root.TryGetProperty("waitSeconds", out var w) && w.TryGetInt32(out int seconds))
+                {
+                    wait = Math.Clamp(seconds, 0, ApiRouter.MaxWaitSeconds);
+                }
+                if (root.TryGetProperty("source", out var src) && src.ValueKind == JsonValueKind.String) source = src.GetString();
+                if (root.TryGetProperty("sessionId", out var sid) && sid.ValueKind == JsonValueKind.String) sessionId = sid.GetString();
+            }
+            catch (JsonException)
+            {
+                return;   // the router answers 400
+            }
+
+            var deadline = DateTime.UtcNow.AddSeconds(wait);
+            while (DateTime.UtcNow < deadline && !stopping.IsCancellationRequested)
+            {
+                bool has = false;
+                await runOnUi(() =>
+                {
+                    has = host.HasReplies(source, sessionId);
+                    return Task.FromResult(new ApiResponse(200, null));
+                });
+                if (has)
+                {
+                    return;
+                }
+                try
+                {
+                    await Task.Delay(500, stopping.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
         }
 

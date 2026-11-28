@@ -43,6 +43,13 @@ claude mcp add text-to-speech -- node C:/Git/TextToSpeech/integrations/mcp/tts-m
 Tools: `speak`, `pause`, `resume`, `skip`, `back`, `stop`, `clear`, `status`, `list_voices`, `set_voice`, `set_rate`,
 `set_volume`, `take_remainder`, `replace_remainder`, `release_remainder`, `peek_session`.
 
+## Voice replies
+
+Pass `expectsReply` with your questions (MCP `speak`, or `tts say --expects-reply --question "..."`) and the user can answer
+by voice: the hotkey (Ctrl+Alt+V) opens a reply box in the app popup and starts Handy; the words go to the app, not into
+another window. Receive them with the MCP tool `wait_for_reply`, or `tts replies --wait 60`. Answers that arrive after the
+turn ended are added to the user's next prompt by the plugin. See `docs/design/voice-replies.md`.
+
 ## Environment variables
 
 | Variable | Meaning |

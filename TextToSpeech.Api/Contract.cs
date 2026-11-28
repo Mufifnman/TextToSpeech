@@ -39,9 +39,11 @@ namespace TextToSpeech.Api
     /// <param name="Pauses">Places where reading stops and waits. The caller decides; the app never guesses what is a question.</param>
     /// <param name="Questions">Shorthand: the questions are added to the end of the text as a numbered list, each followed by a pause.</param>
     /// <param name="PlayAll">Read through the pauses of this text without stopping. Default: the app's "play all by default" setting.</param>
+    /// <param name="ExpectsReply">The caller wants the user's answer to each question or pause point handed back (see <c>POST /v1/replies/take</c>). Needs questions or pauses.</param>
     public sealed record SpeakRequest(string? Text, string? Source, string? Mode, bool? ApplyFilters, bool? Popup,
         string? Voice, int? Rate, int? Volume, TextToSpeech.Api.Arbitration.AgentRef? Agent = null,
-        IReadOnlyList<PauseRequest>? Pauses = null, IReadOnlyList<string>? Questions = null, bool? PlayAll = null);
+        IReadOnlyList<PauseRequest>? Pauses = null, IReadOnlyList<string>? Questions = null, bool? PlayAll = null,
+        bool? ExpectsReply = null);
 
     /// <param name="Id">Name used to mark it answered later. Default: m1, m2...</param>
     /// <param name="Label">The question, so status can say what reading is waiting on. Optional.</param>
@@ -50,6 +52,16 @@ namespace TextToSpeech.Api
 
     /// <param name="SessionId">Limits it to one session when two have a pause with the same id.</param>
     public sealed record AnsweredRequest(string? SessionId);
+
+    /// <param name="Text">What the user said or typed.</param>
+    /// <param name="SessionId">With <paramref name="PauseId"/>: answer a question that reading has not reached yet. Default: the question reading is waiting at.</param>
+    /// <param name="PauseId">The pause point (question) being answered, such as q1.</param>
+    public sealed record ReplyRequest(string? Text, string? SessionId, string? PauseId);
+
+    /// <param name="Source">Only replies to text with this source (the agent label). Default: any.</param>
+    /// <param name="SessionId">Only replies to this session. Default: any.</param>
+    /// <param name="WaitSeconds">Wait up to this long (0 to 120) for a reply when none is there yet. Default 0.</param>
+    public sealed record TakeRepliesRequest(string? Source, string? SessionId, int? WaitSeconds);
 
     public sealed record JumpRequest(string? SessionId, int Sentence, int Word);
     public sealed record VoiceRequest(string? Id);
@@ -86,7 +98,17 @@ namespace TextToSpeech.Api
     /// <param name="Pauses">Every pause point in the reading list, in reading order.</param>
     public sealed record StatusDto(string State, VoiceDto? Voice, int Rate, int Volume, SessionSummary? ActiveSession,
         IReadOnlyList<QueuedSession> Queued, WindowDto Window, int ApiVersion,
-        PausedAtDto? PausedAt = null, IReadOnlyList<PauseDto>? Pauses = null, bool PlayAll = false);
+        PausedAtDto? PausedAt = null, IReadOnlyList<PauseDto>? Pauses = null, bool PlayAll = false,
+        ReplyWaitingDto? ReplyWaiting = null);
+
+    /// <summary>A caller that asked for the answer (<c>expectsReply</c>) is waiting at this question.</summary>
+    public sealed record ReplyWaitingDto(string SessionId, string Source, string PauseId, string? Question, int Number, int Of);
+
+    /// <param name="Seq">Increases with every reply, starting at 1.</param>
+    /// <param name="Question">The label of the pause point that was answered.</param>
+    public sealed record ReplyDto(long Seq, string SessionId, string Source, string PauseId, string? Question, string Text, DateTimeOffset At);
+
+    public sealed record RepliesResponse(IReadOnlyList<ReplyDto> Replies);
 
     /// <param name="Number">Position among the session's pause points, starting at 1.</param>
     public sealed record PausedAtDto(string SessionId, string PauseId, string? Label, int Number, int Of);

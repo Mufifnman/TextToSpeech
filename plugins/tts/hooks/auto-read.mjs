@@ -38,6 +38,7 @@ async function main() {
   await api.speak({
     text, source: 'claude-code', mode: mode === 'reply' ? 'queue' : 'if-idle',
     popup: questions.length ? undefined : false, agent, questions: questions.length ? questions : undefined,
+    expectsReply: questions.length ? true : undefined,
   });
 }
 

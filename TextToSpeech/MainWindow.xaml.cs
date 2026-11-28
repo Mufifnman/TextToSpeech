@@ -278,7 +278,16 @@ namespace TextToSpeech
                 p.SetPlaying(playing);
                 p.SetPlayAll(HasPausePoints(), reading.PlayAll);
                 p.SetPreview(previewingPopup);
+                p.SetAutoSend(settings.AutoSendReply);
                 p.ShowPopup();
+                if (p.IsReplyOpen)
+                {
+                    // The question moved on, or was answered another way (Play, Clear): follow it, or close the box.
+                    // Between two questions reading is speaking and nothing waits: keep the box (and what was dictated) then.
+                    var waiting = api?.Host.Snapshot().ReplyWaiting;
+                    if (waiting != null) p.SetReplyPrompt(ReplyPrompt(waiting));
+                    else if (!playing) EndReply(p);
+                }
             }
             else
             {
@@ -290,6 +299,109 @@ namespace TextToSpeech
                 popupTimer.Interval = wait + TimeSpan.FromMilliseconds(50);
                 popupTimer.Start();
             }
+        }
+
+        // ---- voice replies: the reply box in the popup, and Handy's recording ----
+        private bool handyRecording;
+
+        private static string ReplyPrompt(ReplyWaitingDto waiting) =>
+            string.IsNullOrWhiteSpace(waiting.Question) ? "Reply to " + waiting.Source : "Reply to " + waiting.Source + ": " + waiting.Question;
+
+        /// <summary>
+        /// The reply hotkey. First press: opens the reply box for the question a program is waiting on and starts Handy.
+        /// Second press: stops Handy, which pastes what it heard into the box. Nothing is typed into any other window.
+        /// </summary>
+        private void ReplyHotkey()
+        {
+            if (popup is { IsReplyOpen: true })
+            {
+                if (ToggleHandy()) handyRecording = !handyRecording;
+                return;
+            }
+            var waiting = api?.Host.Snapshot().ReplyWaiting;
+            if (waiting == null)
+            {
+                statusText.Text = api == null || !api.IsRunning
+                    ? "Voice reply: the local API is off (Settings, Tray and background)."
+                    : "Nothing is waiting for a reply.";
+                return;
+            }
+            popupPolicy.KeepForReply = true;
+            var p = popup ??= CreatePopup();
+            p.ShowPopup();
+            p.OpenReply(ReplyPrompt(waiting));
+            handyRecording = ToggleHandy();
+            if (!handyRecording)
+            {
+                p.SetReplyPrompt(ReplyPrompt(waiting) + "  (start Handy yourself, or type)");
+            }
+        }
+
+        /// <summary>Sends the typed or dictated text to the caller that asked, and closes the box.</summary>
+        private void SendReply(string text)
+        {
+            try
+            {
+                api!.Host.SubmitReplyAsync(new ReplyRequest(text, null, null)).GetAwaiter().GetResult();
+            }
+            catch (ApiException ex)
+            {
+                popup?.SetReplyPrompt("Not sent: " + ex.Message);
+                statusText.Text = "Voice reply not sent: " + ex.Message;
+                if (ex.Code == "no_reply_expected" && popup != null) EndReply(popup);
+                return;
+            }
+            if (popup != null) EndReply(popup);
+        }
+
+        private void EndReply(ReadingPopupWindow p)
+        {
+            if (handyRecording)
+            {
+                RunHandy("--cancel");   // still recording: throw the recording away, so nothing is pasted into another window
+                handyRecording = false;
+            }
+            p.CloseReply();
+            popupPolicy.KeepForReply = false;
+            RefreshPopup();
+        }
+
+        /// <summary>Starts or stops Handy's recording with its own command line. False when Handy could not be found or started.</summary>
+        private bool ToggleHandy() => RunHandy("--toggle-transcription");
+
+        private bool RunHandy(string argument)
+        {
+            string? exe = FindHandy();
+            if (exe == null)
+            {
+                statusText.Text = "Handy.exe not found: press Handy's own key, or set HandyPath in the app settings file.";
+                return false;
+            }
+            try
+            {
+                using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, argument)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                statusText.Text = "Could not start Handy: " + ex.Message;
+                return false;
+            }
+        }
+
+        private string? FindHandy()
+        {
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(settings.HandyPath)) candidates.Add(settings.HandyPath);
+            string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            candidates.Add(System.IO.Path.Combine(local, "Handy", "handy.exe"));
+            candidates.Add(System.IO.Path.Combine(local, "Programs", "Handy", "handy.exe"));
+            candidates.Add(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Handy", "handy.exe"));
+            return candidates.FirstOrDefault(System.IO.File.Exists);
         }
 
         private readonly System.Windows.Threading.DispatcherTimer resizeHoldTimer = new() { Interval = TimeSpan.FromSeconds(3) };
@@ -317,7 +429,10 @@ namespace TextToSpeech
                 OpenFullWindow: ShowFullWindow,
                 Dismiss: () => { popupPolicy.Dismiss(); RefreshPopup(); },
                 TakeBack: () => { api?.Host.ReleaseAllHandoffs(); RefreshPopup(); },
-                TogglePlayAll: TogglePlayAll));
+                TogglePlayAll: TogglePlayAll,
+                SendReply: SendReply,
+                CancelReply: () => { if (popup != null) EndReply(popup); }));
+            p.SetAutoSend(settings.AutoSendReply);
             p.SetPanelOpacity(Math.Clamp(settings.PopupOpacity, 0.3, 1.0));
             p.SetTextSize(settings.PopupTextSize);
             p.SetMaxSize(settings.PopupMaxWidth, settings.PopupMaxHeight);
@@ -543,6 +658,8 @@ namespace TextToSpeech
                 failed.Add(hotkeySettings.GetPlayPause().ToString());
             if (!hotkeys.Register(hotkeySettings.GetClearAll(), () => ClearList()))
                 failed.Add(hotkeySettings.GetClearAll().ToString());
+            if (!hotkeys.Register(hotkeySettings.GetReplyByVoice(), ReplyHotkey))
+                failed.Add(hotkeySettings.GetReplyByVoice().ToString());
             if (failed.Count > 0)
             {
                 Title = "Text to Speech (hotkey in use by another app: " + string.Join(", ", failed) + ")";

@@ -17,7 +17,9 @@ namespace TextToSpeech
         Action OpenFullWindow,
         Action Dismiss,
         Action TakeBack,
-        Action TogglePlayAll);
+        Action TogglePlayAll,
+        Action<string> SendReply,
+        Action CancelReply);
 
     /// <summary>
     /// A small always-on-top window in the bottom right corner (above the tray) that shows the reading text with the
@@ -33,6 +35,8 @@ namespace TextToSpeech
 
         [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hWnd, int index);
         [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hWnd, int index, int value);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         private readonly PopupActions actions;
 
@@ -71,6 +75,93 @@ namespace TextToSpeech
                 : (System.Windows.Media.Brush?)TryFindResource("ThemeSubtle") ?? System.Windows.Media.Brushes.Gray;
             playAllButton.ToolTip = on ? "Play all is on: no stopping at questions. Click to stop at each question." : "Stops after each question. Click to read straight through.";
         }
+
+        // ---- reply box ----
+        private readonly System.Windows.Threading.DispatcherTimer autoSendTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+        private IntPtr windowBeforeReply;
+        private bool autoSend;
+
+        /// <summary>The reply box is showing (and the popup can take the keyboard focus).</summary>
+        public bool IsReplyOpen => replyRow.Visibility == Visibility.Visible;
+
+        /// <summary>Send a reply by itself 2 seconds after the text stops changing (the "Send replies automatically" setting).</summary>
+        public void SetAutoSend(bool on) => autoSend = on;
+
+        public void SetReplyPrompt(string text) => replyPrompt.Text = text;
+
+        /// <summary>
+        /// Shows the reply box and takes the keyboard focus, so dictation lands in it. This is the one place the popup
+        /// activates; it gives the focus back to the window that had it when the box closes.
+        /// </summary>
+        public void OpenReply(string prompt)
+        {
+            if (!IsReplyOpen)
+            {
+                IntPtr handle = new WindowInteropHelper(this).Handle;
+                IntPtr before = GetForegroundWindow();
+                windowBeforeReply = before == handle ? IntPtr.Zero : before;
+                SetWindowLong(handle, GWL_EXSTYLE, GetWindowLong(handle, GWL_EXSTYLE) & ~WS_EX_NOACTIVATE);
+                replyBox.Text = "";
+            }
+            replyPrompt.Text = prompt;
+            replyRow.Visibility = Visibility.Visible;
+            Activate();
+            replyBox.Focus();
+            System.Windows.Input.Keyboard.Focus(replyBox);
+        }
+
+        public void CloseReply()
+        {
+            if (!IsReplyOpen) return;
+            autoSendTimer.Stop();
+            replyRow.Visibility = Visibility.Collapsed;
+            replyBox.Text = "";
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            SetWindowLong(handle, GWL_EXSTYLE, GetWindowLong(handle, GWL_EXSTYLE) | WS_EX_NOACTIVATE);
+            if (windowBeforeReply != IntPtr.Zero)
+            {
+                SetForegroundWindow(windowBeforeReply);
+                windowBeforeReply = IntPtr.Zero;
+            }
+        }
+
+        private void SendReplyText()
+        {
+            autoSendTimer.Stop();
+            string text = replyBox.Text.Trim();
+            if (text.Length > 0) actions.SendReply(text);
+        }
+
+        private void ReplySend_Click(object sender, RoutedEventArgs e) => SendReplyText();
+
+        private void ReplyBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter) { SendReplyText(); e.Handled = true; }
+            else if (e.Key == System.Windows.Input.Key.Escape) { actions.CancelReply(); e.Handled = true; }
+        }
+
+        // Typing never starts the auto-send countdown; only text that arrives without typing (Handy's paste) does.
+        private bool typed;
+
+        private void ReplyBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e) => typed = true;
+
+        private void ReplyBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            autoSendTimer.Stop();
+            if (typed)
+            {
+                typed = false;
+                return;
+            }
+            if (autoSend && replyBox.Text.Trim().Length > 0)
+            {
+                autoSendTimer.Tick -= AutoSendElapsed;
+                autoSendTimer.Tick += AutoSendElapsed;
+                autoSendTimer.Start();
+            }
+        }
+
+        private void AutoSendElapsed(object? sender, EventArgs e) => SendReplyText();
 
         public void SetPlaying(bool playing) => playGlyph.Text = playing ? "" : "";   // pause / play
 

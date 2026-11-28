@@ -62,6 +62,13 @@ per line, in the order to ask (no other text in the block). Use headings and lis
 and never spoken. Keep each question short enough to be understood when heard on its own.
 ````
 
+## Voice replies
+
+Pass `expectsReply` with your questions (MCP `speak`, or `tts say --expects-reply --question "..."`) and the user can answer
+by voice: the hotkey (Ctrl+Alt+V) opens a reply box in the app popup and starts Handy; the words go to the app, not into
+another window. Receive them with the MCP tool `wait_for_reply`, or `tts replies --wait 60`. Answers that arrive after the
+turn ended are added to the user's next prompt by the plugin. See `docs/design/voice-replies.md`.
+
 ## Auto-read replies (off by default)
 
 Choose **Auto-read replies** in that window: off, "Say that it finished", or "Read the reply" (code,
