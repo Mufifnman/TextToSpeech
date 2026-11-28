@@ -84,8 +84,7 @@ namespace TextToSpeech.Hotkeys
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(this, WriteOptions));
+                global::TextToSpeech.Core.IO.AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(this, WriteOptions));
             }
             catch { /* best effort */ }
         }
