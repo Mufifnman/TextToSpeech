@@ -14,7 +14,7 @@ namespace TextToSpeech.Api
         public const int ApiVersion = 1;
         public const int MaxBodyChars = 1_000_000;
 
-        private static readonly HashSet<string> ControlActions = new() { "pause", "resume", "toggle", "skip", "back", "stop", "clear" };
+        private static readonly HashSet<string> ControlActions = new() { "pause", "resume", "toggle", "skip", "back", "stop", "clear", "next" };
         private static readonly HashSet<string> SpeakModes = new() { "queue", "interrupt", "if-idle" };
 
         private readonly IReadingHost host;
@@ -100,6 +100,10 @@ namespace TextToSpeech.Api
                 case "agents":
                 case "policy":
                     return await RouteArbitrationAsync(method, parts, request);
+
+                case "pauses" when parts.Length == 4 && parts[3] == "answered":
+                    Expect(method, "POST");
+                    return Ok(await host.AnsweredAsync(parts[2], BodyOrDefault(request, new AnsweredRequest(null)).SessionId));
 
                 case "sessions" when parts.Length == 3:
                     if (method == "GET")
@@ -210,6 +214,27 @@ namespace TextToSpeech.Api
             if (!SpeakModes.Contains(mode))
             {
                 throw ApiException.BadRequest("mode must be queue, interrupt or if-idle.");
+            }
+            if (r.Pauses != null)
+            {
+                if (r.Pauses.Count > 50)
+                {
+                    throw ApiException.BadRequest("At most 50 pauses per request.", "too_many_pauses");
+                }
+                foreach (var p in r.Pauses)
+                {
+                    if (p == null || (p.At.HasValue && p.At.Value < 0) || (p.Id?.Length ?? 0) > 64 || (p.Label?.Length ?? 0) > 1000)
+                    {
+                        throw ApiException.BadRequest("A pause needs an id of at most 64 characters, a label of at most 1000, and an at of 0 or more.", "bad_pause");
+                    }
+                }
+            }
+            if (r.Questions != null)
+            {
+                if (r.Questions.Count > 50 || r.Questions.Any(q => q == null || q.Length > 1000))
+                {
+                    throw ApiException.BadRequest("At most 50 questions of at most 1000 characters each.", "bad_questions");
+                }
             }
             if (r.Voice != null || r.Rate.HasValue || r.Volume.HasValue)
             {

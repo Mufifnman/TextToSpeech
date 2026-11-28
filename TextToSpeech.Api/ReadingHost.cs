@@ -36,6 +36,7 @@ namespace TextToSpeech.Api
             reading.Finished += () => Raise("finished");
             reading.Notice += message => Raise("notice", null, message);
             reading.Cleared += OnCleared;
+            reading.PauseReached += () => Raise("paused-at-pause", reading.PausedAt?.Owner, reading.PausedAt?.Point.Label);
         }
 
         /// <summary>Raised on the UI thread.</summary>
@@ -88,11 +89,38 @@ namespace TextToSpeech.Api
         public StatusDto Snapshot()
         {
             VoiceDto? voice = reading.Voice is { } v ? new VoiceDto(v.Id, v.DisplayName, v.EngineName, v.IsNeural) : null;
-            return new StatusDto(State(), voice, app.Rate, app.Volume, ActiveSession(), QueuedSessions(), app.Window, ApiRouter.ApiVersion);
+            return new StatusDto(State(), voice, app.Rate, app.Volume, ActiveSession(), QueuedSessions(), app.Window, ApiRouter.ApiVersion,
+                PausedAtStatus(), PauseList(), reading.PlayAll);
+        }
+
+        private PausedAtDto? PausedAtStatus()
+        {
+            var at = reading.PausedAt;
+            if (at == null)
+            {
+                return null;
+            }
+            var all = doc.Pauses(at.Owner, pendingOnly: false);
+            int index = all.ToList().FindIndex(x => x.Sentence.Pause == at.Point);
+            return new PausedAtDto(at.Owner ?? "ui", at.Point.Id, at.Point.Label, index + 1, all.Count);
+        }
+
+        private IReadOnlyList<PauseDto> PauseList()
+        {
+            var result = new List<PauseDto>();
+            foreach (var (_, sentence) in doc.Pauses(null, pendingOnly: false))
+            {
+                var p = sentence.Pause!;
+                string state = p.Answered ? "answered" : reading.PausedAt?.Point == p ? "waiting" : "pending";
+                result.Add(new PauseDto(sentence.Owner ?? "ui", p.Id, p.Label, state));
+                if (result.Count >= 100) break;
+            }
+            return result;
         }
 
         private string State()
         {
+            if (reading.PausedAt != null) return "paused_at_pause";
             if (reading.IsPlaying) return "speaking";
             if (!doc.IsAtEnd) return "paused";
             return store.Sessions.Any(s => s.State == SessionState.HandedOff) ? "handed_off" : "idle";
@@ -177,7 +205,25 @@ namespace TextToSpeech.Api
                 return Task.FromResult(new SpeakResponse("", 0, State(), 0, true));
             }
 
+            if (request.ApplyFilters == true && request.Pauses is { Count: > 0 })
+            {
+                throw ApiException.BadRequest("Filters change the text, so pause offsets would point at the wrong place. Use questions, or leave applyFilters off.", "pauses_with_filters");
+            }
             string text = request.ApplyFilters == true ? app.ApplyFilters(request.Text!) : request.Text!;
+            var specs = new List<PauseSpec>();
+            if (request.Pauses != null)
+            {
+                foreach (var p in request.Pauses)
+                {
+                    specs.Add(new PauseSpec(string.IsNullOrWhiteSpace(p.Id) ? "m" + (specs.Count + 1) : p.Id!, p.Label, p.At ?? text.Length));
+                }
+            }
+            if (request.Questions is { Count: > 0 })
+            {
+                var withQuestions = QuestionList.Append(text, request.Questions);
+                text = withQuestions.Text;
+                specs.AddRange(withQuestions.Pauses);
+            }
             var session = store.Create(request.Source ?? "api", text);
 
             bool wasPlaying = reading.IsPlaying;
@@ -189,12 +235,12 @@ namespace TextToSpeech.Api
                 {
                     reading.Pause(); // keeps the word, so the interrupted text is not lost
                 }
-                added = doc.InsertAt(doc.Position.Sentence, text, owner: session.Id);
+                added = doc.InsertMarkdownAt(doc.Position.Sentence, text, app.MarkdownEnabled, specs, owner: session.Id);
             }
             else
             {
                 queuePosition = hadUnread ? SessionsAhead() : 0;
-                added = doc.Append(text, owner: session.Id);
+                added = doc.AppendMarkdown(text, app.MarkdownEnabled, specs, owner: session.Id);
             }
 
             if (added == 0)
@@ -204,6 +250,11 @@ namespace TextToSpeech.Api
                 throw ApiException.BadRequest("There is no speakable text in the request.", "no_speakable_text");
             }
             store.SyncText(session.Id, doc.OwnerText(session.Id), 0);
+            if (specs.Count > 0)
+            {
+                // Each new set of questions starts with pausing on (unless the request or the setting says play all).
+                reading.PlayAll = request.PlayAll ?? app.PlayAllByDefault;
+            }
 
             // queue: only start when nothing was waiting (a paused list stays paused). interrupt: always speak now.
             if (mode == "interrupt" || !hadUnread)
@@ -232,6 +283,12 @@ namespace TextToSpeech.Api
                     break;
                 case "resume":
                     reading.Play();
+                    break;
+                case "next":
+                    if (!reading.ContinueFromPause())
+                    {
+                        throw ApiException.Conflict("not_paused_at_pause", "Reading is not waiting at a pause point.");
+                    }
                     break;
                 case "toggle":
                     reading.TogglePlayPause();
@@ -274,6 +331,21 @@ namespace TextToSpeech.Api
             }
             reading.JumpTo(global, request.Word);
             return Task.FromResult(Snapshot());
+        }
+
+        public Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId)
+        {
+            Tick();
+            foreach (var (_, sentence) in doc.Pauses(sessionId, pendingOnly: true))
+            {
+                if (sentence.Pause!.Id == pauseId)
+                {
+                    reading.MarkAnswered(sentence.Pause);
+                    Raise("pause-answered", sentence.Owner, pauseId);
+                    return Task.FromResult(Snapshot());
+                }
+            }
+            throw ApiException.NotFound($"No unanswered pause point '{pauseId}'.", "no_such_pause");
         }
 
         // ---------- voice, speed, volume ----------

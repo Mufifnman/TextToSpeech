@@ -18,7 +18,7 @@ namespace TextToSpeech.Api.Arbitration
         internal List<PendingRead> Pending { get; } = new();
     }
 
-    public sealed record PendingRead(string Text, long Seq, DateTimeOffset Added);
+    public sealed record PendingRead(string Text, long Seq, DateTimeOffset Added, object? Extra = null);
 
     public enum SubmitOutcome { Speaking, Waiting, Skipped, Dropped }
 
@@ -42,6 +42,7 @@ namespace TextToSpeech.Api.Arbitration
         private readonly Func<DateTimeOffset> clock;
         private readonly Func<bool> isBusy;
         private readonly Action<AgentRecord, string, string> speak;
+        private readonly Action<AgentRecord, string, string, object?>? speakWithExtra;
         private readonly Func<TimeSpan?> pendingTtl;
         private readonly Dictionary<string, AgentRecord> agents = new();
         private long seq;
@@ -49,8 +50,11 @@ namespace TextToSpeech.Api.Arbitration
         /// <param name="isBusy">True while anything is speaking or waiting in the reading list.</param>
         /// <param name="speak">Starts reading text for an agent: (agent, text, mode "queue" or "interrupt").</param>
         /// <param name="pendingTtl">How long waiting text is kept; null means for ever. Default 4 hours.</param>
-        public ReadArbiter(Func<bool> isBusy, Action<AgentRecord, string, string> speak, Func<DateTimeOffset>? clock = null, Func<TimeSpan?>? pendingTtl = null)
+        /// <param name="speakWithExtra">When given, used instead of <paramref name="speak"/> and also receives the opaque extra the request came with (pause points).</param>
+        public ReadArbiter(Func<bool> isBusy, Action<AgentRecord, string, string> speak, Func<DateTimeOffset>? clock = null, Func<TimeSpan?>? pendingTtl = null,
+            Action<AgentRecord, string, string, object?>? speakWithExtra = null)
         {
+            this.speakWithExtra = speakWithExtra;
             this.pendingTtl = pendingTtl ?? (() => DefaultPendingTtl);
             this.isBusy = isBusy;
             this.speak = speak;
@@ -95,7 +99,7 @@ namespace TextToSpeech.Api.Arbitration
         }
 
         /// <summary>An agent wants text read. The caller has already checked the policy.</summary>
-        public SubmitResult Submit(AgentRef who, string text, string mode, int maxPending)
+        public SubmitResult Submit(AgentRef who, string text, string mode, int maxPending, object? extra = null)
         {
             var a = Upsert(who);
             Prune();
@@ -106,7 +110,7 @@ namespace TextToSpeech.Api.Arbitration
             if (HolderId == null || HolderId == a.Id)
             {
                 HolderId = a.Id;
-                speak(a, text, mode);
+                Speak(a, text, mode, extra);
                 return new SubmitResult(SubmitOutcome.Speaking, "Your turn.", null, 0);
             }
             string heldBy = Holder?.Label ?? HolderId;
@@ -114,7 +118,7 @@ namespace TextToSpeech.Api.Arbitration
             {
                 return new SubmitResult(SubmitOutcome.Skipped, heldBy + " is reading.", heldBy, 0);
             }
-            a.Pending.Add(new PendingRead(text, ++seq, clock()));
+            a.Pending.Add(new PendingRead(text, ++seq, clock(), extra));
             while (a.Pending.Count > Math.Max(1, maxPending))
             {
                 a.Pending.RemoveAt(0);
@@ -216,13 +220,25 @@ namespace TextToSpeech.Api.Arbitration
             return next.Id;
         }
 
+        private void Speak(AgentRecord a, string text, string mode, object? extra)
+        {
+            if (speakWithExtra != null)
+            {
+                speakWithExtra(a, text, mode, extra);
+            }
+            else
+            {
+                speak(a, text, mode);
+            }
+        }
+
         private void Flush(AgentRecord a, bool firstInterrupts)
         {
             var items = a.Pending.ToList();
             a.Pending.Clear();
             for (int i = 0; i < items.Count; i++)
             {
-                speak(a, items[i].Text, i == 0 && firstInterrupts ? "interrupt" : "queue");
+                Speak(a, items[i].Text, i == 0 && firstInterrupts ? "interrupt" : "queue", items[i].Extra);
             }
         }
     }
