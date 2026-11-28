@@ -37,7 +37,14 @@ export function pidAlive(pid) {
  * api.json is deleted when the app stops cleanly but survives a crash; when it names a pid that is no longer
  * running, the file is stale and we report "not running" instead of a confusing connection error.
  */
-export function findConnection(env = process.env, readFile = readFileSync, isAlive = pidAlive) {
+/**
+ * The check findConnection uses by default. Process ids only mean something on the machine that wrote api.json, so
+ * the check runs only where the app runs (Windows); a client in WSL or a container cannot see Windows process ids
+ * and would wrongly report a running app as closed.
+ */
+export const defaultPidCheck = (pid) => process.platform !== 'win32' || pidAlive(pid);
+
+export function findConnection(env = process.env, readFile = readFileSync, isAlive = defaultPidCheck) {
   if (env.TTS_API_URL && env.TTS_API_TOKEN) {
     return { baseUrl: env.TTS_API_URL.replace(/\/+$/, ''), token: env.TTS_API_TOKEN };
   }
