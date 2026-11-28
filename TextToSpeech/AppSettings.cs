@@ -1,5 +1,5 @@
 using System.IO;
-using System.Text.Json;
+using TextToSpeech.Core.IO;
 
 namespace TextToSpeech
 {
@@ -142,23 +142,25 @@ namespace TextToSpeech
         private static string FilePath =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TextToSpeech", "settings.json");
 
+        // Remembers the file and version that were loaded so Save can keep a backup of a newer file.
+        private JsonFileStore<AppSettings>? store;
+
         public static AppSettings Load()
         {
-            try
-            {
-                if (File.Exists(FilePath))
-                    return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(FilePath)) ?? new AppSettings();
-            }
-            catch (Exception) { /* corrupt or unreadable: start fresh */ }
-            return new AppSettings();
+            // A corrupt file is kept as settings.json.bad and defaults are used; an unreadable one is left alone.
+            var store = new JsonFileStore<AppSettings>(FilePath);
+            var settings = store.Load();
+            settings.store = store;
+            return settings;
         }
 
         public void Save()
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(FilePathFor())!);
-                File.WriteAllText(FilePathFor(), JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+                string path = FilePathFor();
+                var target = store != null && store.FilePath == path ? store : new JsonFileStore<AppSettings>(path);
+                target.Save(this);
             }
             catch (Exception) { /* settings are a convenience; never crash over them */ }
         }
