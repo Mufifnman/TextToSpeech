@@ -285,3 +285,117 @@ public class FilterToggleTests
         Assert.Equal(new[] { "Citations", "Quiz material" }, FilterRegistry.Groups.ToArray());
     }
 }
+
+/// <summary>
+/// The filters used to remove one match at a time and rescan from the start (quadratic). They now
+/// make linear passes. These tests keep the old algorithm as a reference and check that the results match.
+/// </summary>
+public class FilterLoopEquivalenceTests
+{
+    private static string OldRemove(string text, string target)
+    {
+        while (System.Text.RegularExpressions.Regex.IsMatch(text, target))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(text, target);
+            text = text.Remove(m.Index, m.Length);
+        }
+        return text;
+    }
+
+    private static string OldCombineLines(string text)
+    {
+        Func<string, string, System.Text.RegularExpressions.Match> rx = System.Text.RegularExpressions.Regex.Match;
+        string target = @"[^.]\n[A-Z]";
+        while (System.Text.RegularExpressions.Regex.IsMatch(text, target))
+            text = text.Insert(rx(text, target).Index + 1, ".");
+        text = text.Replace("-\n\r", "").Replace("-\n", "").Replace('\n', ' ');
+        target = @"[0-9]\.[0-9]";
+        while (System.Text.RegularExpressions.Regex.IsMatch(text, target))
+        {
+            var m = rx(text, target);
+            text = text.Remove(m.Index + 1, 1).Insert(m.Index + 1, " point ");
+        }
+        target = @"\.( )*[a-z]";
+        while (System.Text.RegularExpressions.Regex.IsMatch(text, target))
+        {
+            var m = rx(text, target);
+            text = text.Remove(m.Index, 1).Insert(m.Index, " ");
+        }
+        return text;
+    }
+
+    private static IEnumerable<string> Samples()
+    {
+        var alphabet = new[] { "a", "B", "1", "2", ".", "\n", " ", "-", "\r", "x", "Z", "[", "]", "(", ")", ";", ",", "2004", "p. ", "Smith" };
+        var rng = new Random(12345);
+        for (int i = 0; i < 3000; i++)
+        {
+            int len = rng.Next(0, 14);
+            var sb = new System.Text.StringBuilder();
+            for (int j = 0; j < len; j++) sb.Append(alphabet[rng.Next(alphabet.Length)]);
+            yield return sb.ToString();
+        }
+        yield return "a\nB\nC\nD";
+        yield return "Section 1.2.3 and 4.5. then more. And\n\nMore";
+        yield return "(Smith & Jones, 2004; Lee et al., 2010a; Brown, 1999) and [[1]2]";
+    }
+
+    [Fact]
+    public void CombineLinesMatchesTheOldAlgorithm()
+    {
+        foreach (var s in Samples())
+        {
+            string actual = s;
+            Filters.CombineLines(ref actual);
+            Assert.True(OldCombineLines(s) == actual, $"input {s.Replace("\n", "\\n").Replace("\r", "\\r")}");
+        }
+    }
+
+    [Fact]
+    public void CitationFiltersMatchTheOldAlgorithm()
+    {
+        foreach (var s in Samples())
+        {
+            string wiki = s;
+            Filters.WikipediaCitation(ref wiki);
+            Assert.True(OldRemove(OldRemove(s, @"\[edit\]"), @"\[[0-9]+\]") == wiki, $"wiki input {s}");
+
+            string life = s;
+            Filters.GovernmentFilter(ref life);
+            string expected = s;
+            string citation = @"([a-z,A-Z\. ]+, )*([0-9]{4}b?, )?(pp?\. )([0-9, \-xiv]+(ff)?)";
+            string buildup = citation;
+            for (int i = 0; i < 6; i++) { expected = OldRemove(expected, @"\(" + buildup + @"\)"); buildup += "; " + citation; }
+            buildup = citation;
+            for (int i = 0; i < 5; i++) { expected = OldRemove(expected, @"\{" + buildup + @"\)"); buildup += "; " + citation; }
+            expected = OldRemove(expected, "CLASSIC MODELS");
+            expected = OldRemove(expected, @"\([0-9]{4}-[0-9]{4}\)");
+            Assert.True(expected == life, $"government input {s}");
+        }
+    }
+
+    [Fact]
+    public void LongTextIsProcessedInReasonableTime()
+    {
+        // 30,000 citations in about 200 KB; the old one-at-a-time loop rescanned the whole text per match.
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < 30000; i++) sb.Append("word[").Append(i).Append("] ");
+        string text = sb.ToString();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        Filters.WikipediaCitation(ref text);
+        watch.Stop();
+        Assert.DoesNotContain("[", text);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
+    public void ABackTrackingPatternGivesUpInsteadOfFreezing()
+    {
+        string evil = new string('a', 40) + "!";
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        string result = Filters.ReplaceUntilStable(evil, @"^(a+)+$", _ => "");
+        watch.Stop();
+        Assert.Equal(evil, result);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
+    }
+}
