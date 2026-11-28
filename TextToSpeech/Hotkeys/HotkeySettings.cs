@@ -23,6 +23,12 @@ namespace TextToSpeech.Hotkeys
         /// <summary>Clears everything queued to read.</summary>
         public string ClearAll { get; set; } = "Alt+Delete";
 
+        /// <summary>
+        /// Voice reply: opens the reply box for the question a program is waiting on and starts Handy's recording; press it
+        /// again to stop recording, and Handy pastes the words into the box.
+        /// </summary>
+        public string ReplyByVoice { get; set; } = "Ctrl+Alt+V";
+
         public static HotkeyBinding Default(string name) => name switch
         {
             nameof(ReadSelection) => new(ModifierKeys.Alt, Key.R),
@@ -31,6 +37,7 @@ namespace TextToSpeech.Hotkeys
             nameof(ReadRegionQuiet) => new(ModifierKeys.Alt, Key.O),
             nameof(PlayPause) => new(ModifierKeys.Alt, Key.Space),
             nameof(ClearAll) => new(ModifierKeys.Alt, Key.Delete),
+            nameof(ReplyByVoice) => new(ModifierKeys.Control | ModifierKeys.Alt, Key.V),
             _ => new(ModifierKeys.Control | ModifierKeys.Alt, Key.O),
         };
 
@@ -40,6 +47,7 @@ namespace TextToSpeech.Hotkeys
         public HotkeyBinding GetReadRegionQuiet() => Resolve(ReadRegionQuiet, nameof(ReadRegionQuiet));
         public HotkeyBinding GetPlayPause() => Resolve(PlayPause, nameof(PlayPause));
         public HotkeyBinding GetClearAll() => Resolve(ClearAll, nameof(ClearAll));
+        public HotkeyBinding GetReplyByVoice() => Resolve(ReplyByVoice, nameof(ReplyByVoice));
         public HotkeyBinding GetReadRegion() => Resolve(ReadRegion, nameof(ReadRegion));
 
         private static HotkeyBinding Resolve(string text, string name) =>

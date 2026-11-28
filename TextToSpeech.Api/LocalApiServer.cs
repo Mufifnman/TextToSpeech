@@ -118,11 +118,69 @@ namespace TextToSpeech.Api
                 var response = request.Body is { Length: > ApiRouter.MaxBodyChars }
                     ? ApiSecurity.Error(413, "too_large", "Request body is too large.")
                     : await runOnUi(() => router!.HandleAsync(request));
+                if (request.Method == "POST" && request.Path.TrimEnd('/') == "/v1/replies/take" && response.Status == 200)
+                {
+                    response = await WaitForRepliesAsync(request, response);
+                }
                 await WriteAsync(context.Response, response);
             }
             catch (Exception)
             {
                 try { context.Response.Abort(); } catch (Exception) { /* connection already gone */ }
+            }
+        }
+
+        /// <summary>
+        /// Long poll for <c>POST /v1/replies/take</c> with <c>waitSeconds</c>: while no reply has come, asks again every
+        /// half second (each ask runs on the UI thread and returns at once) until one arrives, the time is up or the app stops.
+        /// </summary>
+        private async Task<ApiResponse> WaitForRepliesAsync(ApiRequest request, ApiResponse first)
+        {
+            int wait = 0;
+            try
+            {
+                using var body = JsonDocument.Parse(request.Body ?? "{}");
+                if (body.RootElement.TryGetProperty("waitSeconds", out var w) && w.TryGetInt32(out int seconds))
+                {
+                    wait = Math.Clamp(seconds, 0, ApiRouter.MaxWaitSeconds);
+                }
+            }
+            catch (JsonException)
+            {
+                return first;
+            }
+
+            var response = first;
+            var deadline = DateTime.UtcNow.AddSeconds(wait);
+            while (HasNoReplies(response) && DateTime.UtcNow < deadline && !stopping.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(500, stopping.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                response = await runOnUi(() => router!.HandleAsync(request));
+                if (response.Status != 200)
+                {
+                    break;
+                }
+            }
+            return response;
+        }
+
+        private static bool HasNoReplies(ApiResponse response)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(response.Json ?? "{}");
+                return doc.RootElement.TryGetProperty("replies", out var list) && list.GetArrayLength() == 0;
+            }
+            catch (JsonException)
+            {
+                return false;
             }
         }
 

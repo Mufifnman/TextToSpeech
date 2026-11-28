@@ -14,6 +14,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*" MinHeight="40"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Where the text came from (API clients) or that a client holds the rest. -->
@@ -29,14 +30,26 @@
                        Foreground="{DynamicResource ThemeSubtle}"
                        Text="Preview. This is sample text so you can try the text size and the height of the popup. The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How vexingly quick daft zebras jump. Sphinx of black quartz, judge my vow. The five boxing wizards jump quickly. Waltz, bad nymph, for quick jigs vex. Drag the corner at the top left to resize the popup."/>
 
+            <!-- Reply box: shown while a caller waits for the user's answer to the question being read. It takes the keyboard
+                 focus (see OpenReply) so dictation (Handy) pastes into it; Enter sends, Esc cancels. -->
+            <StackPanel x:Name="replyRow" Grid.Row="2" Visibility="Collapsed" Margin="4,6,4,0">
+                <TextBlock x:Name="replyPrompt" FontSize="12" Foreground="{DynamicResource ThemeSubtle}" TextTrimming="CharacterEllipsis"/>
+                <DockPanel Margin="0,3,0,0">
+                    <Button x:Name="replySendButton" DockPanel.Dock="Right" Content="Send" Padding="10,0" Margin="4,0,0,0" Focusable="False"
+                            Click="ReplySend_Click"/>
+                    <TextBox x:Name="replyBox" MinHeight="26" MaxHeight="90" TextWrapping="Wrap" AcceptsReturn="False"
+                             VerticalContentAlignment="Center" KeyDown="ReplyBox_KeyDown" TextChanged="ReplyBox_TextChanged"/>
+                </DockPanel>
+            </StackPanel>
+
             <!-- drag to resize: grows up and to the left because the popup is anchored bottom right -->
-            <Border x:Name="resizeGrip" Grid.RowSpan="3" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top"
+            <Border x:Name="resizeGrip" Grid.RowSpan="4" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top"
                     Background="Transparent" Cursor="SizeNWSE" ToolTip="Drag to resize"
                     MouseLeftButtonDown="Grip_MouseDown" MouseMove="Grip_MouseMove" MouseLeftButtonUp="Grip_MouseUp">
                 <Path Data="M2,12 L12,2 M2,7 L7,2" Stroke="{DynamicResource ThemeSubtle}" StrokeThickness="1.5"/>
             </Border>
 
-            <Grid Grid.Row="2" Margin="0,4,0,0">
+            <Grid Grid.Row="3" Margin="0,4,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>

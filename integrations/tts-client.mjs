@@ -89,9 +89,15 @@ export const api = {
     questions: args.questions,
     pauses: args.pauses,
     playAll: args.playAll,
+    expectsReply: args.expectsReply,
   }, o),
   next: (o) => call('POST', '/v1/next', undefined, o),
   answered: (id, sessionId, o) => call('POST', `/v1/pauses/${encodeURIComponent(id)}/answered`, sessionId ? { sessionId } : {}, o),
+  // Voice replies: the app hands the user's answer to a question back to the caller that asked for it (expectsReply).
+  reply: (text, args, o) => call('POST', '/v1/replies', { text, sessionId: args?.sessionId, pauseId: args?.pauseId }, o),
+  replies: (o) => call('GET', '/v1/replies', undefined, o),
+  /** Returns and removes the replies for `source` (the agent label). Waits up to waitSeconds (0 to 120) for one. */
+  takeReplies: (args, o) => call('POST', '/v1/replies/take', { source: args?.source, sessionId: args?.sessionId, waitSeconds: args?.waitSeconds }, o),
   policy: (o) => call('GET', '/v1/policy', undefined, o),
   mute: (minutes, o) => call('POST', '/v1/policy/mute', { minutes }, o),
   agents: (o) => call('GET', '/v1/agents', undefined, o),
