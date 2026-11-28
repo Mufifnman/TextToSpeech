@@ -4,6 +4,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using TextToSpeech.Core.Reading;
+using TextToSpeech.Core.Shell;
 
 namespace TextToSpeech
 {
@@ -26,12 +27,135 @@ namespace TextToSpeech
         private readonly Dictionary<int, Run> pauseMarks = new();   // sentence index -> the small marker after a pause point
         private ReadingDocument? document;
         private int styledSentence = -1;
+        private bool following = true;
+        private bool scrollQueued;
+        private FollowButtonAdorner? followButton;
 
         public ReadingDisplay()
         {
             Content = textBlock;
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             SetResourceReference(BackgroundProperty, "ThemeSurface");
+            Loaded += (_, _) => UpdateFollowButton();
+            Unloaded += (_, _) => RemoveFollowButton();
+        }
+
+        /// <summary>
+        /// Whether the view follows the text being read. Scrolling by hand (wheel, scroll bar, touch) turns it off and a
+        /// "Follow" button appears to turn it back on; a new reading, a click on a word or that button turn it on again.
+        /// </summary>
+        public bool Following
+        {
+            get => following;
+            private set
+            {
+                if (following == value)
+                {
+                    return;
+                }
+                following = value;
+                UpdateFollowButton();
+                if (following)
+                {
+                    QueueFollow();
+                }
+            }
+        }
+
+        protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+        {
+            // Dragging or clicking the scroll bar is a manual scroll.
+            if (e.OriginalSource is DependencyObject source && IsInScrollBar(source))
+            {
+                Following = false;
+            }
+            base.OnPreviewMouseDown(e);
+        }
+
+        protected override void OnManipulationStarting(ManipulationStartingEventArgs e)
+        {
+            Following = false;
+            base.OnManipulationStarting(e);
+        }
+
+        private static bool IsInScrollBar(DependencyObject node)
+        {
+            for (var d = node; d != null; d = VisualTreeHelper.GetParent(d))
+            {
+                if (d is System.Windows.Controls.Primitives.ScrollBar)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void UpdateFollowButton()
+        {
+            if (!IsLoaded)
+            {
+                return;
+            }
+            if (following)
+            {
+                RemoveFollowButton();
+                return;
+            }
+            var layer = AdornerLayer.GetAdornerLayer(this);
+            if (layer == null || followButton != null)
+            {
+                return;
+            }
+            followButton = new FollowButtonAdorner(this, () => Following = true);
+            layer.Add(followButton);
+        }
+
+        private void RemoveFollowButton()
+        {
+            if (followButton != null)
+            {
+                AdornerLayer.GetAdornerLayer(this)?.Remove(followButton);
+                followButton = null;
+            }
+        }
+
+        /// <summary>The small "Follow" button shown at the bottom right of the view while following is off.</summary>
+        private sealed class FollowButtonAdorner : Adorner
+        {
+            private readonly Button button;
+
+            public FollowButtonAdorner(UIElement host, Action relock) : base(host)
+            {
+                button = new Button
+                {
+                    Content = "\u2193 Follow reading",
+                    Padding = new Thickness(10, 3, 10, 3),
+                    Focusable = false,
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Scroll back to the text being read and keep following it",
+                };
+                System.Windows.Automation.AutomationProperties.SetName(button, "Follow the text being read");
+                button.Click += (_, _) => relock();
+                AddVisualChild(button);
+            }
+
+            protected override int VisualChildrenCount => 1;
+
+            protected override Visual GetVisualChild(int index) => button;
+
+            protected override Size MeasureOverride(Size constraint)
+            {
+                button.Measure(constraint);
+                return constraint;
+            }
+
+            protected override Size ArrangeOverride(Size finalSize)
+            {
+                var size = button.DesiredSize;
+                // Left of the scroll bar and clear of the text's edge.
+                button.Arrange(new Rect(Math.Max(0, finalSize.Width - size.Width - 24), Math.Max(0, finalSize.Height - size.Height - 12), size.Width, size.Height));
+                return finalSize;
+            }
         }
 
         /// <summary>Font size of the reading text.</summary>
@@ -62,6 +186,10 @@ namespace TextToSpeech
                 ZoomRequested(e.Delta > 0 ? 1 : -1);
                 e.Handled = true;
                 return;
+            }
+            if (ScrollableHeight > 0)
+            {
+                Following = false;   // scrolling by hand: stop following until the Follow button is pressed
             }
             base.OnPreviewMouseWheel(e);
         }
@@ -138,6 +266,10 @@ namespace TextToSpeech
 
         private void Rebuild()
         {
+            if (runs.Count == 0 && document is { Count: > 0 })
+            {
+                Following = true;   // a new reading starts out following
+            }
             textBlock.Inlines.Clear();
             runs.Clear();
             pauseMarks.Clear();
@@ -350,6 +482,7 @@ namespace TextToSpeech
         {
             if (sender is Run { Tag: ValueTuple<int, int> pos })
             {
+                Following = true;   // choosing where to read from means following again
                 WordClicked?.Invoke(pos.Item1, pos.Item2);
                 e.Handled = true;
             }
@@ -426,23 +559,70 @@ namespace TextToSpeech
 
         private void ScrollCurrentIntoView()
         {
-            if (document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count)
+            if (following)
+            {
+                QueueFollow();
+            }
+        }
+
+        /// <summary>Scrolls once layout is up to date (several changes in a row cost one scroll).</summary>
+        private void QueueFollow()
+        {
+            if (scrollQueued)
             {
                 return;
             }
+            scrollQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                scrollQueued = false;
+                FollowCurrent();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private void FollowCurrent()
+        {
+            if (!following || document == null || document.IsAtEnd || document.Position.Sentence >= runs.Count)
+            {
+                return;
+            }
+            // Raw view has one run per block (its sentences have no word runs); formatted view has the sentence's words.
+            TextPointer? from, to;
             if (showRaw)
             {
                 int cur = document.Position.Sentence;
-                blocks.Find(b => cur >= b.First && cur <= b.Last)?.RawRun?.BringIntoView();
-                return;
+                var raw = blocks.Find(b => cur >= b.First && cur <= b.Last)?.RawRun;
+                (from, to) = raw == null ? (null, null) : (raw.ContentStart, raw.ContentEnd);
             }
-            if (runs[document.Position.Sentence].Count == 0)
+            else
+            {
+                var words = runs[document.Position.Sentence];
+                (from, to) = words.Count == 0 ? (null, null) : (words[0].ContentStart, words[^1].ContentEnd);
+            }
+            if (from == null || to == null)
             {
                 return;
             }
-            // GUESS: bring the sentence start into view as reading advances. Scrolling by hand
-            // while reading is still overridden at the next sentence; revisit if that annoys.
-            runs[document.Position.Sentence][0].BringIntoView();
+            try
+            {
+                UpdateLayout();
+                var first = from.GetCharacterRect(LogicalDirection.Forward);
+                var last = to.GetCharacterRect(LogicalDirection.Backward);
+                if (first.IsEmpty || last.IsEmpty)
+                {
+                    return;
+                }
+                // The text block is the scrolled content, so its coordinates are content coordinates.
+                var target = FollowScroll.TargetOffset(first.Top, Math.Max(first.Bottom, last.Bottom), VerticalOffset, ViewportHeight);
+                if (target is double y)
+                {
+                    ScrollToVerticalOffset(y);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The runs were replaced while this waited; the next change scrolls again.
+            }
         }
     }
 }
