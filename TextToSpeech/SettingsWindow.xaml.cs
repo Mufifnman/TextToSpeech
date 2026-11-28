@@ -75,6 +75,17 @@ namespace TextToSpeech
             autoClearSlider.IsEnabled = autoClearBox.IsChecked == true;
             autoClearBox.Click += (_, _) => Changed();
             autoClearSlider.ValueChanged += (_, _) => Changed();
+            popupStaySlider.Value = Math.Clamp(settings.PopupStayOpenSeconds, 0, 120);
+            popupStayText.Text = StayText((int)popupStaySlider.Value);
+            popupStaySlider.ValueChanged += (_, _) => Changed();
+            popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
+            markdownBox.IsChecked = settings.FormatMarkdown;
+            playAllBox.IsChecked = settings.PlayAllByDefault;
+            markdownBox.Click += (_, _) => Changed();
+            playAllBox.Click += (_, _) => Changed();
+            mainTextSizeSlider.Value = Math.Clamp(settings.MainTextSize, 10, 40);
+            mainTextSizeText.Text = (int)mainTextSizeSlider.Value + " pt";
+            mainTextSizeSlider.ValueChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -123,6 +134,13 @@ namespace TextToSpeech
             settings.PopupTextSize = popupTextSizeSlider.Value;
             popupPreviewText.FontSize = popupTextSizeSlider.Value;
             popupTextSizeText.Text = (int)popupTextSizeSlider.Value + " pt";
+            settings.PopupStayOpenSeconds = (int)popupStaySlider.Value;
+            popupStayText.Text = StayText(settings.PopupStayOpenSeconds);
+            popupStaySlider.IsEnabled = popupAutoHideBox.IsChecked == true;
+            settings.FormatMarkdown = markdownBox.IsChecked == true;
+            settings.PlayAllByDefault = playAllBox.IsChecked == true;
+            settings.MainTextSize = mainTextSizeSlider.Value;
+            mainTextSizeText.Text = (int)mainTextSizeSlider.Value + " pt";
             settings.AutoClearAfterReading = autoClearBox.IsChecked == true;
             settings.AutoClearDelaySeconds = (int)autoClearSlider.Value;
             autoClearText.Text = settings.AutoClearDelaySeconds + " s";
@@ -131,6 +149,8 @@ namespace TextToSpeech
             onChanged();
             ShowApiInfo();
         }
+
+        private static string StayText(int seconds) => seconds == 0 ? "with Auto clear" : seconds + " s";
 
         private void ShowApiInfo()
         {

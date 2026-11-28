@@ -10,7 +10,7 @@
 // is still closing aborts Node (exit code 0xC0000409). The client sends "Connection: close" so nothing stays open.
 import { readFileSync } from 'node:fs';
 import { api, agentFromContext } from '../tts-client.mjs';
-import { toSpeakable, lastAssistantText } from '../lib/speakable.mjs';
+import { toReadableMarkdown, extractQuestions, lastAssistantText } from '../lib/speakable.mjs';
 
 async function main() {
   const input = JSON.parse(readFileSync(0, 'utf8') || '{}');
@@ -21,15 +21,24 @@ async function main() {
   if (mode === 'off' || !policy.mayRead) return;
 
   let text = 'Claude Code finished';
+  let questions = [];
   if (mode === 'reply') {
     // Newer Claude Code passes the reply itself; older versions only a transcript path.
     const reply = typeof input.last_assistant_message === 'string' && input.last_assistant_message.trim()
       ? input.last_assistant_message
       : lastAssistantText(readFileSync(input.transcript_path, 'utf8'));
-    const spoken = toSpeakable(reply);
+    // Markdown is passed on as written (the app lays it out and never reads the markup). A tts-questions block becomes
+    // the questions reading waits at; the popup is shown then, so they can be seen and navigated.
+    const extracted = extractQuestions(reply);
+    questions = extracted.questions;
+    const spoken = toReadableMarkdown(extracted.text);
     if (spoken) text = spoken;
+    else if (questions.length) text = 'I have a question.';
   }
-  await api.speak({ text, source: 'claude-code', mode: mode === 'reply' ? 'queue' : 'if-idle', popup: false, agent });
+  await api.speak({
+    text, source: 'claude-code', mode: mode === 'reply' ? 'queue' : 'if-idle',
+    popup: questions.length ? undefined : false, agent, questions: questions.length ? questions : undefined,
+  });
 }
 
 try { await main(); } catch { /* app not running: stay silent */ }

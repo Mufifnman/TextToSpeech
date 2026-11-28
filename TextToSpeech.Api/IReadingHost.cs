@@ -10,7 +10,7 @@ namespace TextToSpeech.Api
         Task<StatusDto> GetStatusAsync();
         Task<SpeakResponse> SpeakAsync(SpeakRequest request);
 
-        /// <summary>action: pause, resume, toggle, skip, back, stop or clear.</summary>
+        /// <summary>action: pause, resume, toggle, skip, back, stop, clear or next (continue from a pause point).</summary>
         Task<StatusDto> ControlAsync(string action);
         Task<StatusDto> JumpAsync(JumpRequest request);
 
@@ -25,5 +25,9 @@ namespace TextToSpeech.Api
         Task<StatusDto> ReplaceAsync(string sessionId, ReplaceRequest request);
         Task<StatusDto> ReleaseAsync(string sessionId, ReleaseRequest request);
         Task<StatusDto> PatchAsync(string sessionId, PatchRequest request);
+
+        /// <summary>Marks a pause point answered; when reading is waiting at it, carries on.</summary>
+        Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId) =>
+            throw ApiException.NotFound("Pause points are not supported here.", "unsupported");
     }
 }

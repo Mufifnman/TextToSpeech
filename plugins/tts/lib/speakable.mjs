@@ -36,3 +36,41 @@ export function lastAssistantText(jsonl) {
   }
   return '';
 }
+
+/**
+ * For the app, which lays out markdown itself and never reads the markup: keeps headings, lists and emphasis, and
+ * drops what should not be read aloud (code blocks, tables, images, bare links), trimmed to about maxChars.
+ */
+export function toReadableMarkdown(md, maxChars = 1500) {
+  let t = String(md ?? '')
+    .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[`~]*[ \t]*$|(?![\s\S]))/gm, ' ') // fenced code, any length, or never closed
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/^[ \t]*\|.*\|[ \t]*$/gm, ' ')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (t.length > maxChars) {
+    const cut = t.slice(0, maxChars);
+    const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('\n'));
+    t = (end > maxChars / 2 ? cut.slice(0, end + 1) : cut).trim();
+  }
+  return t;
+}
+
+/**
+ * Takes a fenced block tagged `tts-questions` (one question per line, a leading "-" or number is fine) out of a reply.
+ * The plugin passes those to the app as the questions to wait on; the app itself never decides what is a question.
+ */
+export function extractQuestions(md) {
+  const questions = [];
+  const text = String(md ?? '').replace(/^[ \t]*```tts-questions[^\n]*\n([\s\S]*?)^[ \t]*```[ \t]*$/gm, (_, body) => {
+    for (const line of body.split('\n')) {
+      const q = line.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim();
+      if (q) questions.push(q);
+    }
+    return '';
+  });
+  return { text: text.trim(), questions };
+}

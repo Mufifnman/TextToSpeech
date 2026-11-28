@@ -5,6 +5,9 @@ namespace TextToSpeech.Api.Arbitration
     /// plain API clients behave as before); requests with an agent are checked against the <see cref="ReadPolicy"/>
     /// and take turns through <see cref="ReadArbiter"/>. Call on the UI thread.
     /// </summary>
+    /// <summary>What travels with waiting text through the arbiter: the pause points of the request.</summary>
+    internal sealed record SpeakExtras(IReadOnlyList<PauseRequest>? Pauses, IReadOnlyList<string>? Questions, bool? PlayAll);
+
     public sealed class ArbitratedHost : IReadingHost, IArbiterHost
     {
         private readonly IReadingHost inner;
@@ -21,8 +24,8 @@ namespace TextToSpeech.Api.Arbitration
             this.inner = inner;
             this.probe = probe;
             this.policy = policy;
-            arbiter = new ReadArbiter(isBusy ?? (() => DefaultBusy()), SpeakFor, () => probe.Now,
-                () => policy().PendingExpiryMinutes > 0 ? TimeSpan.FromMinutes(policy().PendingExpiryMinutes) : null);
+            arbiter = new ReadArbiter(isBusy ?? (() => DefaultBusy()), (a, text, mode) => SpeakFor(a, text, mode, null), () => probe.Now,
+                () => policy().PendingExpiryMinutes > 0 ? TimeSpan.FromMinutes(policy().PendingExpiryMinutes) : null, SpeakFor);
         }
 
         public ReadArbiter Arbiter => arbiter;
@@ -30,10 +33,10 @@ namespace TextToSpeech.Api.Arbitration
         private bool DefaultBusy()
         {
             string state = inner.GetStatusAsync().GetAwaiter().GetResult().State;
-            return state == "speaking" || state == "paused";
+            return state == "speaking" || state == "paused" || state == "paused_at_pause";
         }
 
-        private void SpeakFor(AgentRecord agent, string text, string mode)
+        private void SpeakFor(AgentRecord agent, string text, string mode, object? extra)
         {
             // Waiting text can come due long after it was accepted (headphones unplugged, quiet hours began, muted):
             // the rules are checked again at the moment of speaking.
@@ -42,7 +45,9 @@ namespace TextToSpeech.Api.Arbitration
                 lastSpoken = new SpeakResponse("", 0, "idle", 0, true);
                 return;
             }
-            lastSpoken = inner.SpeakAsync(new SpeakRequest(text, agent.Label, mode, null, null, null, null, null)).GetAwaiter().GetResult();
+            var extras = extra as SpeakExtras;
+            lastSpoken = inner.SpeakAsync(new SpeakRequest(text, agent.Label, mode, null, null, null, null, null,
+                Pauses: extras?.Pauses, Questions: extras?.Questions, PlayAll: extras?.PlayAll)).GetAwaiter().GetResult();
             if (frontedFor != agent.Id)
             {
                 frontedFor = agent.Id;
@@ -162,7 +167,10 @@ namespace TextToSpeech.Api.Arbitration
                 return Task.FromResult(new SpeakResponse("", 0, "idle", 0, true, "denied", string.Join(" ", decision.Reasons)));
             }
             lastSpoken = null;
-            var result = arbiter.Submit(request.Agent, request.Text!, request.Mode ?? "queue", policy().MaxPendingPerAgent);
+            var extras = request.Pauses != null || request.Questions != null || request.PlayAll != null
+                ? new SpeakExtras(request.Pauses, request.Questions, request.PlayAll)
+                : null;
+            var result = arbiter.Submit(request.Agent, request.Text!, request.Mode ?? "queue", policy().MaxPendingPerAgent, extras);
             switch (result.Outcome)
             {
                 case SubmitOutcome.Speaking:
@@ -189,6 +197,7 @@ namespace TextToSpeech.Api.Arbitration
         }
 
         public Task<StatusDto> JumpAsync(JumpRequest request) => inner.JumpAsync(request);
+        public Task<StatusDto> AnsweredAsync(string pauseId, string? sessionId) => inner.AnsweredAsync(pauseId, sessionId);
         public Task<IReadOnlyList<VoiceDto>> GetVoicesAsync() => inner.GetVoicesAsync();
         public Task<StatusDto> SetVoiceAsync(string voiceId) => inner.SetVoiceAsync(voiceId);
         public Task<StatusDto> SetRateAsync(int rate) => inner.SetRateAsync(rate);

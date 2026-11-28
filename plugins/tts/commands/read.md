@@ -6,7 +6,7 @@ argument-hint: "[text to read]"
 Read text aloud with the Text to Speech app.
 
 - If arguments were given, the text is: $ARGUMENTS
-- If no arguments were given, the text is your own previous reply in this conversation, as plain prose: drop code blocks, tables, URLs and markdown symbols, and keep it brief if it is long.
+- If no arguments were given, the text is your own previous reply in this conversation, as markdown prose (headings and lists are fine, the app lays them out and does not speak the markup): drop code blocks, tables and URLs, and keep it brief if it is long.
 
 Send it with the Bash tool, passing the text on stdin through a quoted heredoc so quotes and special characters are safe:
 

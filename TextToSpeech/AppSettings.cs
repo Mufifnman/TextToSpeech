@@ -50,6 +50,22 @@ namespace TextToSpeech
         /// <summary>Seconds to wait after reading finishes before clearing, 1 to 60.</summary>
         public int AutoClearDelaySeconds { get; set; } = 3;
 
+        /// <summary>
+        /// Seconds the popup stays open after reading finishes (when "Hide popup when reading finishes" is on). It never
+        /// hides before Auto clear clears the text, so the effective time is the longer of this and the Auto clear delay.
+        /// 0 means just follow Auto clear. Range 0 to 120.
+        /// </summary>
+        public int PopupStayOpenSeconds { get; set; } = 0;
+
+        /// <summary>Show markdown (lists, headings, code) laid out, with the markup neither shown nor spoken.</summary>
+        public bool FormatMarkdown { get; set; } = true;
+
+        /// <summary>Read through question pauses without stopping, from the start. Off: reading stops after each marked question until you continue.</summary>
+        public bool PlayAllByDefault { get; set; } = false;
+
+        /// <summary>Font size of the reading text in the main window, 10 to 40.</summary>
+        public double MainTextSize { get; set; } = 14;
+
         /// <summary>Also show the popup while the full window is open but not the window being used.</summary>
         public bool ShowPopupWhenWindowUnfocused { get; set; } = false;
 

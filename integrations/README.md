@@ -18,6 +18,16 @@ node integrations/cli/tts.mjs replace <session> --handoff <id> --text "New rest 
 
 `tts.mjs` with no arguments prints every command.
 
+Questions that reading waits at (the app never decides what is a question, the caller passes them):
+
+```
+node integrations/cli/tts.mjs say --question "Which branch?" --question "Add tests?" "Done with the parser."
+node integrations/cli/tts.mjs next                 # continue after the question reading is waiting at
+node integrations/cli/tts.mjs answered q2          # skip a question that is already answered
+```
+
+See `docs/design/markdown-and-question-pauses.md` for the API fields.
+
 ## Claude Code hook (announce when work finishes)
 
 Copy the `hooks` from `claude-code/settings.example.json` into your Claude Code settings and fix the path. `Stop` says

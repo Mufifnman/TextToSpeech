@@ -2,6 +2,9 @@ using TextToSpeech.Speech;
 
 namespace TextToSpeech.Core.Reading
 {
+    /// <summary>Where reading is waiting: the pause point, who owns the text, and the document index of the sentence it follows.</summary>
+    public sealed record PausedAtInfo(string? Owner, PausePoint Point, int SentenceIndex);
+
     /// <summary>
     /// Drives reading: speaks the <see cref="ReadingDocument"/> sentence by sentence through a speech engine,
     /// with play, pause, skip, rewind, jump, the pause between sentences, a fallback voice, and look-ahead hints.
@@ -56,6 +59,18 @@ namespace TextToSpeech.Core.Reading
         /// <summary>Silence after each sentence, in milliseconds.</summary>
         public int GapMs { get; set; } = SentencePacing.DefaultGapMs;
 
+        /// <summary>
+        /// Read through pause points without stopping. Off by default; the app sets it from its "play all by default"
+        /// setting when new text with pause points arrives, and the play-all button flips it.
+        /// </summary>
+        public bool PlayAll { get; set; }
+
+        /// <summary>Set while reading is stopped at a pause point (a question waiting for an answer).</summary>
+        public PausedAtInfo? PausedAt { get; private set; }
+
+        /// <summary>Reading stopped at a pause point.</summary>
+        public event Action? PauseReached;
+
         /// <summary>Something is being spoken or waited on (this stays true while paused only until the pause cancels it).</summary>
         public bool IsSpeaking => speechCts != null;
 
@@ -86,6 +101,7 @@ namespace TextToSpeech.Core.Reading
         public void Play()
         {
             paused = false;
+            ClearPausedAt(markAnswered: true);
             if (!IsSpeaking)
             {
                 SpeakCurrent();
@@ -108,30 +124,64 @@ namespace TextToSpeech.Core.Reading
             {
                 Pause();
             }
-            else if (!document.IsAtEnd)
+            else if (PausedAt != null || !document.IsAtEnd)
             {
                 paused = false;
+                ClearPausedAt(markAnswered: true);
                 SpeakCurrent();
             }
         }
 
         public void Rewind()
         {
+            ClearPausedAt(markAnswered: false);
             document.Rewind();
             AfterMove();
         }
 
         public void Skip()
         {
+            // Skipping while waiting at a question counts as moving past it.
+            ClearPausedAt(markAnswered: true);
             if (document.Skip())
             {
                 AfterMove();
             }
         }
 
+        /// <summary>
+        /// Marks a pause point as answered. When reading is waiting at exactly that one it carries on from there.
+        /// Returns false when nothing has that point.
+        /// </summary>
+        public bool MarkAnswered(PausePoint point)
+        {
+            point.Answered = true;
+            if (PausedAt?.Point == point)
+            {
+                Play();
+            }
+            else
+            {
+                StateChanged?.Invoke();
+            }
+            return true;
+        }
+
+        /// <summary>Continues after the pause point reading is waiting at (marking it answered). False when not waiting at one.</summary>
+        public bool ContinueFromPause()
+        {
+            if (PausedAt == null)
+            {
+                return false;
+            }
+            Play();
+            return true;
+        }
+
         /// <summary>Reads from a word the user picked, even when paused or stopped.</summary>
         public void JumpTo(int sentence, int word)
         {
+            ClearPausedAt(markAnswered: false);
             document.JumpTo(sentence, word);
             paused = false;
             SpeakCurrent();
@@ -144,6 +194,7 @@ namespace TextToSpeech.Core.Reading
             clearPreparedAudio();
             document.Clear();
             paused = false;
+            PausedAt = null;
             StateChanged?.Invoke();
             Cleared?.Invoke();
         }
@@ -152,6 +203,7 @@ namespace TextToSpeech.Core.Reading
         public void Interrupt()
         {
             CancelSpeech();
+            ClearPausedAt(markAnswered: false);
             paused = true;
             StateChanged?.Invoke();
         }
@@ -172,6 +224,15 @@ namespace TextToSpeech.Core.Reading
             {
                 SpeakCurrent();
             }
+        }
+
+        private void ClearPausedAt(bool markAnswered)
+        {
+            if (PausedAt != null && markAnswered)
+            {
+                PausedAt.Point.Answered = true;
+            }
+            PausedAt = null;
         }
 
         private void CancelSpeech()
@@ -255,8 +316,21 @@ namespace TextToSpeech.Core.Reading
             }
 
             // Move on first, so pausing during the gap resumes at the next sentence, not the one just read.
+            var finished = document.CurrentSentence;
             document.CompleteSentence();
-            var gap = SentencePacing.GapAfter(document.IsAtEnd, GapMs);
+
+            // A pause point the caller asked for: stop here and wait (the next sentences are already being prepared).
+            if (finished?.Pause is { Answered: false } point && !PlayAll)
+            {
+                CancelSpeech();
+                paused = true;
+                PausedAt = new PausedAtInfo(finished.Owner, point, document.Position.Sentence - 1);
+                StateChanged?.Invoke();
+                PauseReached?.Invoke();
+                return;
+            }
+
+            var gap = SentencePacing.GapAfter(document.IsAtEnd, GapMs, finished?.Format?.GapFactor ?? 1);
             if (gap > TimeSpan.Zero)
             {
                 try

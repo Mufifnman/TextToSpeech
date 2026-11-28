@@ -36,8 +36,20 @@ namespace TextToSpeech.Api
     /// <param name="Popup">false reads without showing the reading popup. Default true.</param>
     /// <param name="Voice">Reserved: rejected for now (use PUT /v1/voice). Same for Rate and Volume.</param>
     /// <param name="Agent">Who is asking. Set, the request goes through arbitration (policy and turn taking); left out, it is spoken straight away as before.</param>
+    /// <param name="Pauses">Places where reading stops and waits. The caller decides; the app never guesses what is a question.</param>
+    /// <param name="Questions">Shorthand: the questions are added to the end of the text as a numbered list, each followed by a pause.</param>
+    /// <param name="PlayAll">Read through the pauses of this text without stopping. Default: the app's "play all by default" setting.</param>
     public sealed record SpeakRequest(string? Text, string? Source, string? Mode, bool? ApplyFilters, bool? Popup,
-        string? Voice, int? Rate, int? Volume, TextToSpeech.Api.Arbitration.AgentRef? Agent = null);
+        string? Voice, int? Rate, int? Volume, TextToSpeech.Api.Arbitration.AgentRef? Agent = null,
+        IReadOnlyList<PauseRequest>? Pauses = null, IReadOnlyList<string>? Questions = null, bool? PlayAll = null);
+
+    /// <param name="Id">Name used to mark it answered later. Default: m1, m2...</param>
+    /// <param name="Label">The question, so status can say what reading is waiting on. Optional.</param>
+    /// <param name="At">Character offset into the text: reading stops after the paragraph or list item that contains it. Default: the end.</param>
+    public sealed record PauseRequest(string? Id, string? Label, int? At);
+
+    /// <param name="SessionId">Limits it to one session when two have a pause with the same id.</param>
+    public sealed record AnsweredRequest(string? SessionId);
 
     public sealed record JumpRequest(string? SessionId, int Sentence, int Word);
     public sealed record VoiceRequest(string? Id);
@@ -69,9 +81,18 @@ namespace TextToSpeech.Api
     /// <param name="Mode">hidden, popup, full.</param>
     public sealed record WindowDto(string Mode, bool Pinned);
 
-    /// <param name="State">idle, speaking, paused or handed_off.</param>
+    /// <param name="State">idle, speaking, paused, paused_at_pause (waiting at a question) or handed_off.</param>
+    /// <param name="PausedAt">Only while State is paused_at_pause.</param>
+    /// <param name="Pauses">Every pause point in the reading list, in reading order.</param>
     public sealed record StatusDto(string State, VoiceDto? Voice, int Rate, int Volume, SessionSummary? ActiveSession,
-        IReadOnlyList<QueuedSession> Queued, WindowDto Window, int ApiVersion);
+        IReadOnlyList<QueuedSession> Queued, WindowDto Window, int ApiVersion,
+        PausedAtDto? PausedAt = null, IReadOnlyList<PauseDto>? Pauses = null, bool PlayAll = false);
+
+    /// <param name="Number">Position among the session's pause points, starting at 1.</param>
+    public sealed record PausedAtDto(string SessionId, string PauseId, string? Label, int Number, int Of);
+
+    /// <param name="State">pending, waiting (reading is stopped here) or answered.</param>
+    public sealed record PauseDto(string SessionId, string Id, string? Label, string State);
 
     /// <param name="Decision">Only with an agent: speaking, waiting, skipped or denied. Waiting text has no session yet (SessionId is empty).</param>
     public sealed record SpeakResponse(string SessionId, int Revision, string State, int QueuePosition, bool Skipped,
