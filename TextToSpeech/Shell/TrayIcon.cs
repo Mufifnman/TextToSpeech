@@ -41,6 +41,7 @@ namespace TextToSpeech.Shell
             startupItem.Click += (_, _) => actions.SetStartWithWindows(startupItem.IsChecked);
             menu.Items.Add(startupItem);
             menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Open log folder", OpenLogFolder));
             menu.Items.Add(Item("Exit", actions.Exit));
 
             icon = new TaskbarIcon
@@ -51,6 +52,21 @@ namespace TextToSpeech.Shell
             };
             icon.TrayLeftMouseUp += (_, _) => actions.ShowWindow();
             icon.ForceCreate();
+        }
+
+        /// <summary>Shows the folder with app.log in Explorer (created first so it always opens).</summary>
+        private static void OpenLogFolder()
+        {
+            try
+            {
+                string folder = global::TextToSpeech.Core.Diagnostics.AppLog.Folder;
+                System.IO.Directory.CreateDirectory(folder);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                global::TextToSpeech.Core.Diagnostics.AppLog.Warn("Could not open the log folder", ex);
+            }
         }
 
         private static MenuItem Item(string header, Action action)
