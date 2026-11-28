@@ -27,6 +27,12 @@ namespace TextToSpeech.Api.Arbitration
         /// <summary>Bring the reading agent's window to the front when its turn starts. Off by default (acts on the user's screen).</summary>
         public bool BringToFront { get; init; }
 
+        /// <summary>Waiting text older than this many minutes is dropped. 0 turns auto-expire off. Default 240 (4 hours).</summary>
+        public int PendingExpiryMinutes { get; init; } = 240;
+
+        /// <summary>The user submitting a prompt in an agent's window drops that agent's waiting text (it is old by then).</summary>
+        public bool ExpireOnPrompt { get; init; } = true;
+
         /// <summary>Waiting reads kept per agent; the oldest are dropped past this.</summary>
         public int MaxPendingPerAgent { get; init; } = 5;
     }

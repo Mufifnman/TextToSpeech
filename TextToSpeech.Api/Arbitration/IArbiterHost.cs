@@ -10,6 +10,9 @@ namespace TextToSpeech.Api.Arbitration
         /// <summary>The user is in this agent's window (a client-side signal such as a prompt being submitted).</summary>
         Task<ArbiterStatus> FocusAsync(AgentRef agent);
 
+        /// <summary>The user submitted a prompt in this agent's window: it is focused, and (by policy) its waiting text is dropped as stale.</summary>
+        Task<ArbiterStatus> PromptAsync(AgentRef agent);
+
         Task<PolicyResponse> GetPolicyAsync();
 
         /// <summary>Silences agents for some minutes. Agents may only make the policy stricter, never looser.</summary>

@@ -91,6 +91,7 @@ export const api = {
   mute: (minutes, o) => call('POST', '/v1/policy/mute', { minutes }, o),
   agents: (o) => call('GET', '/v1/agents', undefined, o),
   registerAgent: (agent, o) => call('POST', '/v1/agents', agent, o),
+  promptAgent: (agent, o) => call('POST', '/v1/agents/prompt', agent, o),
   focusAgent: (agent, o) => call('POST', '/v1/agents/focus', agent, o),
   unregisterAgent: (id, o) => call('DELETE', `/v1/agents/${encodeURIComponent(id)}`, undefined, o),
   control: (action, o) => call('POST', `/v1/${action}`, undefined, o),

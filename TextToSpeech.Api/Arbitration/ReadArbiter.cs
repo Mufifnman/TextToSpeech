@@ -36,19 +36,22 @@ namespace TextToSpeech.Api.Arbitration
     {
         public static readonly TimeSpan AgentTtl = TimeSpan.FromHours(6);
 
-        /// <summary>Waiting text older than this is dropped: stale news is worse than none.</summary>
-        public static readonly TimeSpan PendingTtl = TimeSpan.FromMinutes(30);
+        /// <summary>Default for how long waiting text is kept before it is dropped as stale.</summary>
+        public static readonly TimeSpan DefaultPendingTtl = TimeSpan.FromHours(4);
 
         private readonly Func<DateTimeOffset> clock;
         private readonly Func<bool> isBusy;
         private readonly Action<AgentRecord, string, string> speak;
+        private readonly Func<TimeSpan?> pendingTtl;
         private readonly Dictionary<string, AgentRecord> agents = new();
         private long seq;
 
         /// <param name="isBusy">True while anything is speaking or waiting in the reading list.</param>
         /// <param name="speak">Starts reading text for an agent: (agent, text, mode "queue" or "interrupt").</param>
-        public ReadArbiter(Func<bool> isBusy, Action<AgentRecord, string, string> speak, Func<DateTimeOffset>? clock = null)
+        /// <param name="pendingTtl">How long waiting text is kept; null means for ever. Default 4 hours.</param>
+        public ReadArbiter(Func<bool> isBusy, Action<AgentRecord, string, string> speak, Func<DateTimeOffset>? clock = null, Func<TimeSpan?>? pendingTtl = null)
         {
+            this.pendingTtl = pendingTtl ?? (() => DefaultPendingTtl);
             this.isBusy = isBusy;
             this.speak = speak;
             this.clock = clock ?? (() => DateTimeOffset.UtcNow);
@@ -187,10 +190,15 @@ namespace TextToSpeech.Api.Arbitration
 
         private void DropExpired()
         {
+            var ttl = pendingTtl();
+            if (ttl == null)
+            {
+                return;
+            }
             var now = clock();
             foreach (var a in agents.Values)
             {
-                a.Pending.RemoveAll(p => now - p.Added > PendingTtl);
+                a.Pending.RemoveAll(p => now - p.Added > ttl.Value);
             }
         }
 

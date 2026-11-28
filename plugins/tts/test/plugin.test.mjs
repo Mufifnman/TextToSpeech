@@ -130,11 +130,11 @@ test('hook exits 0 when the app is not running', async () => {
   assert.equal(code, 0);
 });
 
-test('focus hook tells the app which window the user is in', async () => {
+test('prompt hook tells the app which window the user typed in', async () => {
   await withServer(async (url, seen, urls) => {
     const code = await runScript('hooks/focus.mjs', E(url), JSON.stringify({ cwd: '/work/proj' }));
     assert.equal(code, 0);
-    assert.deepEqual(urls, ['POST /v1/agents/focus']);
+    assert.deepEqual(urls, ['POST /v1/agents/prompt']);
     assert.equal(seen[0].label, 'proj');
   });
   const code = await runScript('hooks/focus.mjs', E('http://127.0.0.1:1'), '{}');

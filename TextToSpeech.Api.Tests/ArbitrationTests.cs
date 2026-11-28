@@ -264,9 +264,24 @@ namespace TextToSpeech.Api.Tests
         {
             arb.Submit(A("a"), "a1", "queue", 5);
             arb.Submit(A("b"), "b1", "queue", 5);
-            now += ReadArbiter.PendingTtl + TimeSpan.FromMinutes(1);
+            now += TimeSpan.FromHours(3);
+            Assert.Single(arb.WaitingOrder()); // the default is 4 hours
+            now += TimeSpan.FromHours(2);
             Assert.Empty(arb.WaitingOrder());
             Assert.Null(arb.OnReadingFinished());
+        }
+
+        [Fact]
+        public void Auto_expire_can_be_turned_off_or_changed()
+        {
+            TimeSpan? ttl = null;
+            var a2 = new ReadArbiter(() => true, (_, _, _) => { }, () => now, () => ttl);
+            a2.Submit(A("a"), "a1", "queue", 5);
+            a2.Submit(A("b"), "b1", "queue", 5);
+            now += TimeSpan.FromDays(30);
+            Assert.Single(a2.WaitingOrder()); // never expires
+            ttl = TimeSpan.FromMinutes(10);
+            Assert.Empty(a2.WaitingOrder());
         }
 
         [Fact]
@@ -418,6 +433,30 @@ namespace TextToSpeech.Api.Tests
         }
 
         [Fact]
+        public async Task Prompt_in_a_window_drops_its_waiting_text_and_focuses_it()
+        {
+            await host.SpeakAsync(Req("a", "one"));
+            busy = true;
+            await host.SpeakAsync(Req("b", "two"));
+            var s = await host.PromptAsync(new AgentRef("b", null, null, null, null));
+            Assert.Equal("b", s.FocusedId);
+            Assert.Equal(0, s.Agents.Single(x => x.Id == "b").Waiting);
+            host.OnReadingFinished();
+            Assert.Single(inner.Calls);
+        }
+
+        [Fact]
+        public async Task Prompt_keeps_waiting_text_when_the_setting_is_off()
+        {
+            policy = new ReadPolicy { ExpireOnPrompt = false };
+            await host.SpeakAsync(Req("a", "one"));
+            busy = true;
+            await host.SpeakAsync(Req("b", "two"));
+            await host.PromptAsync(new AgentRef("b", null, null, null, null));
+            Assert.Equal(1, (await host.GetArbiterAsync()).Agents.Single(x => x.Id == "b").Waiting);
+        }
+
+        [Fact]
         public async Task Mute_ends()
         {
             await host.MuteAsync(5);
@@ -509,6 +548,7 @@ namespace TextToSpeech.Api.Tests
         {
             Assert.Equal(200, (await Send("POST", "/v1/agents", "{\"id\":\"s1\",\"label\":\"proj\",\"pid\":42}")).Status);
             Assert.Equal(200, (await Send("POST", "/v1/agents/focus", "{\"id\":\"s1\"}")).Status);
+            Assert.Equal(200, (await Send("POST", "/v1/agents/prompt", "{\"id\":\"s1\"}")).Status);
             var list = await Send("GET", "/v1/agents");
             Assert.Contains("\"focusedId\":\"s1\"", list.Json);
             Assert.Equal(200, (await Send("DELETE", "/v1/agents/s1")).Status);

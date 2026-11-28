@@ -162,6 +162,11 @@ namespace TextToSpeech.Api
                 Expect(method, "POST");
                 return Ok(await arb.RegisterAsync(ValidateAgent(Body<AgentRef>(request))));
             }
+            if (parts.Length == 3 && parts[2] == "prompt")
+            {
+                Expect(method, "POST");
+                return Ok(await arb.PromptAsync(ValidateAgent(Body<AgentRef>(request))));
+            }
             if (parts.Length == 3 && parts[2] == "focus")
             {
                 Expect(method, "POST");

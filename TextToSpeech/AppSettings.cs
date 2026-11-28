@@ -95,6 +95,12 @@ namespace TextToSpeech
         /// <summary>Bring the reading agent's window to the front when its turn starts. Off: nothing on screen is moved.</summary>
         public bool AgentBringToFront { get; set; } = false;
 
+        /// <summary>Waiting agent text older than this many minutes is dropped; 0 never. Default 4 hours.</summary>
+        public int AgentPendingExpiryMinutes { get; set; } = 240;
+
+        /// <summary>Typing a prompt in an agent's window drops the text that was waiting for it.</summary>
+        public bool AgentExpireOnPrompt { get; set; } = true;
+
         public TextToSpeech.Api.Arbitration.ReadPolicy ToReadPolicy() => new()
         {
             Enabled = AgentReadingEnabled,
@@ -104,6 +110,8 @@ namespace TextToSpeech
             QuietTo = string.IsNullOrWhiteSpace(AgentQuietTo) ? null : AgentQuietTo,
             FocusMode = AgentFocusMode is "off" or "now" ? AgentFocusMode : "next",
             BringToFront = AgentBringToFront,
+            PendingExpiryMinutes = Math.Clamp(AgentPendingExpiryMinutes, 0, 10080),
+            ExpireOnPrompt = AgentExpireOnPrompt,
         };
 
         /// <summary>The one-time "still running in the tray" hint has been shown.</summary>

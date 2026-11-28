@@ -74,19 +74,6 @@ namespace TextToSpeech
             autoClearSlider.IsEnabled = autoClearBox.IsChecked == true;
             autoClearBox.Click += (_, _) => Changed();
             autoClearSlider.ValueChanged += (_, _) => Changed();
-            agentEnabledBox.IsChecked = settings.AgentReadingEnabled;
-            agentHeadphonesBox.IsChecked = settings.AgentRequireHeadphones;
-            agentFrontBox.IsChecked = settings.AgentBringToFront;
-            agentQuietFromBox.Text = settings.AgentQuietFrom;
-            agentQuietToBox.Text = settings.AgentQuietTo;
-            foreach (var item in AutoReadChoices) agentAutoReadBox.Items.Add(item.Label);
-            foreach (var item in FocusChoices) agentFocusBox.Items.Add(item.Label);
-            agentAutoReadBox.SelectedIndex = Math.Max(0, Array.FindIndex(AutoReadChoices, c => c.Value == settings.AgentAutoRead));
-            agentFocusBox.SelectedIndex = Math.Max(0, Array.FindIndex(FocusChoices, c => c.Value == settings.AgentFocusMode));
-            foreach (CheckBox box in new[] { agentEnabledBox, agentHeadphonesBox, agentFrontBox }) box.Click += (_, _) => Changed();
-            foreach (TextBox box in new[] { agentQuietFromBox, agentQuietToBox }) box.LostFocus += (_, _) => Changed();
-            agentAutoReadBox.SelectionChanged += (_, _) => Changed();
-            agentFocusBox.SelectionChanged += (_, _) => Changed();
             BuildOcrMenu();
             opacitySlider.ValueChanged += (_, _) => Changed();
             autoShowBox.Click += (_, _) => Changed();
@@ -98,7 +85,7 @@ namespace TextToSpeech
             ShowConflicts();
 
             // Sections that take more than a line are collapsible; the open ones are remembered.
-            foreach (Expander section in new[] { shellExpander, popupExpander, opacityExpander, agentsExpander, hotkeyExpander })
+            foreach (Expander section in new[] { shellExpander, popupExpander, opacityExpander, hotkeyExpander })
             {
                 section.IsExpanded = settings.ExpandedSections.Contains((string)section.Tag);
                 section.Expanded += (_, _) => RememberSection(section, true);
@@ -107,19 +94,7 @@ namespace TextToSpeech
             loading = false;
         }
 
-        private static readonly (string Value, string Label)[] AutoReadChoices =
-        {
-            ("off", "Off"),
-            ("announce", "Say that it finished"),
-            ("reply", "Read the reply"),
-        };
-
-        private static readonly (string Value, string Label)[] FocusChoices =
-        {
-            ("off", "Do nothing"),
-            ("next", "Read it next"),
-            ("now", "Read it now (interrupts)"),
-        };
+        private void AgentRules_Click(object sender, RoutedEventArgs e) => new AgentSettingsWindow(settings) { Owner = this }.ShowDialog();
 
         private void Changed()
         {
@@ -132,13 +107,6 @@ namespace TextToSpeech
             settings.PopupAutoHide = popupAutoHideBox.IsChecked == true;
             settings.PopupKeepOpenWhenPaused = popupKeepBox.IsChecked == true;
             settings.ApiEnabled = apiBox.IsChecked == true;
-            settings.AgentReadingEnabled = agentEnabledBox.IsChecked == true;
-            settings.AgentRequireHeadphones = agentHeadphonesBox.IsChecked == true;
-            settings.AgentBringToFront = agentFrontBox.IsChecked == true;
-            settings.AgentQuietFrom = agentQuietFromBox.Text.Trim();
-            settings.AgentQuietTo = agentQuietToBox.Text.Trim();
-            if (agentAutoReadBox.SelectedIndex >= 0) settings.AgentAutoRead = AutoReadChoices[agentAutoReadBox.SelectedIndex].Value;
-            if (agentFocusBox.SelectedIndex >= 0) settings.AgentFocusMode = FocusChoices[agentFocusBox.SelectedIndex].Value;
             popupAutoHideBox.IsEnabled = popupKeepBox.IsEnabled = popupUnfocusedBox.IsEnabled = showPopupBox.IsChecked == true;
             settings.SentenceGapMs = (int)Math.Round(gapSlider.Value);
             gapText.Text = settings.SentenceGapMs + " ms";

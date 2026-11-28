@@ -21,7 +21,8 @@ namespace TextToSpeech.Api.Arbitration
             this.inner = inner;
             this.probe = probe;
             this.policy = policy;
-            arbiter = new ReadArbiter(isBusy ?? (() => DefaultBusy()), SpeakFor, () => probe.Now);
+            arbiter = new ReadArbiter(isBusy ?? (() => DefaultBusy()), SpeakFor, () => probe.Now,
+                () => policy().PendingExpiryMinutes > 0 ? TimeSpan.FromMinutes(policy().PendingExpiryMinutes) : null);
         }
 
         public ReadArbiter Arbiter => arbiter;
@@ -118,6 +119,18 @@ namespace TextToSpeech.Api.Arbitration
         public Task<ArbiterStatus> FocusAsync(AgentRef agent)
         {
             arbiter.Upsert(agent);
+            lastFocusSeen = agent.Id;
+            arbiter.NotifyFocus(agent.Id, policy().FocusMode);
+            return Task.FromResult(Snapshot());
+        }
+
+        public Task<ArbiterStatus> PromptAsync(AgentRef agent)
+        {
+            arbiter.Upsert(agent);
+            if (policy().ExpireOnPrompt)
+            {
+                arbiter.ClearPending(agent.Id); // the user is typing here now: whatever was waiting is old
+            }
             lastFocusSeen = agent.Id;
             arbiter.NotifyFocus(agent.Id, policy().FocusMode);
             return Task.FromResult(Snapshot());
