@@ -89,6 +89,7 @@
         </DockPanel>
 
         <CheckBox x:Name="chunkBox" Content="Split long sentences at commas (neural voices)" Margin="0,0,0,14"
+                  AutomationProperties.Name="Split long sentences at commas"
                   ToolTip="Long sentences are generated in pieces, so speech starts sooner and there is no gap before a long sentence. Turn off if the joins at commas sound wrong."/>
 
         <CheckBox x:Name="autoClearBox" Content="Auto clear" Margin="0,0,0,6"

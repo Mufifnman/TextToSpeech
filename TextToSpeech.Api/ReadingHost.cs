@@ -38,6 +38,12 @@ namespace TextToSpeech.Api
         /// <summary>Only the first sentences of a hint are prepared, which keeps the work and memory small.</summary>
         public const int MaxHintSentences = 8;
 
+        /// <summary>Only the start of a hint's text is looked at (a hint is for the next few sentences).</summary>
+        public const int MaxHintChars = 5000;
+
+        /// <summary>At most this many callers have a hint at once; a new caller beyond that pushes out the one that expires first.</summary>
+        public const int MaxHintCallers = 8;
+
         private readonly Func<DateTimeOffset> now;
         private readonly Dictionary<string, Hint> hints = new();
         private int hintsSent, hintsConfirmed, hintsReplaced, hintsCancelled, hintsTimedOut;
@@ -116,13 +122,27 @@ namespace TextToSpeech.Api
         {
             Tick();
             string text = request.ApplyFilters == true ? app.ApplyFilters(request.Text!) : request.Text!;
-            var texts = SpokenSentences(text).Take(MaxHintSentences).ToList();
+            bool cut = text.Length > MaxHintChars;
+            var sentences = SpokenSentences(cut ? text.Substring(0, MaxHintChars) : text);
+            if (cut && sentences.Count > 1)
+            {
+                sentences = sentences.Take(sentences.Count - 1).ToList();   // the last one may have been cut in the middle
+            }
+            var texts = sentences.Take(MaxHintSentences).ToList();
             if (texts.Count == 0)
             {
                 throw ApiException.BadRequest("There is no speakable text in the request.", "no_speakable_text");
             }
             string key = HintKey(request.Agent?.Id);
             if (hints.TryGetValue(key, out var old) && !old.Confirmed) hintsReplaced++;   // replaced by this newer hint
+            if (!hints.ContainsKey(key) && hints.Count >= MaxHintCallers)
+            {
+                // Too many callers: the hint that would expire first goes (used ones before active ones).
+                var (evictKey, evicted) = hints.OrderByDescending(h => h.Value.Confirmed).ThenBy(h => h.Value.Expires).First();
+                hints.Remove(evictKey);
+                if (!evicted.Confirmed) hintsCancelled++;
+                reading.PrewarmHint(evictKey, Array.Empty<string>());
+            }
             hints[key] = new Hint { Texts = texts, Expires = now() + HintLife };
             hintsSent++;
             reading.PrewarmHint(key, texts);

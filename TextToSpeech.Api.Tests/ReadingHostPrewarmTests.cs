@@ -114,6 +114,32 @@ namespace TextToSpeech.Api.Tests
         }
 
         [Fact]
+        public async Task TooManyCallers_PushOutTheHintThatExpiresFirst()
+        {
+            for (int i = 0; i < ReadingHost.MaxHintCallers; i++)
+            {
+                await Hint($"Text from caller {i}.", "w" + i);
+                rig.Now += TimeSpan.FromSeconds(1);
+            }
+            var response = await Hint("One caller too many.", "extra");
+
+            Assert.Equal(ReadingHost.MaxHintCallers, response.Hints.Count);
+            Assert.DoesNotContain(response.Hints, h => h.Key == "w0");   // the oldest went
+            Assert.Contains(response.Hints, h => h.Key == "extra");
+            Assert.Equal(1, response.Stats.Cancelled);
+            Assert.Empty(rig.Engine.Hints.Where(h => h.Key == "w0").Last().Texts);   // and its audio was withdrawn
+        }
+
+        [Fact]
+        public async Task AVeryLongText_IsOnlyLookedAtAtTheStart()
+        {
+            var huge = string.Join(" ", Enumerable.Range(1, 5000).Select(i => $"Sentence number {i}."));
+            await Hint(huge);
+
+            Assert.Equal(ReadingHost.MaxHintSentences, rig.Engine.Hints.Last().Texts.Length);
+        }
+
+        [Fact]
         public async Task AHintWithNothingToSay_IsRejected()
         {
             var e = await Assert.ThrowsAsync<ApiException>(() => Hint("   "));
