@@ -75,7 +75,7 @@ Gaps:
 - The preferred port is fixed (47821) with a free-port fallback; fine, because `api.json` is the source of truth.
 
 ### 7. No logging
-There is no log of any kind (`catch (Exception) { }` appears in dozens of places, including the API request handler).
+There is no log of any kind (empty `catch` blocks appear in many places, including the API request handler).
 When something fails on Kevin's PC the only evidence is a status-line message. Add a tiny rolling file logger (Core
 interface, App implementation) before more background features (voice input, arbitration) make failures harder to see.
 
