@@ -48,7 +48,7 @@ export async function call(method, path, body, { env = process.env, fetchImpl = 
   try {
     res = await fetchImpl(baseUrl + path, {
       method,
-      headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      headers: { Authorization: `Bearer ${token}`, Connection: 'close', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (e) {
