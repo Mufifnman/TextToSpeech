@@ -60,6 +60,9 @@ namespace TextToSpeech
         /// <summary>Show markdown (lists, headings, code) laid out, with the markup neither shown nor spoken.</summary>
         public bool FormatMarkdown { get; set; } = true;
 
+        /// <summary>Show the original text with its markup symbols instead of the laid-out view. The popup's </> button flips it and remembers the choice.</summary>
+        public bool ShowRawText { get; set; } = false;
+
         /// <summary>Read through question pauses without stopping, from the start. Off: reading stops after each marked question until you continue.</summary>
         public bool PlayAllByDefault { get; set; } = false;
 

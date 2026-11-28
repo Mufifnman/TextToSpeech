@@ -61,6 +61,7 @@ namespace TextToSpeech
             document.ContentChanged += (_, _) => UpdatePlayAllButton();
             reading.PlayAll = settings.PlayAllByDefault;
             __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
             __ReadListDisplay__.LineClicked += (first, last) => reading.PlayRange(first, last);
             __ReadListDisplay__.ZoomRequested += step => SetMainTextSize(settings.MainTextSize + step);
             reading.SentenceStarting += OnSentenceStarting;
@@ -790,15 +791,16 @@ namespace TextToSpeech
 
         private void ClearList(object? sender = null, RoutedEventArgs? e = null) => reading.Clear();
 
-        private bool rawView;
+        private bool rawView => settings.ShowRawText;
 
         private bool HasFormatting() => document.Sentences.Any(s => s.Format != null);
 
         /// <summary>The popup's raw text button: flips between the laid-out view and the original text with its symbols.</summary>
         private void ToggleRawView()
         {
-            rawView = !rawView;
-            __ReadListDisplay__.ShowRaw = rawView;
+            settings.ShowRawText = !settings.ShowRawText;   // remembered between runs
+            settings.Save();
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
             RefreshPopup();
         }
 
@@ -983,6 +985,7 @@ namespace TextToSpeech
         {
             reading.GapMs = settings.SentenceGapMs;
             __ReadListDisplay__.TextSize = Math.Clamp(settings.MainTextSize, 10, 40);
+            __ReadListDisplay__.ShowRaw = settings.ShowRawText;
             Opacity = Math.Clamp(settings.WindowOpacity, 0.3, 1.0);
             double popup = Math.Clamp(settings.PopupOpacity, 0.3, 1.0);
             if (speedPopup.Child is UIElement speedPanel) speedPanel.Opacity = popup;
